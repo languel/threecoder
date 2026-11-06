@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baba Yaga's Winter Clearing</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #080d18;
+    }
+
+    #scene {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #scene:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 45%, transparent 42%, rgba(2, 5, 12, 0.2) 72%, rgba(2, 4, 10, 0.72) 100%),
+        linear-gradient(to bottom, rgba(2, 5, 12, 0.18), transparent 30%);
+      z-index: 2;
+    }
+
+    .title {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      z-index: 3;
+      color: #f4e9cf;
+      pointer-events: none;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 48px);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .title p {
+      margin: 7px 0 0;
+      color: #b9c8d5;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .controls {
+      position: fixed;
+      right: 24px;
+      bottom: 22px;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #d8e1ec;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+    }
+
+    .controls span {
+      padding: 9px 12px;
+      border: 1px solid rgba(220, 235, 245, 0.18);
+      border-radius: 999px;
+      background: rgba(8, 13, 24, 0.52);
+      backdrop-filter: blur(8px);
+    }
+
+    button {
+      border: 1px solid rgba(220, 235, 245, 0.25);
+      border-radius: 999px;
+      padding: 9px 14px;
+      color: #f1eadb;
+      background: rgba(28, 43, 59, 0.68);
+      font: inherit;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+
+    button:hover {
+      background: rgba(57, 83, 108, 0.8);
+    }
+
+    @media (max-width: 640px) {
+      .title {
+        top: 18px;
+        left: 20px;
+      }
+
+      .controls {
+        right: 14px;
+        bottom: 14px;
+        left: 14px;
+        justify-content: center;
+      }
+
+      .controls span {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="scene" aria-label="Interactive 3D winter scene inside a snowglobe"></canvas>
+  <div class="vignette"></div>
+
+  <header class="title">
+    <h1>Baba Yaga's Clearing</h1>
+    <p>Eastern folklore · dusk · snow</p>
+  </header>
+
+  <div class="controls">
+    <span>Drag to look · Scroll to zoom · Double-click to reset</span>
+    <button id="reset" type="button">Reset view</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const canvas = document.querySelector("#scene");
+    const resetButton = document.querySelector("#reset");
+
+    // ---------------------------------------------------------------------
+    // Renderer, scene, camera
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101928);
+    scene.fog = new THREE.FogExp2(0x172133, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(
+      43,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+
+    const cameraTarget = new THREE.Vector3(0, 2.1, -0.7);
+
+    let targetTheta = 0.67;
+    let targetPhi = 1.08;
+    let targetRadius = 16.2;
+
+    let theta = targetTheta;
+    let phi = targetPhi;
+    let radius = targetRadius;
+
+    function updateCamera() {
+      const sinPhi = Math.sin(phi);
+
+      camera.position.set(
+        cameraTarget.x + radius * sinPhi * Math.sin(theta),
+        cameraTarget.y + radius * Math.cos(phi),
+        cameraTarget.z + radius * sinPhi * Math.cos(theta)
+      );
+
+      camera.lookAt(cameraTarget);
+    }
+
+    updateCamera();
+
+    // ---------------------------------------------------------------------
+    // Lighting
+    // ---------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x8aa9d6, 0x2b1d18, 1.35));
+
+    const moonLight = new THREE.DirectionalLight(0xa7c9ff, 2.2);
+    moonLight.position.set(-8, 13, 7);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.set(2048, 2048);
+    moonLight.shadow.camera.left = -13;
+    moonLight.shadow.camera.right = 13;
+    moonLight.shadow.camera.top = 13;
+    moonLight.shadow.camera.bottom = -13;
+    moonLight.shadow.camera.near = 1;
+    moonLight.shadow.camera.far = 35;
+    moonLight.shadow.bias = -0.0004;
+    scene.add(moonLight);
+
+    const warmLight = new THREE.PointLight(0xff7b27, 5, 5, 2);
+    warmLight.position.set(0.95, 6.2, -0.2);
+    scene.add(warmLight);
+
+    const blueGlow = new THREE.PointLight(0x6c8dff, 2.5, 12, 2);
+    blueGlow.position.set(-4, 4, 4);
+    scene.add(blueGlow);
+
+    // ---------------------------------------------------------------------
+    // Materials and helpers
+    // ---------------------------------------------------------------------
+
+    const materials = {
+      snow: new THREE.MeshStandardMaterial({
+        color: 0xe9f2f5,
+        roughness: 0.95
+      }),
+      darkSnow: new THREE.MeshStandardMaterial({
+        color: 0xb9c9d1,
+        roughness: 1
+      }),
+      trunk: new THREE.MeshStandardMaterial({
+        color: 0x34251d,
+        roughness: 1
+      }),
+      roof: new THREE.MeshStandardMaterial({
+        color: 0x302d38,
+        roughness: 0.92
+      }),
+      wood: new THREE.MeshStandardMaterial({
+        color: 0x5b3825,
+        roughness: 0.9
+      }),
+      darkWood: new THREE.MeshStandardMaterial({
+        color: 0x241713,
+        roughness: 0.95
+      }),
+      iron: new THREE.MeshStandardMaterial({
+        color: 0x262b30,
+        metalness: 0.65,
+        roughness: 0.5
+      }),
+      glass: new THREE.MeshPhysicalMaterial({
+        color: 0xc6e5f2,
+        transparent: true,
+        opacity: 0.12,
+        roughness: 0.12,
+        metalness: 0,
+        transmission: 0.18,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      }),
+      window: new THREE.MeshStandardMaterial({
+        color: 0xffb34d,
+        emissive: 0xff6b1a,
+        emissiveIntensity: 2.2,
+        roughness: 0.45
+      }),
+      fox: new THREE.MeshStandardMaterial({
+        color: 0xd86b28,
+        roughness: 0.85
+      }),
+      foxLight: new THREE.MeshStandardMaterial({
+        color: 0xf0c48a,
+        roughness: 0.8
+      }),
+      foxDark: new THREE.MeshStandardMaterial({
+        color: 0x6e2f16,
+        roughness: 0.9
+      }),
+      black: new THREE.MeshStandardMaterial({
+        color: 0x111419,
+        roughness: 0.72
+      }),
+      owl: new THREE.MeshStandardMaterial({
+        color: 0x40342b,
+        roughness: 0.95
+      }),
+      owlWing: new THREE.MeshStandardMaterial({
+        color: 0x282421,
+        roughness: 1
+      }),
+      raven: new THREE.MeshStandardMaterial({
+        color: 0x101419,
+        roughness: 0.65,
+        metalness: 0.08
+      }),
+      leaf: new THREE.MeshStandardMaterial({
+        color: 0x172a28,
+        roughness: 1
+      }),
+      broom: new THREE.MeshStandardMaterial({
+        color: 0x9a7135,
+        roughness: 1
+      })
+    };
+
+    function mesh(geometry, material, position, scale, parent = scene) {
+      const object = new THREE.Mesh(geometry, material);
+      if (position) object.position.set(...position);
+      if (scale) object.scale.set(...scale);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function beam(start, end, radius, material, parent = scene) {
+      const a = new THREE.Vector3(...start);
+      const b = new THREE.Vector3(...end);
+      const direction = b.clone().sub(a);
+      const length = direction.length();
+
+      const object = mesh(
+        new THREE.CylinderGeometry(radius, radius, length, 8),
+        material,
+        a.clone().add(b).multiplyScalar(0.5).toArray(),
+        null,
+        parent
+      );
+
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      return object;
+    }
+
+    // ---------------------------------------------------------------------
+    // Snowy clearing and distant forest
+    // ---------------------------------------------------------------------
+
+    const ground = mesh(
+      new THREE.PlaneGeometry(42, 42),
+      materials.darkSnow,
+      [0, -0.04, 0]
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.castShadow = false;
+
+    const clearing = mesh(
+      new THREE.CircleGeometry(7.4, 64),
+      materials.snow,
+      [0, 0.015, -0.5]
+    );
+    clearing.rotation.x = -Math.PI / 2;
+    clearing.scale.set(1.25, 1, 1);
+    clearing.castShadow = false;
+
+    // Soft snowdrifts.
+    [
+      [-5.7, 0.18, 3.2, 1.5, 0.35, 1.1],
+      [4.8, 0.12, 3.8, 1.2, 0.28, 0.9],
+      [-3.2, 0.1, -4.8, 1.8, 0.3, 1.1],
+      [5.2, 0.1, -4.4, 1.5, 0.26, 1.0],
+      [0.2, 0.12, 5.2, 2.0, 0.25, 1.2]
+    ].forEach(([x, y, z, sx, sy, sz]) => {
+      const mound = mesh(
+        new THREE.SphereGeometry(1, 18, 10),
+        materials.snow,
+        [x, y, z]
+      );
+      mound.scale.set(sx, sy, sz);
+      mound.castShadow = false;
+    });
+
+    function createTree(x, z, scale = 1) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(scale);
+      scene.add(tree);
+
+      beam([0, 0, 0], [0, 3.2, 0], 0.22, materials.trunk, tree);
+
+      const layers = [
+        [0, 2.0, 0, 1.35, 0x263b38],
+        [0, 2.8, 0, 1.05, 0x203533],
+        [0, 3.55, 0, 0.72, 0x172c2b]
+      ];
+
+      layers.forEach(([lx, ly, lz, radius, material]) => {
+        mesh(
+          new THREE.ConeGeometry(radius, 2.15, 8),
+          material,
+          [lx, ly, lz],
+          null,
+          tree
+        );
+      });
+
+      return tree;
+    }
+
+    [
+      [-8.5, -8.5, 1.15],
+      [-6.8, -11.2, 1.35],
+      [-3.8, -12.5, 1.0],
+      [0.5, -13.5, 1.25],
+      [4.2, -11.8, 1.4],
+      [7.2, -8.7, 1.1],
+      [-10.2, -3.8, 1.3],
+      [10.4, -4.6, 1.5],
+      [8.8, 5.8, 1.15],
+      [-8.8, 6.4, 1.25]
+    ].forEach(([x, z, scale]) => createTree(x, z, scale));
+
+    // Moon.
+    const moon = mesh(
+      new THREE.SphereGeometry(1.35, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xdce9f2 }),
+      [-8.5, 10.5, -15]
+    );
+    moon.castShadow = false;
+
+    // ---------------------------------------------------------------------
+    // Baba Yaga's hut
+    // ---------------------------------------------------------------------
+
+    const hut = new THREE.Group();
+    hut.position.set(-3.1, 0, -4.2);
+    scene.add(hut);
+
+    // Stilts and braces.
+    const legPositions = [
+      [-1.25, -0.95],
+      [1.25, -0.95],
+      [-1.25, 0.95],
+      [1.25, 0.95]
+    ];
+
+    legPositions.forEach(([x, z]) => {
+      beam([x, 0.05, z], [x * 0.82, 2.55, z], 0.13, materials.trunk, hut);
+    });
+
+    beam([-1.25, 1.0, -0.95], [1.25, 2.15, -0.95], 0.08, materials.wood, hut);
+    beam([-1.25, 1.0, 0.95], [1.25, 2.15, 0.95], 0.08, materials.wood, hut);
+    beam([-1.25, 1.8, -0.95], [-1.25, 2.55, 0.95], 0.08, materials.wood, hut);
+    beam([1.25, 1.8, -0.95], [1.25, 2.55, 0.95], 0.08, materials.wood, hut);
+
+    mesh(
+      new THREE.BoxGeometry(4.25, 0.25, 3.15),
+      materials.wood,
+      [0, 2.55, 0],
+      null,
+      hut
+    );
+
+    // Crooked hut body.
+    const hutBody = mesh(
+      new THREE.BoxGeometry(3.2, 2.55, 2.85),
+      materials.wood,
+      [0, 4.15, 0],
+      null,
+      hut
+    );
+    hutBody.rotation.z = -0.035;
+
+    // Gable roof.
+    const roofShape = new THREE.Shape();
+    roofShape.moveTo(-1.85, 0);
+    roofShape.lineTo(0, 1.55);
+    roofShape.lineTo(1.85, 0);
+    roofShape.closePath();
+
+    const roofGeometry = new THREE.ExtrudeGeometry(roofShape, {
+      depth: 3.05,
+      bevelEnabled: false,
+      steps: 1
+    });
+
+    mesh(
+      roofGeometry,
+      materials.roof,
+      [0, 5.5, -1.525],
+      null,
+      hut
+    );
+
+    // Roof trim.
+    beam([-1.85, 5.5, -1.53], [0, 7.05, -1.53], 0.055, materials.iron, hut);
+    beam([0, 7.05, -1.53], [1.85, 5.5, -1.53], 0.055, materials.iron, hut);
+    beam([-1.85, 5.5, 1.53], [0, 7.05, 1.53], 0.055, materials.iron, hut);
+    beam([0, 7.05, 1.53], [1.85, 5.5, 1.53], 0.055, materials.iron, hut);
+
+    // Front door.
+    const door = mesh(
+      new THREE.BoxGeometry(0.82, 1.75, 0.14),
+      materials.darkWood,
+      [0.25, 3.65, 1.48],
+      null,
+      hut
+    );
+    door.rotation.z = -0.05;
+
+    mesh(
+      new THREE.SphereGeometry(0.075, 12, 8),
+      materials.iron,
+      [0.25, 3.65, 1.57],
+      null,
+      hut
+    );
+
+    // Front window.
+    mesh(
+      new THREE.BoxGeometry(0.78, 0.9, 0.14),
+      materials.darkWood,
+      [-0.7, 4.65, 1.48],
+      null,
+      hut
+    );
+
+    mesh(
+      new THREE.BoxGeometry(0.58, 0.68, 0.08),
+      materials.window,
+      [-0.7, 4.65, 1.58],
+      null,
+      hut
+    );
+
+    mesh(
+      new THREE.BoxGeometry(0.055, 0.68, 0.08),
+      materials.iron,
+      [-0.7, 4.65, 1.64],
+      null,
+      hut
+    );
+
+    mesh(
+      new THREE.BoxGeometry(0.58, 0.055, 0.08),
+      materials.iron,
+      [-0.7, 4.65, 1.64],
+      null,
+      hut
+    );
+
+    // Side window.
+    mesh(
+      new THREE.BoxGeometry(0.14, 0.85, 0.72),
+      materials.darkWood,
+      [1.66, 4.25, -0.05],
+      null,
+      hut
+    );
+
+    mesh(
+      new THREE.BoxGeometry(0.08, 0.63, 0.5),
+      materials.window,
+      [1.75, 4.25, -0.05],
+      null,
+      hut
+    );
+
+    // Chimney.
+    const chimney = mesh(
+      new THREE.BoxGeometry(0.7, 2.35, 0.7),
+      materials.darkWood,
+      [0.85, 7.0, -0.2],
+      null,
+      hut
+    );
+
+    mesh(
+      new THREE.BoxGeometry(0.9, 0.16, 0.9),
+      materials.iron,
+      [0.85, 8.18, -0.2],
+      null,
+      hut
+    );
+
+    // Baba Yaga's sign.
+    const signCanvas = document.createElement("canvas");
+    signCanvas.width = 512;
+    signCanvas.height = 256;
+    const signContext = signCanvas.getContext("2d");
+
+    signContext.fillStyle = "#492c20";
+    signContext.fillRect(0, 0, 512, 256);
+    signContext.strokeStyle = "#b18a55";
+    signContext.lineWidth = 12;
+    signContext.strokeRect(14, 14, 484, 228);
+    signContext.fillStyle = "#f0d29a";
+    signContext.textAlign = "center";
+    signContext.textBaseline = "middle";
+    signContext.font = "bold 70px Georgia";
+    signContext.fillText("БАБА-ЯГА", 256, 128);
+
+    const signTexture = new THREE.CanvasTexture(signCanvas);
+    signTexture.colorSpace = THREE.SRGBColorSpace;
+
+    const sign = mesh(
+      new THREE.PlaneGeometry(1.55, 0.78),
+      new THREE.MeshStandardMaterial({
+        map: signTexture,
+        roughness: 0.9
+      }),
+      [-0.95, 5.55, 1.56],
+      null,
+      hut
+    );
+
+    // Broom leaning against the hut.
+    const broom = new THREE.Group();
+    broom.position.set(1.8, 2.75, 1.1);
+    broom.rotation.z = -0.18;
+    hut.add(broom);
+
+    beam([0, 0, 0], [0.12, 2.2, 0.04], 0.045, materials.wood, broom);
+
+    const broomBristles = mesh(
+      new THREE.BoxGeometry(0.48, 0.85, 0.2),
+      materials.broom,
+      [0.12, 2.22, 0.04],
+      null,
+      broom
+    );
+    broomBristles.rotation.z = -0.12;
+
+    // Barrels.
+    function createBarrel(x, y, z, scale = 1) {
+      const barrel = new THREE.Group();
+      barrel.position.set(x, y, z);
+      barrel.scale.setScalar(scale);
+      hut.add(barrel);
+
+      mesh(
+        new THREE.CylinderGeometry(0.38, 0.34, 0.8, 12),
+        materials.wood,
+        [0, 0.4, 0],
+        null,
+        barrel
+      );
+
+      mesh(
+        new THREE.TorusGeometry(0.365, 0.035, 8, 18),
+        materials.iron,
+        [0, 0.2, 0],
+        null,
+        barrel
+      ).rotation.x = Math.PI / 2;
+
+      mesh(
+        new THREE.TorusGeometry(0.365, 0.035, 8, 18),
+        materials.iron,
+        [0, 0.6, 0],
+        null,
+        barrel
+      ).rotation.x = Math.PI / 2;
+    }
+
+    createBarrel(-1.75, 2.7, 1.25, 0.9);
+    createBarrel(1.8, 2.7, 1.35, 0.75);
+
+    // Small warm lantern beside the door.
+    const lantern = new THREE.Group();
+    lantern.position.set(-1.35, 3.05, 1.75);
+    hut.add(lantern);
+
+    mesh(
+      new THREE.SphereGeometry(0.16, 12, 8),
+      materials.window,
+      [0, 0, 0],
+      null,
+      lantern
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.22, 0.28, 4),
+      materials.iron,
+      [0, 0.28, 0],
+      null,
+      lantern
+    );
+
+    // ---------------------------------------------------------------------
+    // Fox
+    // ---------------------------------------------------------------------
+
+    const fox = new THREE.Group();
+    fox.position.set(-3.8, 0, 2.6);
+    fox.rotation.y = -0.18;
+    scene.add(fox);
+
+    const foxBody = mesh(
+      new THREE.SphereGeometry(0.7, 18, 12),
+      materials.fox,
+      [0, 1.05, 0],
+      [0.9, 1.25, 0.75],
+      fox
+    );
+
+    const foxHead = mesh(
+      new THREE.SphereGeometry(0.58, 18, 12),
+      materials.fox,
+      [0, 1.78, 0.34],
+      [0.95, 1.0, 0.85],
+      fox
+    );
+
+    const foxMuzzle = mesh(
+      new THREE.SphereGeometry(0.42, 16, 10),
+      materials.foxLight,
+      [0, 1.56, 0.73],
+      [0.85, 0.7, 0.65],
+      fox
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.19, 0.48, 4),
+      materials.fox,
+      [-0.27, 2.12, 0.36],
+      [0.8, 1, 0.8],
+      fox
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.19, 0.48, 4),
+      materials.fox,
+      [0.27, 2.12, 0.36],
+      [0.8, 1, 0.8],
+      fox
+    );
+
+    mesh(
+      new THREE.SphereGeometry(0.065, 12, 8),
+      materials.foxDark,
+      [0, 1.65, 0.91],
+      null,
+      fox
+    );
+
+    const foxEyeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffe3a2,
+      emissive: 0xffb83d,
+      emissiveIntensity: 0.8
+    });
+
+    mesh(
+      new THREE.SphereGeometry(0.065, 10, 8),
+      foxEyeMaterial,
+      [-0.17, 1.94, 0.68],
+      null,
+      fox
+    );
+
+    mesh(
+      new THREE.SphereGeometry(0.065, 10, 8),
+      foxEyeMaterial,
+      [0.17, 1.94, 0.68],
+      null,
+      fox
+    );
+
+    [-1, 1].forEach((side) => {
+      mesh(
+        new THREE.CylinderGeometry(0.075, 0.09, 0.55, 8),
+        materials.foxDark,
+        [side * 0.3, 0.36, 0.1],
+        null,
+        fox
+      );
+
+      mesh(
+        new THREE.SphereGeometry(0.11, 12, 8),
+        materials.foxLight,
+        [side * 0.25, 0.08, 0.38],
+        null,
+        fox
+      );
+    });
+
+    const foxTail = new THREE.Group();
+    foxTail.position.set(0, 0.75, -0.42);
+    fox.add(foxTail);
+
+    for (let i = 0; i < 5; i++) {
+      const tailPiece = mesh(
+        new THREE.SphereGeometry(0.27, 14, 10),
+        i % 2 === 0 ? materials.fox : materials.foxLight,
+        [0, -0.12 * i, -0.28 * i],
+        [0.75, 0.72, 0.65],
+        foxTail
+      );
+      tailPiece.rotation.z = -0.18;
+    }
+
+    // ---------------------------------------------------------------------
+    // Owl
+    // ---------------------------------------------------------------------
+
+    const owl = new THREE.Group();
+    owl.position.set(3.65, 1.45, 1.7);
+    owl.rotation.y = 0.25;
+    scene.add(owl);
+
+    mesh(
+      new THREE.SphereGeometry(0.62, 18, 12),
+      materials.owl,
+      [0, 0, 0],
+      [1.1, 1.25, 0.9],
+      owl
+    );
+
+    mesh(
+      new THREE.SphereGeometry(0.55, 18, 12),
+      materials.owl,
+      [0, 0.38, 0.03],
+      [1.1, 1.05, 0.9],
+      owl
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.12, 0.28, 4),
+      materials.owlWing,
+      [0, 0.63, 0.18],
+      null,
+      owl
+    );
+
+    const owlEyeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffd75c,
+      emissive: 0xffa51e,
+      emissiveIntensity: 1.8
+    });
+
+    mesh(
+      new THREE.SphereGeometry(0.115, 12, 8),
+      owlEyeMaterial,
+      [-0.2, 0.48, 0.43],
+      null,
+      owl
+    );
+
+    mesh(
+      new THREE.SphereGeometry(0.115, 12, 8),
+      owlEyeMaterial,
+      [0.2, 0.48, 0.43],
+      null,
+      owl
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.11, 0.23, 4),
+      materials.owlWing,
+      [0, 0.28, 0.56],
+      [0.8, 0.7, 0.7],
+      owl
+    );
+
+    // Perch branch.
+    beam(
+      [2.5, 0.25, 1.2],
+      [5.1, 0.25, 1.2],
+      0.11,
+      materials.trunk
+    );
+
+    const owlFoot = mesh(
+      new THREE.TorusGeometry(0.12, 0.035, 8, 14),
+      materials.iron,
+      [0, 0.05, 0.3],
+      null,
+      owl
+    );
+    owlFoot.rotation.x = Math.PI / 2;
+
+    // ---------------------------------------------------------------------
+    // Raven
+    // ---------------------------------------------------------------------
+
+    const raven = new THREE.Group();
+    raven.position.set(1.2, 3.05, -2.5);
+    raven.rotation.y = 0.35;
+    scene.add(raven);
+
+    const ravenBody = mesh(
+      new THREE.SphereGeometry(0.65, 18, 12),
+      materials.raven,
+      [0, 0, 0],
+      [0.9, 1.2, 0.8],
+      raven
+    );
+
+    const ravenHead = mesh(
+      new THREE.SphereGeometry(0.5, 18, 12),
+      materials.raven,
+      [0, 0.62, 0],
+      [1.0, 1.0, 0.85],
+      raven
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.13, 0.4, 4),
+      materials.raven,
+      [0, 0.96, 0],
+      null,
+      raven
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.12, 0.28, 4),
+      materials.raven,
+      [-0.24, 0.69, 0.03],
+      [0.8, 1, 0.8],
+      raven
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.12, 0.28, 4),
+      materials.raven,
+      [0.24, 0.69, 0.03],
+      [0.8, 1, 0.8],
+      raven
+    );
+
+    mesh(
+      new THREE.ConeGeometry(0.12, 0.24, 4),
+      materials.raven,
+      [0, 0.39, 0.39],
+      [0.8, 0.7, 0.7],
+      raven
+    );
+
+    const ravenBeak = mesh(
+      new THREE.ConeGeometry(0.11, 0.32, 4),
+      materials.iron,
+      [0, 0.43, 0.46],
+      [0.75, 0.7, 0.8],
+      raven
+    );
+    ravenBeak.rotation.x = -0.25;
+
+    const ravenWings = [
+      mesh(
+        new THREE.SphereGeometry(0.72, 16, 10),
+        materials.owlWing,
+        [-0.32, 0.05, -0.05],
+        [0.65, 0.95, 0.48],
+        raven
+      ),
+      mesh(
+        new THREE.SphereGeometry(0.72, 16, 10),
+        materials.owlWing,
+        [0.32, 0.05, -0.05],
+        [0.65, 0.95, 0.48],
+        raven
+      )
+    ];
+
+    // ---------------------------------------------------------------------
+    // Chimney smoke
+    // ---------------------------------------------------------------------
+
+    const smoke = [];
+
+    for (let i = 0; i < 14; i++) {
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xf0f4f3,
+        transparent: true,
+        opacity: 0,
+        roughness: 1,
+        depthWrite: false
+      });
+
+      const puff = mesh(
+        new THREE.SphereGeometry(0.28, 12, 8),
+        material,
+        [0.9, 8.2, -0.2],
+        null,
+        scene
+      );
+
+      puff.castShadow = false;
+      puff.receiveShadow = false;
+
+      smoke.push({
+        mesh: puff,
+        phase: i / 14,
+        speed: 0.11 + (i % 3) * 0.025,
+        drift: Math.sin(i * 2.3) * 0.25
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // Fireflies
+    // ---------------------------------------------------------------------
+
+    const fireflyCount = 24;
+    const fireflyPositions = new Float32Array(fireflyCount * 3);
+    const fireflyBase = [];
+
+    for (let i = 0; i < fireflyCount; i++) {
+      const x = (Math.random() - 0.5) * 10;
+      const y = 0.5 + Math.random() * 4.5;
+      const z = (Math.random() - 0.5) * 8;
+
+      fireflyBase.push({ x, y, z, phase: Math.random() * Math.PI * 2 });
+      fireflyPositions[i * 3] = x;
+      fireflyPositions[i * 3 + 1] = y;
+      fireflyPositions[i * 3 + 2] = z;
+    }
+
+    const fireflyGeometry = new THREE.BufferGeometry();
+    fireflyGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(fireflyPositions, 3)
+    );
+
+    const fireflyMaterial = new THREE.PointsMaterial({
+      color: 0xffd86b,
+      size: 0.11,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const fireflies = new THREE.Points(fireflyGeometry, fireflyMaterial);
+    scene.add(fireflies);
+
+    // ---------------------------------------------------------------------
+    // Falling snow
+    // ---------------------------------------------------------------------
+
+    const snowCount = 750;
+    const snowPositions = new Float32Array(snowCount * 3);
+    const snowData = [];
+
+    for (let i = 0; i < snowCount; i++) {
+      snowData.push({
+        x: (Math.random() - 0.5) * 22,
+        y: Math.random() * 13 - 5,
+        z: (Math.random() - 0.5) * 22,
+        speed: 0.35 + Math.random() * 0.65,
+        drift: (Math.random() - 0.5) * 0.12,
+        phase: Math.random() * Math.PI * 2
+      });
+
+      snowPositions[i * 3] = snowData[i].x;
+      snowPositions[i * 3 + 1] = snowData[i].y;
+      snowPositions[i * 3 + 2] = snowData[i].z;
+    }
+
+    const snowGeometry = new THREE.BufferGeometry();
+    snowGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(snowPositions, 3)
+    );
+
+    const snowMaterial = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.095,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+
+    const snow = new THREE.Points(snowGeometry, snowMaterial);
+    scene.add(snow);
+
+    // ---------------------------------------------------------------------
+    // Stars
+    // ---------------------------------------------------------------------
+
+    const starCount = 420;
+    const starPositions = new Float32Array(starCount * 3);
+
+    for (let i = 0; i < starCount; i++) {
+      const radius = 19 + Math.random() * 8;
+      const angle = Math.random() * Math.PI * 2;
+      const y = 5 + Math.random() * 13;
+
+      starPositions[i * 3] = Math.cos(angle) * radius;
+      starPositions[i * 3 + 1] = y;
+      starPositions[i * 3 + 2] = Math.sin(angle) * radius;
+    }
+
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(starPositions, 3)
+    );
+
+    const starMaterial = new THREE.PointsMaterial({
+      color: 0xe7efff,
+      size: 0.13,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+
+    // ---------------------------------------------------------------------
+    // Snowglobe frame and glass
+    // ---------------------------------------------------------------------
+
+    const globe = new THREE.Group();
+    globe.position.y = 0.35;
+    scene.add(globe);
+
+    const glass = mesh(
+      new THREE.SphereGeometry(8.1, 48, 32),
+      materials.glass,
+      [0, 0, 0],
+      null,
+      globe
+    );
+    glass.castShadow = false;
+    glass.receiveShadow = false;
+    glass.renderOrder = 4;
+
+    const base = mesh(
+      new THREE.CylinderGeometry(5.35, 5.65, 0.42, 64),
+      materials.darkSnow,
+      [0, -7.95, 0],
+      null,
+      scene
+    );
+
+    const baseTop = mesh(
+      new THREE.CylinderGeometry(5.25, 5.25, 0.12, 64),
+      materials.snow,
+      [0, -7.68, 0],
+      null,
+      scene
+    );
+
+    const rim = mesh(
+      new THREE.TorusGeometry(5.35, 0.11, 12, 80),
+      materials.iron,
+      [0, -7.72, 0],
+      null,
+      scene
+    );
+    rim.rotation.x = Math.PI / 2;
+
+    // ---------------------------------------------------------------------
+    // Custom orbit controls
+    // ---------------------------------------------------------------------
+
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const deltaX = event.clientX - previousX;
+      const deltaY = event.clientY - previousY;
+
+      previousX = event.clientX;
+      previousY = event.clientY;
+
+      targetTheta -= deltaX * 0.006;
+      targetPhi = THREE.MathUtils.clamp(
+        targetPhi - deltaY * 0.005,
+        0.28,
+        1.46
+      );
+    });
+
+    function endDrag(event) {
+      dragging = false;
+      if (event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        targetRadius = THREE.MathUtils.clamp(
+          targetRadius + event.deltaY * 0.012,
+          10.5,
+          23
+        );
+      },
+      { passive: false }
+    );
+
+    function resetView() {
+      targetTheta = 0.67;
+      targetPhi = 1.08;
+      targetRadius = 16.2;
+    }
+
+    canvas.addEventListener("dblclick", resetView);
+    resetButton.addEventListener("click", resetView);
+
+    // ---------------------------------------------------------------------
+    // Animation
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      // Smooth camera movement.
+      theta += (targetTheta - theta) * 0.075;
+      phi += (targetPhi - phi) * 0.075;
+      radius += (targetRadius - radius) * 0.075;
+      updateCamera();
+
+      // Fox movement.
+      fox.position.y = Math.sin(elapsed * 1.35) * 0.025;
+      foxTail.rotation.y = Math.sin(elapsed * 0.8) * 0.12;
+      foxHead.rotation.z = Math.sin(elapsed * 1.5) * 0.035;
+
+      // Raven perching and wing motion.
+      raven.position.y = 3.05 + Math.sin(elapsed * 1.1) * 0.035;
+      ravenWings[0].rotation.z = Math.sin(elapsed * 1.3) * 0.035;
+      ravenWings[1].rotation.z = -Math.sin(elapsed * 1.3) * 0.035;
+
+      // Owl blink.
+      const blink = Math.pow(
+        Math.max(0, Math.sin(elapsed * 2.1 - 0.5)),
+        8
+      );
+      owlEyeMaterial.emissiveIntensity = 0.25 + blink * 1.7;
+
+      // Chimney smoke.
+      smoke.forEach((puff, index) => {
+        const cycle = (elapsed * puff.speed + puff.phase) % 1;
+        const spread = 0.22 + cycle * 1.15;
+
+        puff.mesh.position.set(
+          0.95 + cycle * 1.25 + puff.drift * cycle,
+          8.25 + cycle * 4.2,
+          -0.2 + cycle * 0.55
+        );
+
+        puff.mesh.scale.setScalar(spread);
+        puff.mesh.material.opacity =
+          0.2 * Math.sin(Math.PI * cycle) * (1 - cycle * 0.25);
+      });
+
+      // Firefly movement.
+      const positionAttribute = fireflyGeometry.getAttribute("position");
+
+      for (let i = 0; i < fireflyCount; i++) {
+        const base = fireflyBase[i];
+
+        positionAttribute.setXYZ(
+          i,
+          base.x + Math.sin(elapsed * 0.65 + base.phase) * 0.35,
+          base.y + Math.sin(elapsed * 0.9 + base.phase) * 0.22,
+          base.z + Math.cos(elapsed * 0.55 + base.phase) * 0.25
+        );
+      }
+
+      positionAttribute.needsUpdate = true;
+      fireflyMaterial.opacity = 0.55 + Math.sin(elapsed * 1.4) * 0.25;
+
+      // Falling snow.
+      const snowAttribute = snowGeometry.getAttribute("position");
+
+      for (let i = 0; i < snowCount; i++) {
+        const particle = snowData[i];
+
+        snowAttribute.setXYZ(
+          i,
+          particle.x + particle.drift * elapsed,
+          particle.y - particle.speed * delta,
+          particle.z + Math.sin(elapsed * 0.3 + particle.phase) * 0.15
+        );
+
+        if (snowAttribute.getY(i) < -5.5) {
+          snowAttribute.setY(i, 8 + Math.random() * 3);
+          snowAttribute.setX(
+            i,
+            (Math.random() - 0.5) * 22
+          );
+          snowAttribute.setZ(
+            i,
+            (Math.random() - 0.5) * 22
+          );
+        }
+      }
+
+      snowAttribute.needsUpdate = true;
+      snowMaterial.opacity = 0.68 + Math.sin(elapsed * 0.8) * 0.12;
+
+      // Subtle moon and window flicker.
+      moonLight.intensity = 2.15 + Math.sin(elapsed * 0.6) * 0.08;
+      warmLight.intensity = 4.8 + Math.sin(elapsed * 7.3) * 0.25;
+      materials.window.emissiveIntensity =
+        2.15 + Math.sin(elapsed * 2.1) * 0.15;
+
+      stars.material.opacity = 0.68 + Math.sin(elapsed * 0.35) * 0.12;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // ---------------------------------------------------------------------
+    // Resize
+    // ---------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

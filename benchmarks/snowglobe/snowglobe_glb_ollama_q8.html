@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baba Yaga Winter Scene</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #091222;
+    }
+
+    #scene {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 10;
+      width: min(390px, calc(100vw - 44px));
+      padding: 20px 22px;
+      color: #eef8ff;
+      background:
+        linear-gradient(145deg, rgba(19, 35, 57, 0.88), rgba(8, 17, 31, 0.82));
+      border: 1px solid rgba(153, 211, 255, 0.2);
+      border-radius: 18px;
+      box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(16px);
+      user-select: none;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #91c9f5;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 7px;
+      height: 7px;
+      content: "";
+      background: #72e5ff;
+      border-radius: 50%;
+      box-shadow: 0 0 12px #72e5ff;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 36px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .description {
+      margin: 11px 0 17px;
+      color: #afc0d1;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-bottom: 18px;
+    }
+
+    .feature {
+      padding: 6px 9px;
+      color: #ccecf7;
+      background: rgba(113, 177, 224, 0.08);
+      border: 1px solid rgba(121, 194, 240, 0.13);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 47px;
+      padding: 0 18px;
+      color: #07121e;
+      background: linear-gradient(135deg, #b9ecff, #75c9f3);
+      border: 0;
+      border-radius: 12px;
+      box-shadow:
+        0 8px 24px rgba(65, 174, 229, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 850;
+      letter-spacing: 0.035em;
+      transition:
+        transform 160ms ease,
+        filter 160ms ease,
+        opacity 160ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      filter: brightness(1.07);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.58;
+    }
+
+    button svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    #status {
+      min-height: 18px;
+      margin-top: 10px;
+      color: #8fa6bd;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .hint {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 8px 12px;
+      color: rgba(213, 235, 250, 0.58);
+      background: rgba(7, 15, 27, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 999px;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 640px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 16px;
+      }
+
+      .description {
+        margin-bottom: 12px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <canvas id="scene"></canvas>
+
+  <section class="panel">
+    <div class="eyebrow">Low-poly animated asset</div>
+    <h1>Baba Yaga Winter</h1>
+    <p class="description">
+      A cozy snowy clearing with a timber hut, stone chimney, wildlife,
+      falling stars, and softly rising smoke.
+    </p>
+
+    <div class="features">
+      <span class="feature">Low poly</span>
+      <span class="feature">Animated</span>
+      <span class="feature">GLB ready</span>
+    </div>
+
+    <button id="exportButton" type="button">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      Export GLB
+    </button>
+
+    <div id="status" aria-live="polite"></div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const canvas = document.querySelector("#scene");
+    const exportButton = document.querySelector("#exportButton");
+    const status = document.querySelector("#status");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance",
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1527);
+    scene.fog = new THREE.FogExp2(0x0a1527, 0.017);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(11.5, 8.2, 14.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.1, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 7;
+    controls.maxDistance = 30;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    const hemisphere = new THREE.HemisphereLight(0xa9d5ff, 0x182131, 1.65);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffe7c4, 3.2);
+    keyLight.position.set(-5, 12, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -13;
+    keyLight.shadow.camera.right = 13;
+    keyLight.shadow.camera.top = 13;
+    keyLight.shadow.camera.bottom = -13;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 35;
+    keyLight.shadow.bias = -0.0003;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x659dff, 1.8);
+    rimLight.position.set(8, 6, -9);
+    scene.add(rimLight);
+
+    const amberLight = new THREE.PointLight(0xff9d45, 2.3, 6, 2);
+    amberLight.position.set(-0.7, 2.8, 1.5);
+    scene.add(amberLight);
+
+    const asset = new THREE.Group();
+    asset.name = "BabaYagaWinterScene";
+    scene.add(asset);
+
+    const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+
+    function material(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.84,
+        metalness: 0,
+        flatShading: true,
+        ...options,
+      });
+    }
+
+    const materials = {
+      snow: material(0xeaf5ff, { roughness: 0.96 }),
+      snowShade: material(0xc7dfeb, { roughness: 0.98 }),
+      snowWhite: material(0xffffff, { roughness: 1 }),
+      wood: material(0x75452f),
+      woodLight: material(0x93603d),
+      woodDark: material(0x493126),
+      wall: material(0x8b5638),
+      wallDark: material(0x68402d),
+      stone: material(0x56606a),
+      stoneDark: material(0x343d46),
+      teal: material(0x28535a, { roughness: 0.72 }),
+      amber: material(0xffb34d, {
+        emissive: 0xff7b20,
+        emissiveIntensity: 1.8,
+        roughness: 0.45,
+      }),
+      black: material(0x171c23, { roughness: 0.78 }),
+      fox: material(0xc65a38),
+      foxLight: material(0xe17a4c),
+      cream: material(0xf0d8b5),
+      innerEar: material(0x9b3f38),
+      owl: material(0xf4f1de),
+      owlWing: material(0xd8d5c8),
+      smoke: material(0x596471, {
+        roughness: 1,
+        transparent: true,
+        opacity: 0.76,
+        depthWrite: false,
+      }),
+      smokeDark: material(0x303943, {
+        roughness: 1,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false,
+      }),
+    };
+
+    function addMesh(
+      geometry,
+      mat,
+      name,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0],
+      scale = [1, 1, 1],
+      parent = asset,
+      shadows = true
+    ) {
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.name = name;
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      mesh.scale.set(...scale);
+      mesh.castShadow = shadows;
+      mesh.receiveShadow = shadows;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function box(
+      name,
+      size,
+      position,
+      mat,
+      parent = asset,
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(
+        new THREE.BoxGeometry(...size),
+        mat,
+        name,
+        position,
+        rotation,
+        [1, 1, 1],
+        parent
+      );
+    }
+
+    function cylinder(
+      name,
+      radiusTop,
+      radiusBottom,
+      height,
+      position,
+      mat,
+      parent = asset,
+      rotation = [0, 0, 0],
+      segments = 8
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(
+          radiusTop,
+          radiusBottom,
+          height,
+          segments
+        ),
+        mat,
+        name,
+        position,
+        rotation,
+        [1, 1, 1],
+        parent
+      );
+    }
+
+    function ico(
+      name,
+      radius,
+      position,
+      scale,
+      mat,
+      parent = asset
+    ) {
+      return addMesh(
+        new THREE.IcosahedronGeometry(radius, 1),
+        mat,
+        name,
+        position,
+        [0, 0, 0],
+        scale,
+        parent
+      );
+    }
+
+    function dodeca(
+      name,
+      radius,
+      position,
+      scale,
+      mat,
+      parent = asset
+    ) {
+      return addMesh(
+        new THREE.DodecahedronGeometry(radius, 0),
+        mat,
+        name,
+        position,
+        [0, 0, 0],
+        scale,
+        parent
+      );
+    }
+
+    function beam(
+      name,
+      start,
+      end,
+      radius,
+      mat,
+      parent = asset
+    ) {
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+      const mesh = addMesh(
+        new THREE.CylinderGeometry(radius, radius, length, 6),
+        mat,
+        name,
+        [0, 0, 0],
+        [0, 0, 0],
+        [1, 1, 1],
+        parent
+      );
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        V(0, 1, 0),
+        direction.normalize()
+      );
+      return mesh;
+    }
+
+    let randomSeed = 83472;
+    function random() {
+      randomSeed =
+        (randomSeed * 1664525 + 1013904223) >>> 0;
+      return randomSeed / 4294967296;
+    }
+
+    // ---------------------------------------------------------------------
+    // Snow island
+    // ---------------------------------------------------------------------
+
+    cylinder(
+      "SnowIsland",
+      8.35,
+      8.8,
+      1.35,
+      [0, -0.05, 0],
+      materials.snowShade,
+      asset,
+      [0, 0, 0],
+      12
+    );
+
+    addMesh(
+      new THREE.IcosahedronGeometry(7.65, 1),
+      materials.snow,
+      "SnowCap",
+      [0, 0.62, 0],
+      [0, 0.12, 0],
+      [1, 0.24, 1],
+      asset
+    );
+
+    const snowRockMaterial = material(0xd7e6ef, { roughness: 1 });
+
+    [
+      [-6.1, 0.83, 2.8, 0.72],
+      [5.9, 0.79, -3.2, 0.64],
+      [4.8, 0.76, 4.2, 0.52],
+      [-4.4, 0.75, -4.8, 0.48],
+      [1.0, 0.74, 6.0, 0.44],
+    ].forEach(([x, y, z, scale], index) => {
+      dodeca(
+        `SnowRock${index}`,
+        scale,
+        [x, y, z],
+        [1.2, 0.7, 1],
+        snowRockMaterial
+      );
+    });
+
+    // ---------------------------------------------------------------------
+    // Baba Yaga hut
+    // ---------------------------------------------------------------------
+
+    const hut = new THREE.Group();
+    hut.name = "BabaYagaHut";
+    hut.position.set(-1.4, 0, 0);
+    asset.add(hut);
+
+    // Raised timber posts.
+    const postPositions = [
+      [-1.35, -1.0],
+      [1.35, -1.0],
+      [-1.35, 1.0],
+      [1.35, 1.0],
+    ];
+
+    postPositions.forEach(([x, z], index) => {
+      beam(
+        `HutPost${index}`,
+        V(x, 0.55, z),
+        V(x, 1.58, z),
+        0.12,
+        materials.woodDark,
+        hut
+      );
+    });
+
+    box(
+      "HutFloor",
+      [3.12, 0.18, 2.52],
+      [0, 1.57, 0],
+      materials.woodDark,
+      hut
+    );
+
+    // Individual low-poly wall boards.
+    for (let i = 0; i < 5; i++) {
+      box(
+        `HutWallBoard${i}`,
+        [3.0, 0.35, 2.32],
+        [0, 1.85 + i * 0.42, 0],
+        i % 2 === 0 ? materials.wall : materials.wallDark,
+        hut
+      );
+    }
+
+    // Front door.
+    box(
+      "HutDoor",
+      [0.88, 1.72, 0.10],
+      [0.18, 2.42, 1.20],
+      materials.teal,
+      hut
+    );
+
+    box(
+      "DoorFrameTop",
+      [1.05, 0.12, 0.14],
+      [0.18, 3.31, 1.25],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "DoorFrameBottom",
+      [1.05, 0.12, 0.14],
+      [0.18, 1.53, 1.25],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "DoorFrameLeft",
+      [0.12, 1.84, 0.14],
+      [-0.31, 2.42, 1.25],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "DoorFrameRight",
+      [0.12, 1.84, 0.14],
+      [0.67, 2.42, 1.25],
+      materials.woodLight,
+      hut
+    );
+    ico(
+      "DoorKnob",
+      0.065,
+      [0.49, 2.36, 1.30],
+      [1, 1, 0.55],
+      materials.amber,
+      hut
+    );
+
+    // Front window.
+    box(
+      "HutWindow",
+      [0.90, 0.78, 0.10],
+      [-0.67, 2.72, 1.21],
+      materials.amber,
+      hut
+    );
+    box(
+      "WindowFrameTop",
+      [1.08, 0.10, 0.15],
+      [-0.67, 3.14, 1.26],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "WindowFrameBottom",
+      [1.08, 0.10, 0.15],
+      [-0.67, 2.30, 1.26],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "WindowFrameLeft",
+      [0.10, 0.94, 0.15],
+      [-1.10, 2.72, 1.26],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "WindowFrameRight",
+      [0.10, 0.94, 0.15],
+      [-0.24, 2.72, 1.26],
+      materials.woodLight,
+      hut
+    );
+    box(
+      "WindowMullionV",
+      [0.06, 0.82, 0.08],
+      [-0.67, 2.72, 1.29],
+      materials.woodDark,
+      hut
+    );
+    box(
+      "WindowMullionH",
+      [0.82, 0.06, 0.08],
+      [-0.67, 2.72, 1.29],
+      materials.woodDark,
+      hut
+    );
+
+    // Side window.
+    box(
+      "SideWindow",
+      [0.10, 0.78, 0.92],
+      [1.51, 2.68, 0.05],
+      materials.amber,
+      hut,
+      [0, Math.PI / 2, 0]
+    );
+    box(
+      "SideWindowFrame",
+      [0.15, 0.96, 1.08],
+      [1.55, 2.68, 0.05],
+      materials.woodLight,
+      hut,
+      [0, Math.PI / 2, 0]
+    );
+
+    // Pitched roofs with snow caps.
+    box(
+      "LeftRoof",
+      [2.16, 0.22, 3.12],
+      [-0.96, 3.55, 0],
+      materials.woodDark,
+      hut,
+      [0, 0, 0.30]
+    );
+    box(
+      "RightRoof",
+      [2.16, 0.22, 3.12],
+      [0.96, 3.55, 0],
+      materials.woodDark,
+      hut,
+      [0, 0, -0.30]
+    );
+    box(
+      "LeftSnowRoof",
+      [2.19, 0.14, 3.15],
+      [-0.96, 3.71, 0],
+      materials.snow,
+      hut,
+      [0, 0, 0.30]
+    );
+    box(
+      "RightSnowRoof",
+      [2.19, 0.14, 3.15],
+      [0.96, 3.71, 0],
+      materials.snow,
+      hut,
+      [0, 0, -0.30]
+    );
+    cylinder(
+      "RoofRidge",
+      0.15,
+      0.15,
+      3.22,
+      [0, 3.94, 0],
+      materials.snowShade,
+      hut,
+      [Math.PI / 2, 0, 0],
+      8
+    );
+
+    // Stone chimney.
+    box(
+      "ChimneyCore",
+      [0.68, 1.48, 0.68],
+      [-0.66, 4.48, 0],
+      materials.stoneDark,
+      hut
+    );
+
+    const chimneyStones = [
+      [-0.91, 4.03, 0.18, 0.48],
+      [-0.66, 4.22, -0.18, 0.51],
+      [-0.39, 4.42, 0.18, 0.48],
+      [-0.91, 4.63, -0.16, 0.50],
+      [-0.66, 4.84, 0.17, 0.48],
+      [-0.37, 5.02, -0.18, 0.43],
+    ];
+
+    chimneyStones.forEach(([x, y, z, size], index) => {
+      dodeca(
+        `ChimneyStone${index}`,
+        size,
+        [x, y, z],
+        [1, 1.12, 1],
+        index % 2 ? materials.stone : materials.stoneDark,
+        hut
+      );
+    });
+
+    // Stylized smoke.
+    const smokeRoot = new THREE.Group();
+    smokeRoot.name = "SmokeRoot";
+    smokeRoot.position.set(-0.66, 5.08, 0.05);
+    hut.add(smokeRoot);
+
+    const smokePuffs = [];
+    for (let i = 0; i < 5; i++) {
+      const puffGroup = new THREE.Group();
+      puffGroup.name = `SmokePuff${i + 1}`;
+      smokeRoot.add(puffGroup);
+
+      const puff = ico(
+        `SmokePuffMesh${i + 1}`,
+        0.39,
+        [0, i * 0.34, 0],
+        [1, 0.86, 1],
+        i % 2 ? materials.smoke : materials.smokeDark,
+        puffGroup
+      );
+      puff.castShadow = false;
+      puff.receiveShadow = false;
+      smokePuffs.push({ group: puffGroup, mesh: puff });
+    }
+
+    // ---------------------------------------------------------------------
+    // Fox
+    // ---------------------------------------------------------------------
+
+    const fox = new THREE.Group();
+    fox.name = "Fox";
+    fox.position.set(3.55, 0.58, 1.15);
+    asset.add(fox);
+
+    const foxBody = ico(
+      "FoxBody",
+      1,
+      [0, 0.77, 0],
+      [0.86, 0.55, 0.65],
+      materials.fox,
+      fox
+    );
+
+    const foxHead = new THREE.Group();
+    foxHead.name = "FoxHead";
+    foxHead.position.set(0.63, 1.25, 0.02);
+    fox.add(foxHead);
+
+    ico(
+      "FoxHeadMesh",
+      0.46,
+      [0, 0, 0],
+      [1, 0.96, 0.92],
+      materials.foxLight,
+      foxHead
+    );
+    ico(
+      "FoxSnout",
+      0.30,
+      [0.38, -0.12, 0.05],
+      [1.15, 0.62, 0.85],
+      materials.cream,
+      foxHead
+    );
+    ico(
+      "FoxNose",
+      0.085,
+      [0.56, 0.02, 0.08],
+      [1, 0.8, 1],
+      materials.black,
+      foxHead
+    );
+
+    [-1, 1].forEach((side) => {
+      addMesh(
+        new THREE.ConeGeometry(0.22, 0.53, 5),
+        materials.innerEar,
+        `FoxEar${side}`,
+        [0.02, 0.55, side * 0.25],
+        [0, 0, side * 0.18],
+        [1, 1, 1],
+        foxHead
+      );
+      ico(
+        `FoxEye${side}`,
+        0.045,
+        [0.10, 0.09, side * 0.36],
+        [1, 1, 0.55],
+        materials.black,
+        foxHead
+      );
+    });
+
+    [-0.43, 0.43].forEach((x, sideIndex) => {
+      [-0.32, 0.32].forEach((z, zIndex) => {
+        beam(
+          `FoxLeg${sideIndex}_${zIndex}`,
+          V(x, 0.58, z),
+          V(x * 1.12, 0.06, z * 1.15),
+          0.065,
+          materials.woodDark,
+          fox
+        );
+        ico(
+          `FoxPaw${sideIndex}_${zIndex}`,
+          0.14,
+          [x * 1.12, 0.06, z * 1.15],
+          [1.25, 0.55, 1.15],
+          materials.black,
+          fox
+        );
+      });
+    });
+
+    const tailBase = new THREE.Group();
+    tailBase.name = "TailBase";
+    tailBase.position.set(-0.68, 0.72, 0);
+    fox.add(tailBase);
+
+    const tail1 = addMesh(
+      new THREE.ConeGeometry(0.27, 0.82, 5),
+      materials.fox,
+      "Tail1",
+      [-0.34, 0, 0],
+      [0, 0, Math.PI / 2],
+      [1, 1, 1],
+      tailBase
+    );
+    tail1.rotation.z = Math.PI / 2;
+
+    const tail2 = new THREE.Group();
+    tail2.name = "Tail2";
+    tail2.position.set(-0.68, 0, 0);
+    tailBase.add(tail2);
+
+    addMesh(
+      new THREE.ConeGeometry(0.24, 0.78, 5),
+      materials.foxLight,
+      "Tail2Mesh",
+      [-0.31, 0, 0],
+      [0, 0, Math.PI / 2],
+      [1, 1, 1],
+      tail2
+    );
+
+    const tail3 = new THREE.Group();
+    tail3.name = "Tail3";
+    tail3.position.set(-0.63, 0, 0);
+    tail2.add(tail3);
+
+    addMesh(
+      new THREE.ConeGeometry(0.18, 0.66, 5),
+      materials.cream,
+      "Tail3Mesh",
+      [-0.28, 0, 0],
+      [0, 0, Math.PI / 2],
+      [1, 1, 1],
+      tail3
+    );
+
+    // ---------------------------------------------------------------------
+    // Raven
+    // ---------------------------------------------------------------------
+
+    const raven = new THREE.Group();
+    raven.name = "Raven";
+    raven.position.set(0.35, 0.58, 2.55);
+    asset.add(raven);
+
+    ico(
+      "RavenBody",
+      1,
+      [0, 1.0, 0],
+      [0.43, 0.68, 0.35],
+      materials.black,
+      raven
+    );
+    ico(
+      "RavenHead",
+      0.35,
+      [0, 1.68, 0],
+      [1, 0.95, 0.95],
+      materials.black,
+      raven
+    );
+
+    addMesh(
+      new THREE.ConeGeometry(0.13, 0.37, 4),
+      materials.black,
+      "RavenBeak",
+      [0.39, 1.66, 0],
+      [0, 0, -Math.PI / 2],
+      [1, 1, 1],
+      raven
+    );
+    ico(
+      "RavenEyeLeft",
+      0.038,
+      [-0.12, 1.76, 0.26],
+      [1, 1, 0.55],
+      materials.amber,
+      raven
+    );
+    ico(
+      "RavenEyeRight",
+      0.038,
+      [-0.12, 1.76, -0.26],
+      [1, 1, 0.55],
+      materials.amber,
+      raven
+    );
+
+    [-1, 1].forEach((side) => {
+      ico(
+        `RavenWing${side}`,
+        0.32,
+        [0, 1.07, side * 0.29],
+        [0.42, 1.25, 0.68],
+        materials.black,
+        raven
+      );
+    });
+
+    [-0.17, 0, 0.17].forEach((z, index) => {
+      box(
+        `RavenTailFeather${index}`,
+        [0.10, 0.68, 0.09],
+        [-0.18, 0.73, z],
+        materials.black,
+        raven,
+        [0, 0, -0.18]
+      );
+    });
+
+    [-0.13, 0.13].forEach((x, index) => {
+      beam(
+        `RavenLeg${index}`,
+        V(x, 0.58, 0),
+        V(x, 0.08, 0),
+        0.035,
+        materials.woodDark,
+        raven
+      );
+    });
+
+    // ---------------------------------------------------------------------
+    // Small clearing trough
+    // ---------------------------------------------------------------------
+
+    const trough = new THREE.Group();
+    trough.name = "ClearingTrough";
+    trough.position.set(1.95, 0.56, 1.35);
+    asset.add(trough);
+
+    box(
+      "TroughBottom",
+      [1.35, 0.10, 0.78],
+      [0, 0.05, 0],
+      materials.wood,
+      trough
+    );
+    box(
+      "TroughFront",
+      [1.35, 0.36, 0.08],
+      [0, 0.20, 0.36],
+      materials.woodLight,
+      trough
+    );
+    box(
+      "TroughBack",
+      [1.35, 0.36, 0.08],
+      [0, 0.20, -0.36],
+      materials.wood,
+      trough
+    );
+    box(
+      "TroughLeft",
+      [0.08, 0.36, 0.72],
+      [-0.64, 0.20, 0],
+      materials.woodDark,
+      trough
+    );
+    box(
+      "TroughRight",
+      [0.08, 0.36, 0.72],
+      [0.64, 0.20, 0],
+      materials.woodDark,
+      trough
+    );
+    box(
+      "TroughSnow",
+      [1.16, 0.08, 0.57],
+      [0, 0.15, 0],
+      materials.snow,
+      trough
+    );
+
+    // ---------------------------------------------------------------------
+    // Snow flakes and stars
+    // ---------------------------------------------------------------------
+
+    const snowflakeMaterial = material(0xffffff, { roughness: 1 });
+
+    for (let i = 0; i < 38; i++) {
+      const angle = random() * Math.PI * 2;
+      const radius = 4.7 + random() * 8.5;
+      const snowflake = addMesh(
+        new THREE.OctahedronGeometry(0.035 + random() * 0.045, 0),
+        snowflakeMaterial,
+        `Snowflake${i}`,
+        [
+          Math.cos(angle) * radius,
+          0.8 + random() * 9,
+          Math.sin(angle) * radius,
+        ],
+        [0, random() * Math.PI, 0],
+        [1, 1.7, 1],
+        asset,
+        false
+      );
+      snowflake.castShadow = false;
+    }
+
+    const starMaterial = new THREE.MeshBasicMaterial({
+      color: 0x91baff,
+    });
+
+    for (let i = 0; i < 34; i++) {
+      const angle = random() * Math.PI * 2;
+      const radius = 14 + random() * 11;
+      const star = addMesh(
+        new THREE.OctahedronGeometry(0.07 + random() * 0.09, 0),
+        starMaterial,
+        `Star${i}`,
+        [
+          Math.cos(angle) * radius,
+          7.5 + random() * 7,
+          Math.sin(angle) * radius,
+        ],
+        [0, random() * Math.PI, 0],
+        [0.65, 1.3, 0.65],
+        asset,
+        false
+      );
+      star.castShadow = false;
+    }
+
+    // ---------------------------------------------------------------------
+    // GLTF-compatible animation
+    // ---------------------------------------------------------------------
+
+    const animationDuration = 6;
+    const smokeTimes = [0, 1.5, 3, 4.5, 6];
+    const animationTracks = [];
+
+    function vectorTrack(name, property, keyframes) {
+      const values = [];
+      keyframes.forEach((frame) => {
+        values.push(frame[0], frame[1], frame[2]);
+      });
+      return new THREE.VectorKeyframeTrack(`${name}.${property}`, keyframes, values);
+    }
+
+    function quaternionTrack(name, keyframes) {
+      const values = [];
+      keyframes.forEach((frame) => {
+        const quaternion = new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(frame[0], frame[1], frame[2])
+        );
+        values.push(
+          quaternion.x,
+          quaternion.y,
+          quaternion.z,
+          quaternion.w
+        );
+      });
+      return new THREE.QuaternionKeyframeTrack(`${name}.quaternion`, keyframes, values);
+    }
+
+    smokePuffs.forEach(({ group, mesh }, index) => {
+      const base = group.position.clone();
+      const phase = index * 0.8;
+      const positionValues = [];
+      const scaleValues = [];
+
+      smokeTimes.forEach((time) => {
+        const driftX = Math.sin(time * 0.72 + phase) * 0.32;
+        const driftZ = Math.cos(time * 0.58 + phase * 0.7) * 0.24;
+        const rise = time * 0.49 + Math.sin(time * 0.8 + phase) * 0.12;
+
+        positionValues.push(
+          base.x + driftX,
+          base.y + rise,
+          base.z + driftZ
+        );
+
+        const width = 1 - index * 0.075;
+        const height = 0.92 - index * 0.065;
+        scaleValues.push(width, height, width);
+      });
+
+      animationTracks.push(
+        vectorTrack(group.name, "position", positionValues),
+        vectorTrack(group.name, "scale", scaleValues)
+      );
+    });
+
+    animationTracks.push(
+      quaternionTrack("SmokeRoot", [
+        [0, 0, 0],
+        [0.03, 0.18, -0.04],
+        [-0.02, 0.36, 0.03],
+        [0.04, 0.54, -0.02],
+        [0, 0, 0],
+      ])
+    );
+
+    // Fox breathing and tail sway.
+    animationTracks.push(
+      vectorTrack("FoxBody", "scale", [
+        [0.86, 0.55, 0.65],
+        [0.88, 0.57, 0.66],
+        [0.86, 0.55, 0.65],
+        [0.84, 0.53, 0.64],
+        [0.86, 0.55, 0.65],
+      ])
+    );
+
+    animationTracks.push(
+      quaternionTrack("FoxHead", [
+        [0, 0, 0],
+        [0.02, -0.05, 0.03],
+        [0, 0.04, -0.02],
+        [-0.02, 0.06, -0.04],
+        [0, 0, 0],
+      ])
+    );
+
+    animationTracks.push(
+      quaternionTrack("TailBase", [
+        [0, 0, 0],
+        [0.08, 0.18, -0.10],
+        [-0.07, 0.05, 0.09],
+        [0.05, -0.17, -0.06],
+        [0, 0, 0],
+      ])
+    );
+
+    // Subtle raven wing movement.
+    animationTracks.push(
+      quaternionTrack("RavenWingLeft", [
+        [0, 0, 0],
+        [0, 0, -0.12],
+        [0, 0, 0.08],
+        [0, 0, 0],
+      ])
+    );
+    animationTracks.push(
+      quaternionTrack("RavenWingRight", [
+        [0, 0, 0],
+        [0, 0, 0.12],
+        [0, 0, -0.08],
+        [0, 0, 0],
+      ])
+    );
+
+    const winterClip = new THREE.AnimationClip(
+      "Winter_Idle",
+      animationDuration,
+      animationTracks
+    );
+
+    const mixer = new THREE.AnimationMixer(asset);
+    const winterAction = mixer.clipAction(winterClip);
+    winterAction.play();
+
+    // ---------------------------------------------------------------------
+    // Render loop
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function render() {
+      requestAnimationFrame(render);
+      const delta = Math.min(clock.getDelta(), 0.05);
+      mixer.update(delta);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    render();
+
+    // ---------------------------------------------------------------------
+    // GLB export, including the animation clip
+    // ---------------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      asset.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary",
+          });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "baba_yaga_winter.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB exported successfully.";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed. See the browser console.";
+        },
+        {
+          binary: true,
+          animations: [winterClip],
+          includeCustomExtensions: false,
+        }
+      );
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

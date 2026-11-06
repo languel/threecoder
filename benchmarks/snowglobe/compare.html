@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snowglobe Benchmark Viewer — Ollama vs MLX</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .prompt-pill {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--muted);
+      max-width: 520px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button, select, a.open-btn {
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 11px;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    button:hover, select:hover, a.open-btn:hover {
+      border-color: var(--accent);
+    }
+    button.active {
+      background: rgba(88, 166, 255, 0.16);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    main {
+      flex: 1;
+      display: grid;
+      gap: 1px;
+      background: var(--border);
+    }
+    main.single { grid-template-columns: 1fr; }
+    main.split  { grid-template-columns: 1fr 1fr; }
+    main.quad   { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .pane {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+    .pane-bar {
+      background: #12161d;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .pane-bar span.meta { color: var(--muted); font-size: 11px; }
+    iframe {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <span>Baba Yaga Snowglobe — Ollama vs MLX</span>
+      <span class="prompt-pill" title="a small wintry scene inside a snowglobe. baba yaga hut in a small clearing. eastern foklore, a fox, a raven and an oul and chimney smoke. dusk, starry sky, fluffy snow.">
+        “baba yaga hut in a small clearing · fox, raven, owl, chimney smoke · dusk, starry sky, fluffy snow”
+      </span>
+    </div>
+    <div class="controls">
+      <button id="mode-single" class="active" onclick="setMode('single')">Single</button>
+      <button id="mode-split" onclick="setMode('split')">Side-by-Side (2×)</button>
+      <button id="mode-quad" onclick="setMode('quad')">All 4 (2×2)</button>
+    </div>
+  </header>
+
+  <main id="grid" class="single"></main>
+
+  <script>
+    const MODELS = [
+      {
+        id: "3d_mlx",
+        label: "3D-Coder · Ollama BF16 (MLX) ✅ Zero-shot",
+        file: "snowglobe_3d_ollama_mlx.html",
+        notes: "16,934 tok · 21.0 tok/s · 1,351 lines · Valid JS"
+      },
+      {
+        id: "3d_q8_fixed",
+        label: "3D-Coder · Ollama Q8_0 (2 duplicate consts fixed)",
+        file: "snowglobe_3d_ollama_q8_fixed.html",
+        notes: "19,697 tok · 24.4 tok/s · 1,468 lines · Patched ravenBeak & snowMaterial"
+      },
+      {
+        id: "glb_q8",
+        label: "GLB-Coder · Ollama Q8_0 (llamacpp) ✅ Zero-shot",
+        file: "snowglobe_glb_ollama_q8.html",
+        notes: "21,601 tok · 26.3 tok/s · 1,325 lines · Export GLB"
+      },
+      {
+        id: "glb_mlx",
+        label: "GLB-Coder · Standalone mlx-lm BF16 ✅ Zero-shot",
+        file: "snowglobe_glb_mlx_lm.html",
+        notes: "23,282 tok · 18.2 tok/s · 869 lines · Export GLB"
+      },
+      {
+        id: "3d_q8_raw",
+        label: "3D-Coder · Ollama Q8_0 (Raw unedited — JS SyntaxError)",
+        file: "snowglobe_3d_ollama_q8.html",
+        notes: "Raw Q8_0 output · Duplicate const ravenBeak & snowMaterial"
+      }
+    ];
+
+    let mode = "single";
+    let selected = [0, 1, 2, 3];
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      document.querySelectorAll("header .controls button").forEach(b => b.classList.remove("active"));
+      document.getElementById(`mode-${nextMode}`).classList.add("active");
+      render();
+    }
+
+    function updatePane(paneIdx, modelIdx) {
+      selected[paneIdx] = Number(modelIdx);
+      render();
+    }
+
+    function render() {
+      const grid = document.getElementById("grid");
+      grid.className = mode;
+      const count = mode === "single" ? 1 : mode === "split" ? 2 : 4;
+      grid.innerHTML = "";
+
+      for (let i = 0; i < count; i++) {
+        const idx = mode === "quad" ? i : selected[i];
+        const m = MODELS[idx];
+        const pane = document.createElement("div");
+        pane.className = "pane";
+
+        const optionsHtml = MODELS.map((opt, optIdx) =>
+          `<option value="${optIdx}" ${optIdx === idx ? "selected" : ""}>${opt.label}</option>`
+        ).join("");
+
+        pane.innerHTML = `
+          <div class="pane-bar">
+            ${mode === "quad"
+              ? `<strong>${m.label}</strong>`
+              : `<select onchange="updatePane(${i}, this.value)">${optionsHtml}</select>`
+            }
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="meta">${m.notes}</span>
+              <a class="open-btn" href="${m.file}" target="_blank">Open Raw ↗</a>
+            </div>
+          </div>
+          <iframe src="${m.file}" loading="lazy"></iframe>
+        `;
+        grid.appendChild(pane);
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>

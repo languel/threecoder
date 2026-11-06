@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baba Yaga Wintry</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #07111f;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 10;
+      width: min(340px, calc(100vw - 44px));
+      padding: 18px 18px 16px;
+      border: 1px solid rgba(160, 220, 255, 0.2);
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(9, 24, 42, 0.9), rgba(11, 31, 49, 0.76));
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(14px);
+      color: #eefaff;
+      user-select: none;
+    }
+
+    .eyebrow {
+      margin: 0 0 5px;
+      color: #74d5ff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .description {
+      margin: 9px 0 16px;
+      color: #abc0d1;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 16px;
+      background: linear-gradient(135deg, #75d9ff, #5aa8ff);
+      box-shadow: 0 7px 22px rgba(51, 160, 255, 0.25);
+      color: #071321;
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 850;
+      transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.07);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.62;
+      transform: none;
+    }
+
+    #status {
+      color: #91aabc;
+      font-size: 12px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 9px 13px;
+      border: 1px solid rgba(160, 220, 255, 0.13);
+      border-radius: 999px;
+      background: rgba(7, 18, 31, 0.58);
+      color: #9fb4c7;
+      font-size: 12px;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 560px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 14px;
+      }
+
+      .hint {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <canvas id="viewport"></canvas>
+
+  <section class="panel">
+    <p class="eyebrow">Low-poly Godot Asset</p>
+    <h1>Baba Yaga Wintry</h1>
+    <p class="description">
+      A tiny snowy clearing with a warm woodland hut, rising chimney smoke,
+      a fox, raven, and owl. Built entirely from Three.js geometry.
+    </p>
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <span id="status">Ready</span>
+    </div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera, and controls
+    // -------------------------------------------------------------------------
+
+    const canvas = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07111f);
+    scene.fog = new THREE.FogExp2(0x07111f, 0.017);
+
+    const camera = new THREE.PerspectiveCamera(
+      43,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(10.5, 7.2, 11.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.35, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.enablePan = false;
+    controls.minDistance = 7;
+    controls.maxDistance = 23;
+    controls.minPolarAngle = 0.45;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.38;
+    controls.update();
+
+    renderer.domElement.addEventListener("pointerdown", () => {
+      controls.autoRotate = false;
+    });
+
+    // Everything inside assetRoot is included in the GLB.
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "BabaYagaWintry";
+    scene.add(assetRoot);
+
+    // -------------------------------------------------------------------------
+    // Materials and geometry helpers
+    // -------------------------------------------------------------------------
+
+    function standardMaterial(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.86,
+        metalness: 0,
+        flatShading: true,
+        ...options
+      });
+    }
+
+    const M = {
+      snow: standardMaterial(0xeaf8ff),
+      snowShade: standardMaterial(0xc7e4f1),
+      snowBlue: standardMaterial(0xb8d9ed),
+      wood: standardMaterial(0x76503a),
+      woodDark: standardMaterial(0x4b3027),
+      woodLight: standardMaterial(0x9b6947),
+      door: standardMaterial(0x39251f),
+      roof: standardMaterial(0x563b32),
+      stone: standardMaterial(0x66747d),
+      stoneDark: standardMaterial(0x46555f),
+      trunk: standardMaterial(0x5a3c2d),
+      pineDark: standardMaterial(0x173f3d),
+      pine: standardMaterial(0x245a4b),
+      pineLight: standardMaterial(0x316a58),
+      orange: standardMaterial(0xd97832),
+      orangeLight: standardMaterial(0xf09a4c),
+      cream: standardMaterial(0xf2dfbd),
+      tail: standardMaterial(0x2b2630),
+      wing: standardMaterial(0x24252c),
+      eye: standardMaterial(0xf5ead2),
+      pupil: standardMaterial(0x101317),
+      amber: standardMaterial(0xffae45, {
+        emissive: 0xff6b13,
+        emissiveIntensity: 1.8,
+        roughness: 0.42
+      }),
+      moon: standardMaterial(0xe9f5ff, {
+        emissive: 0x8ebbd6,
+        emissiveIntensity: 1.25,
+        roughness: 0.5
+      }),
+      star: new THREE.MeshBasicMaterial({
+        color: 0xaedfff,
+        toneMapped: false
+      }),
+      smoke: standardMaterial(0x71828e, {
+        transparent: true,
+        opacity: 0.34,
+        depthWrite: false,
+        roughness: 1
+      })
+    };
+
+    function addMesh(
+      geometry,
+      material,
+      position = [0, 0, 0],
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0],
+      parent = assetRoot
+    ) {
+      const object = new THREE.Mesh(geometry, material);
+      object.position.fromArray(position);
+      object.scale.fromArray(scale);
+      object.rotation.set(rotation[0], rotation[1], rotation[2]);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function box(size, position, material, rotation = [0, 0, 0], parent = assetRoot) {
+      return addMesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material,
+        position,
+        [1, 1, 1],
+        rotation,
+        parent
+      );
+    }
+
+    function cylinder(
+      radiusTop,
+      radiusBottom,
+      height,
+      position,
+      material,
+      segments = 8,
+      rotation = [0, 0, 0],
+      parent = assetRoot
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+        material,
+        position,
+        [1, 1, 1],
+        rotation,
+        parent
+      );
+    }
+
+    function cone(
+      radius,
+      height,
+      position,
+      material,
+      segments = 7,
+      rotation = [0, 0, 0],
+      parent = assetRoot
+    ) {
+      return addMesh(
+        new THREE.ConeGeometry(radius, height, segments),
+        material,
+        position,
+        [1, 1, 1],
+        rotation,
+        parent
+      );
+    }
+
+    function ball(
+      radius,
+      position,
+      scale,
+      material,
+      detail = 1,
+      parent = assetRoot
+    ) {
+      return addMesh(
+        new THREE.IcosahedronGeometry(radius, detail),
+        material,
+        position,
+        scale,
+        [0, 0, 0],
+        parent
+      );
+    }
+
+    function segmentBetween(start, end, radius, material, parent = assetRoot) {
+      const a = new THREE.Vector3().fromArray(start);
+      const b = new THREE.Vector3().fromArray(end);
+      const direction = b.clone().sub(a);
+      const midpoint = a.clone().add(b).multiplyScalar(0.5);
+      const object = cylinder(
+        radius,
+        radius,
+        direction.length(),
+        midpoint.toArray(),
+        material,
+        6,
+        [0, 0, 0],
+        parent
+      );
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      return object;
+    }
+
+    // -------------------------------------------------------------------------
+    // Snow globe, clearing, and scattered snow
+    // -------------------------------------------------------------------------
+
+    addMesh(
+      new THREE.SphereGeometry(6.4, 24, 16),
+      M.snow,
+      [0, 1.55, 0],
+      [1, 0.84, 0.92]
+    );
+
+    cylinder(4.55, 4.9, 0.34, [0, 0.02, 0], M.snow, 18);
+    cylinder(4.38, 4.55, 0.12, [0, 0.22, 0], M.snowShade, 18);
+
+    addMesh(
+      new THREE.TorusGeometry(4.54, 0.11, 6, 32),
+      M.snowBlue,
+      [0, 0.18, 0],
+      [1, 1, 1],
+      [Math.PI / 2, 0, 0]
+    );
+
+    const driftPositions = [
+      [-4.0, 0.31, 2.7, 1.35, 0.20, 0.75],
+      [4.1, 0.30, 2.5, 1.45, 0.19, 0.80],
+      [-3.9, 0.29, -2.6, 1.25, 0.18, 0.68],
+      [3.7, 0.29, -2.9, 1.30, 0.18, 0.72],
+      [0.4, 0.29, -4.1, 1.55, 0.18, 0.70],
+      [-1.0, 0.29, 3.9, 1.40, 0.18, 0.65]
+    ];
+
+    for (const drift of driftPositions) {
+      ball(drift[0], drift[1], drift[2], [drift[3], drift[4], drift[5]], M.snow);
+    }
+
+    // Stone path through the clearing.
+    const pathStones = [
+      [-0.75, 3.45], [-0.48, 2.82], [-0.65, 2.18],
+      [-0.30, 1.55], [-0.45, 0.93], [-0.18, 0.36]
+    ];
+
+    for (const [x, z] of pathStones) {
+      cylinder(
+        0.25 + (x % 2) * 0.05,
+        0.30,
+        0.09,
+        [x, 0.30, z],
+        M.stone,
+        7
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Low-poly evergreens
+    // -------------------------------------------------------------------------
+
+    function makeTree(x, z, height, radius, tint) {
+      const y = 0.22;
+
+      cylinder(
+        radius * 0.16,
+        radius * 0.20,
+        height,
+        [x, y + height * 0.5, z],
+        M.trunk,
+        7
+      );
+
+      cone(
+        radius,
+        height * 0.72,
+        [x, y + height * 0.39, z],
+        tint,
+        7
+      );
+
+      cone(
+        radius * 0.72,
+        height * 0.55,
+        [x, y + height * 0.80, z + 0.03],
+        tint,
+        7
+      );
+
+      cone(
+        radius * 0.47,
+        height * 0.42,
+        [x, y + height * 1.13, z + 0.02],
+        tint,
+        7
+      );
+
+      cone(
+        radius * 0.38,
+        height * 0.24,
+        [x, y + height * 1.37, z + 0.02],
+        M.snow,
+        7
+      );
+    }
+
+    makeTree(-4.15, -2.95, 3.65, 0.82, M.pineDark);
+    makeTree(-3.80, -3.55, 3.10, 0.67, M.pine);
+    makeTree(3.95, -3.25, 3.45, 0.76, M.pine);
+    makeTree(4.25, -2.60, 2.85, 0.58, M.pineLight);
+    makeTree(-4.55, 0.85, 2.55, 0.54, M.pineDark);
+
+    segmentBetween(
+      [4.0, 0.28, -1.85],
+      [4.65, 3.15, -2.25],
+      0.12,
+      M.trunk
+    );
+
+    segmentBetween(
+      [4.25, 0.28, -2.10],
+      [3.65, 2.60, -2.65],
+      0.09,
+      M.trunk
+    );
+
+    // -------------------------------------------------------------------------
+    // Rocks
+    // -------------------------------------------------------------------------
+
+    const rocks = [
+      [-3.45, 0.43, 1.75, 0.55],
+      [-3.00, 0.39, 2.05, 0.36],
+      [3.45, 0.40, 0.15, 0.48],
+      [3.05, 0.36, -0.40, 0.32],
+      [-1.95, 0.36, -3.25, 0.38]
+    ];
+
+    for (const [x, y, z, size] of rocks) {
+      ball(
+        size,
+        [x, y, z],
+        [1.25, 0.68, 0.95],
+        M.stone,
+        0
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Baba yaga hut
+    // -------------------------------------------------------------------------
+
+    const hutX = -1.35;
+    const hutZ = -0.50;
+
+    box([2.75, 0.26, 1.95], [hutX, 0.39, hutZ], M.wood);
+    box([2.18, 1.42, 1.52], [hutX, 1.20, hutZ], M.wood);
+    box([2.30, 0.13, 1.64], [hutX, 1.96, hutZ], M.snow);
+
+    // Door.
+    box([0.78, 1.18, 0.09], [hutX - 0.34, 1.13, 0.36], M.door);
+    box([0.12, 1.30, 0.15], [hutX - 0.77, 1.17, 0.39], M.woodLight);
+    box([0.12, 1.30, 0.15], [hutX + 0.09, 1.17, 0.39], M.woodLight);
+    box([0.92, 0.13, 0.15], [hutX - 0.34, 1.79, 0.39], M.woodLight);
+    ball(0.055, [hutX - 0.34, 1.16, 0.43], [1, 1, 0.5], M.stoneDark, 0);
+
+    // Glowing window.
+    box([0.65, 0.59, 0.08], [hutX + 0.43, 1.38, 0.37], M.amber);
+    box([0.77, 0.09, 0.13], [hutX + 0.43, 1.71, 0.40], M.woodDark);
+    box([0.77, 0.09, 0.13], [hutX + 0.43, 1.05, 0.40], M.woodDark);
+    box([0.09, 0.67, 0.13], [hutX + 0.10, 1.38, 0.40], M.woodDark);
+    box([0.09, 0.67, 0.13], [hutX + 0.76, 1.38, 0.40], M.woodDark);
+
+    // Two pitched roof sections.
+    box(
+      [2.88, 0.18, 1.30],
+      [hutX, 2.45, -0.93],
+      M.roof,
+      [0.30, 0, 0]
+    );
+
+    box(
+      [2.88, 0.18, 1.30],
+      [hutX, 2.45, 0.13],
+      M.roof,
+      [-0.30, 0, 0]
+    );
+
+    box(
+      [2.95, 0.16, 0.19],
+      [hutX, 2.74, -0.50],
+      M.roof
+    );
+
+    // Snow caps on the roof.
+    box(
+      [2.95, 0.08, 1.37],
+      [hutX, 2.60, -0.93],
+      M.snow,
+      [0.30, 0, 0]
+    );
+
+    box(
+      [2.95, 0.08, 1.37],
+      [hutX, 2.60, 0.13],
+      M.snow,
+      [-0.30, 0, 0]
+    );
+
+    // Chimney.
+    box([0.58, 1.10, 0.58], [hutX + 0.35, 3.20, hutZ], M.stone);
+    box([0.76, 0.16, 0.76], [hutX + 0.35, 3.80, hutZ], M.stoneDark);
+    box([0.48, 0.10, 0.48], [hutX + 0.35, 3.92, hutZ], M.stone);
+
+    // Small masonry details.
+    for (let i = 0; i < 4; i++) {
+      box(
+        [0.34, 0.07, 0.61],
+        [hutX + 0.35, 2.92 + i * 0.25, hutZ],
+        M.stoneDark
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Animated-looking chimney smoke (model-based static export)
+    // -------------------------------------------------------------------------
+
+    const smokeGroup = new THREE.Group();
+    smokeGroup.name = "ChimneySmoke";
+    assetRoot.add(smokeGroup);
+
+    for (let i = 0; i < 7; i++) {
+      const puff = addMesh(
+        new THREE.IcosahedronGeometry(0.38 + i * 0.075, 1),
+        M.smoke,
+        [
+          Math.sin(i * 0.72) * 0.13,
+          4.08 + i * 0.39,
+          Math.cos(i * 0.58) * 0.10
+        ],
+        [1.0 - i * 0.075, 0.88 + i * 0.025, 1.0 - i * 0.065],
+        [0, i * 0.31, 0],
+        smokeGroup
+      );
+      puff.castShadow = false;
+      puff.receiveShadow = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Fox
+    // -------------------------------------------------------------------------
+
+    const fox = new THREE.Group();
+    fox.name = "Fox";
+    fox.position.set(2.35, 0.22, 1.55);
+    fox.rotation.y = -0.38;
+    assetRoot.add(fox);
+
+    ball(0.55, [0, 0.85, 0], [1.0, 0.77, 0.70], M.orange, 1, fox);
+    ball(0.38, [0, 1.30, 0.17], [1.0, 0.92, 0.92], M.orangeLight, 1, fox);
+    ball(0.27, [0, 1.25, 0.45], [1.0, 0.72, 0.75], M.cream, 1, fox);
+
+    cone(0.17, 0.42, [-0.21, 1.66, 0.12], M.orange, 5, [0, 0, -0.20], fox);
+    cone(0.17, 0.42, [0.21, 1.66, 0.12], M.orange, 5, [0, 0, 0.20], fox);
+
+    cylinder(0.075, 0.09, 0.48, [-0.22, 0.45, 0.24], M.orange, 6, [0, 0, 0], fox);
+    cylinder(0.075, 0.09, 0.48, [0.22, 0.45, 0.24], M.orange, 6, [0, 0, 0], fox);
+    cylinder(0.075, 0.09, 0.48, [-0.22, 0.45, -0.22], M.orange, 6, [0, 0, 0], fox);
+    cylinder(0.075, 0.09, 0.48, [0.22, 0.45, -0.22], M.orange, 6, [0, 0, 0], fox);
+
+    box([0.25, 0.13, 0.34], [-0.22, 0.23, 0.30], M.orangeLight, [0, 0, 0], fox);
+    box([0.25, 0.13, 0.34], [0.22, 0.23, 0.30], M.orangeLight, [0, 0, 0], fox);
+    box([0.25, 0.13, 0.34], [-0.22, 0.23, -0.28], M.orangeLight, [0, 0, 0], fox);
+    box([0.25, 0.13, 0.34], [0.22, 0.23, -0.28], M.orangeLight, [0, 0, 0], fox);
+
+    cone(0.15, 0.64, [0, 0.87, -0.61], M.tail, [-Math.PI / 2, 0, 0], fox);
+
+    ball(0.045, [-0.12, 1.38, 0.47], [1, 1, 0.55], M.pupil, 0, fox);
+    ball(0.045, [0.12, 1.38, 0.47], [1, 1, 0.55], M.pupil, 0, fox);
+    ball(0.055, [0, 1.20, 0.57], [1, 0.75, 0.75], M.pupil, 0, fox);
+
+    // -------------------------------------------------------------------------
+    // Raven
+    // -------------------------------------------------------------------------
+
+    const raven = new THREE.Group();
+    raven.name = "Raven";
+    raven.position.set(-2.45, 0.22, 1.90);
+    raven.rotation.y = 0.12;
+    assetRoot.add(raven);
+
+    ball(0.43, [0, 0.73, 0], [1, 1.05, 0.90], M.wing, 1, raven);
+    ball(0.31, [0, 1.20, 0.10], [1, 0.95, 0.95], M.wing, 1, raven);
+
+    cone(0.09, 0.30, [0, 1.17, 0.43], M.cream, [Math.PI / 2, 0, 0], raven);
+    ball(0.045, [-0.10, 1.31, 0.31], [1, 1, 0.6], M.pupil, 0, raven);
+    ball(0.045, [0.10, 1.31, 0.31], [1, 1, 0.6], M.pupil, 0, raven);
+
+    box([0.11, 0.58, 0.43], [-0.29, 0.80, -0.02], M.wing, [0.08, 0, -0.22], raven);
+    box([0.11, 0.58, 0.43], [0.29, 0.80, -0.02], M.wing, [0.08, 0, 0.22], raven);
+
+    cylinder(0.035, 0.045, 0.31, [-0.12, 0.25, 0.08], M.cream, 6, [0, 0, 0], raven);
+    cylinder(0.035, 0.045, 0.31, [0.12, 0.25, 0.08], M.cream, 6, [0, 0, 0], raven);
+    box([0.17, 0.05, 0.17], [-0.12, 0.08, 0.12], M.cream, [0, 0, 0], raven);
+    box([0.17, 0.05, 0.17], [0.12, 0.08, 0.12], M.cream, [0, 0, 0], raven);
+
+    // -------------------------------------------------------------------------
+    // Owl
+    // -------------------------------------------------------------------------
+
+    const owl = new THREE.Group();
+    owl.name = "Owl";
+    owl.position.set(2.75, 0.22, -1.45);
+    owl.rotation.y = -0.18;
+    assetRoot.add(owl);
+
+    ball(0.56, [0, 0.87, 0], [1, 1.02, 0.92], M.wood, 1, owl);
+    ball(0.38, [0, 1.34, 0.08], [1, 0.95, 0.95], M.woodLight, 1, owl);
+
+    ball(0.145, [-0.145, 1.43, 0.34], [1, 1, 0.65], M.eye, 1, owl);
+    ball(0.145, [0.145, 1.43, 0.34], [1, 1, 0.65], M.eye, 1, owl);
+    ball(0.060, [-0.145, 1.43, 0.445], [1, 1, 0.55], M.pupil, 1, owl);
+    ball(0.060, [0.145, 1.43, 0.445], [1, 1, 0.55], M.pupil, 1, owl);
+
+    cone(0.11, 0.30, [0, 1.24, 0.45], M.orange, [Math.PI / 2, 0, 0], owl);
+
+    box([0.13, 0.64, 0.48], [-0.36, 0.87, -0.02], M.woodDark, [0.05, 0, -0.25], owl);
+    box([0.13, 0.64, 0.48], [0.36, 0.87, -0.02], M.woodDark, [0.05, 0, 0.25], owl);
+
+    cylinder(0.045, 0.055, 0.34, [-0.18, 0.22, 0.12], M.cream, 6, [0, 0, 0], owl);
+    cylinder(0.045, 0.055, 0.34, [0.18, 0.22, 0.12], M.cream, 6, [0, 0, 0], owl);
+    box([0.20, 0.06, 0.20], [-0.18, 0.05, 0.14], M.cream, [0, 0, 0], owl);
+    box([0.20, 0.06, 0.20], [0.18, 0.05, 0.14], M.cream, [0, 0, 0], owl);
+
+    // A small branch beneath the owl.
+    segmentBetween(
+      [-0.80, 0.10, -0.20],
+      [-0.20, 0.18, -0.32],
+      0.045,
+      M.trunk,
+      owl
+    );
+
+    // -------------------------------------------------------------------------
+    // Starry sky and moon
+    // -------------------------------------------------------------------------
+
+    for (let i = 0; i < 52; i++) {
+      const radius = 8 + Math.random() * 10;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(1 - (radius + 1) / 18);
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = 3.7 + radius * Math.cos(phi);
+      const z = radius * Math.sin(phi) * Math.sin(theta);
+      const scale = 0.55 + Math.random() * 1.0;
+
+      addMesh(
+        new THREE.OctahedronGeometry(0.105, 0),
+        M.star,
+        [x, y, z],
+        [scale, scale * (0.55 + Math.random() * 0.5), scale]
+      );
+    }
+
+    ball(
+      0.68,
+      [-6.5, 6.4, -10.5],
+      [1, 1, 1],
+      M.moon,
+      2
+    );
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0x9edaff, 0x172334, 1.55);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffe0b5, 3.1);
+    keyLight.position.set(-5, 10, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 11;
+    keyLight.shadow.camera.bottom = -8;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 30;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x559eff, 1.55);
+    rimLight.position.set(7, 5, -7);
+    scene.add(rimLight);
+
+    const windowLight = new THREE.PointLight(0xff822e, 7, 4.5, 2);
+    windowLight.position.set(-0.35, 1.45, 1.05);
+    scene.add(windowLight);
+
+    const chimneyLight = new THREE.PointLight(0x71889a, 2.2, 3.5, 2);
+    chimneyLight.position.set(-0.95, 4.15, -0.45);
+    scene.add(chimneyLight);
+
+    // -------------------------------------------------------------------------
+    // GLB export
+    // -------------------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        assetRoot,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "baba_yaga_wictory.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB downloaded";
+          setTimeout(() => {
+            status.textContent = "Ready";
+          }, 2400);
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Render loop
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener("resize", resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

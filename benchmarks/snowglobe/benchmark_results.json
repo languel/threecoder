@@ -1,0 +1,65 @@
+[
+  {
+    "slug": "snowglobe_3d_ollama_q8",
+    "engine": "ccore-3d-coder",
+    "eval_tokens": 19697,
+    "tok_per_sec": 24.4,
+    "wall_seconds": 809.3,
+    "thinking_chars": 20081,
+    "html_lines": 1468,
+    "html_bytes": 39503,
+    "has_closing_html": true,
+    "html_path": "benchmarks/snowglobe/snowglobe_3d_ollama_q8.html",
+    "js_syntax_valid": false,
+    "js_syntax_errors": [
+      [
+        "/private/var/folders/yr/ktccsfgd71lf83bxxl60ymzh0000gn/T/tmp6iie89w6.mjs:839",
+        "    const ravenBeak = new THREE.Mesh(",
+        "          ^"
+      ]
+    ]
+  },
+  {
+    "slug": "snowglobe_3d_ollama_mlx",
+    "engine": "ccore-3d-coder-mlx",
+    "eval_tokens": 16934,
+    "tok_per_sec": 21.0,
+    "wall_seconds": 810.1,
+    "thinking_chars": 16287,
+    "html_lines": 1351,
+    "html_bytes": 33776,
+    "has_closing_html": true,
+    "html_path": "benchmarks/snowglobe/snowglobe_3d_ollama_mlx.html",
+    "js_syntax_valid": true,
+    "js_syntax_errors": []
+  },
+  {
+    "slug": "snowglobe_glb_ollama_q8",
+    "engine": "ccore-glb-coder",
+    "eval_tokens": 21601,
+    "tok_per_sec": 26.3,
+    "wall_seconds": 826.8,
+    "thinking_chars": 34034,
+    "html_lines": 1325,
+    "html_bytes": 30323,
+    "has_closing_html": true,
+    "html_path": "benchmarks/snowglobe/snowglobe_glb_ollama_q8.html",
+    "js_syntax_valid": true,
+    "js_syntax_errors": []
+  },
+  {
+    "slug": "snowglobe_glb_mlx_lm",
+    "engine": "mlx_lm (standalone BF16)",
+    "eval_tokens": 23282,
+    "tok_per_sec": 18.2,
+    "wall_seconds": 1283.5,
+    "peak_memory_gb": 9.42,
+    "thinking_chars": 43162,
+    "html_lines": 869,
+    "html_bytes": 24630,
+    "has_closing_html": true,
+    "html_path": "benchmarks/snowglobe/snowglobe_glb_mlx_lm.html",
+    "js_syntax_valid": true,
+    "js_syntax_errors": []
+  }
+]

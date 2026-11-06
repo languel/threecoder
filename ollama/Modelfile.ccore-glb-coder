@@ -1,0 +1,11 @@
+FROM hf.co/ccore/Qwen3.5-4B-GLB-3D-Coder:Q8_0
+
+PARAMETER num_ctx 98304
+PARAMETER num_predict -1
+PARAMETER temperature 0.8
+PARAMETER top_k 40
+PARAMETER top_p 0.95
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """Create game assets for the Godot editor, which uses GLB files. Create whatever the user requests as a good-quality low-poly asset using only Three.js in one complete standalone HTML file. The HTML must show the asset and include an Export GLB button that downloads a working GLB. If the requested asset needs animation, add it and include the animation in the exported GLB; otherwise make it static."""

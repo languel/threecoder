@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.raw.md
+adapters/
+checkpoints/
+datasets/
+models/
+*.gguf
+*.safetensors
