@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dusk Winter — Low-Poly Snowglobe</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0b1420;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      max-width: 340px;
+      padding: 16px 18px;
+      border: 1px solid rgba(190, 225, 255, 0.18);
+      border-radius: 14px;
+      color: #eef8ff;
+      background: linear-gradient(145deg, rgba(13, 26, 42, 0.88), rgba(20, 37, 56, 0.7));
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+    }
+
+    #panel h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    #panel p {
+      margin: 0;
+      color: #abc5d9;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    #export {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 10;
+      min-width: 150px;
+      padding: 13px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 12px;
+      color: #07101a;
+      background: linear-gradient(135deg, #f5fbff, #b9dcff);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: transform 160ms ease, filter 160ms ease;
+    }
+
+    #export:hover {
+      transform: translateY(-20px);
+      filter: brightness(1.08);
+    }
+
+    #export:active {
+      transform: translateY(0);
+    }
+
+    #export:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #status {
+      position: fixed;
+      right: 20px;
+      bottom: 72px;
+      z-index: 10;
+      max-width: 320px;
+      color: #c9e0f2;
+      font-size: 12px;
+      text-align: right;
+      pointer-events: none;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="panel">
+    <h1>Dusk Winter</h1>
+    <p>
+      A small wintry clearing with a plank hut, chimney smoke, fox, raven,
+      and ossoil. Drag to orbit; scroll to zoom.
+    </p>
+  </div>
+
+  <button id="export" type="button">Export GLB</button>
+  <div id="status">Ready to export</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera, and lighting
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101d2b);
+    scene.fog = new THREE.Fog(0x101d2b, 18, 43);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(10.5, 7.3, 12.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-0.2, 2.35, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 7;
+    controls.maxDistance = 26;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemisphere = new THREE.HemisphereLight(0xa8d9ff, 0x493127, 1.65);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffd7a0, 3.1);
+    keyLight.position.set(-7, 13, 8);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -12;
+    keyLight.shadow.camera.right = 12;
+    keyLight.shadow.camera.top = 12;
+    keyLight.shadow.camera.bottom = -12;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 35;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x73aaff, 1.45);
+    rimLight.position.set(9, 7, -10);
+    scene.add(rimLight);
+
+    const windowLight = new THREE.PointLight(0xffa34d, 11, 6, 2);
+    windowLight.position.set(-1.3, 2.1, 1.7);
+    scene.add(windowLight);
+
+    // -------------------------------------------------------------------------
+    // Exportable asset root
+    // -------------------------------------------------------------------------
+
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "DuskWinterScene";
+    scene.add(assetRoot);
+
+    function makeMaterial(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.84,
+        metalness: 0,
+        flatShading: true,
+        ...options
+      });
+    }
+
+    const M = {
+      snow: makeMaterial(0xeaf6ff, { roughness: 0.98 }),
+      snowShade: makeMaterial(0xcbdde8, { roughness: 1 }),
+      wood: makeMaterial(0x805037),
+      darkWood: makeMaterial(0x4e3026),
+      plank: makeMaterial(0xa66d45),
+      door: makeMaterial(0x6e402d),
+      stone: makeMaterial(0x68737b, { roughness: 1 }),
+      mortar: makeMaterial(0x3e464d, { roughness: 1 }),
+      iron: makeMaterial(0x28323a, { metalness: 0.35, roughness: 0.65 }),
+      window: makeMaterial(0xffcf72, {
+        emissive: 0xff8f2f,
+        emissiveIntensity: 1.7,
+        roughness: 0.35
+      }),
+      eye: makeMaterial(0xffd976, {
+        emissive: 0xff7a24,
+        emissiveIntensity: 1.2,
+        roughness: 0.25
+      }),
+      fox: makeMaterial(0xc66b39),
+      foxLight: makeMaterial(0xe4a262),
+      raven: makeMaterial(0x20252b, { roughness: 0.72 }),
+      beak: makeMaterial(0xe4ae3f, { roughness: 0.55 }),
+      ironShade: makeMaterial(0x414a50, { metalness: 0.4, roughness: 0.65 }),
+      pine: makeMaterial(0x284b46),
+      pineDark: makeMaterial(0x183732),
+      smoke: makeMaterial(0xb6ccd2, {
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false,
+        roughness: 1
+      })
+    };
+
+    M.sky = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      side: THREE.BackSide,
+      toneMapped: false
+    });
+
+    M.moon = new THREE.MeshBasicMaterial({
+      color: 0xcce9ff,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    });
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addMesh(geometry, material, parent = assetRoot) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function box(parent, size, material, position = [0, 0, 0], rotation = [0, 0, 0]) {
+      const mesh = addMesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material,
+        parent
+      );
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      return mesh;
+    }
+
+    function cylinder(
+      parent,
+      radiusTop,
+      radiusBottom,
+      height,
+      segments,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0]
+    ) {
+      const mesh = addMesh(
+        new THREE.CylinderGeometry(
+          radiusTop,
+          radiusBottom,
+          height,
+          segments,
+          1,
+          false
+        ),
+        material,
+        parent
+      );
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      return mesh;
+    }
+
+    function ico(
+      parent,
+      radius,
+      detail,
+      material,
+      position = [0, 0, 0],
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0]
+    ) {
+      const mesh = addMesh(
+        new THREE.IcosahedronGeometry(radius, detail),
+        material,
+        parent
+      );
+      mesh.position.set(...position);
+      mesh.scale.set(...scale);
+      mesh.rotation.set(...rotation);
+      return mesh;
+    }
+
+    function cone(
+      parent,
+      radius,
+      height,
+      segments,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0]
+    ) {
+      const mesh = addMesh(
+        new THREE.ConeGeometry(radius, height, segments),
+        material,
+        parent
+      );
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      return mesh;
+    }
+
+    function makeRoofGeometry(width, depth, eaveY, ridgeY) {
+      const A = [-width / 2, eaveY, -depth / 2];
+      const B = [ width / 2, eaveY, -depth / 2];
+      const C = [ width / 2, eaveY,  depth / 2];
+      const D = [-width / 2, eaveY,  depth / 2];
+      const E = [-width / 4, ridgeY, 0];
+      const F = [ width / 4, ridgeY, 0];
+
+      const positions = [];
+
+      function triangle(a, b, c) {
+        positions.push(...a, ...b, ...c);
+      }
+
+      triangle(A, F, B);
+      triangle(A, E, F);
+
+      triangle(B, C, F);
+      triangle(B, F, E);
+
+      triangle(C, D, E);
+      triangle(C, E, F);
+
+      triangle(D, A, E);
+      triangle(D, E, F);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // -------------------------------------------------------------------------
+    // Faceted snow clearing and ground drifts
+    // -------------------------------------------------------------------------
+
+    const ground = cylinder(
+      assetRoot,
+      7.65,
+      8.15,
+      0.48,
+      24,
+      M.snow,
+      [0, -0.24, 0]
+    );
+    ground.receiveShadow = true;
+
+    const driftData = [
+      [-6.5, 0.05,  2.2, 1.5, 0.45, 0.8],
+      [ 6.3, 0.02,  2.5, 1.7, 0.42, 0.9],
+      [-5.8, 0.00, -3.7, 1.3, 0.38, 0.7],
+      [ 4.8, 0.01, -4.5, 1.6, 0.40, 0.8],
+      [ 0.0, 0.02,  5.8, 2.3, 0.36, 0.75],
+      [-2.7, 0.00, -5.4, 1.0, 0.32, 0.65]
+    ];
+
+    for (const d of driftData) {
+      ico(
+        assetRoot,
+        1,
+        1,
+        M.snow,
+        [d[0], d[1], d[2]],
+        [d[3], d[4], d[5]],
+        [0, d[0] * 0.7, 0]
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Starfield sky shell
+    // -------------------------------------------------------------------------
+
+    const sky = addMesh(
+      new THREE.SphereGeometry(38, 32, 18),
+      M.sky
+    );
+    sky.castShadow = false;
+    sky.receiveShadow = false;
+
+    const skyPositions = sky.geometry.attributes.position;
+    const skyColors = [];
+    const backgroundColor = new THREE.Color(0x101d2b);
+    const starColor = new THREE.Color(0x8ebaff);
+
+    for (let i = 0; i < skyPositions.count; i++) {
+      const x = skyPositions.getX(i);
+      const y = skyPositions.getY(i);
+      const z = skyPositions.getZ(i);
+
+      const direction = new THREE.Vector3(x, y, z).normalize();
+      const hash = Math.abs(
+        Math.sin(direction.x * 12.9898 + direction.y * 78.233 + direction.z * 37.719) * 43758.5453
+      ) % 1;
+
+      const starDensity = Math.floor((hash - 0.5) * 230);
+      const mix = THREE.MathUtils.clamp(starDensity + 0.5, 0, 1);
+
+      const color = backgroundColor.clone().lerp(starColor, mix);
+      skyColors.push(color.r, color.g, color.b);
+    }
+
+    sky.geometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(skyColors, 3)
+    );
+
+    // -------------------------------------------------------------------------
+    // Dusk moon
+    // -------------------------------------------------------------------------
+
+    const moon = addMesh(
+      new THREE.TorusGeometry(0.72, 0.13, 6, 32, Math.PI * 1.55),
+      M.moon
+    );
+    moon.position.set(-6.4, 7.4, -8.2);
+    moon.rotation.set(0.05, -0.15, -0.35);
+    moon.castShadow = false;
+
+    // -------------------------------------------------------------------------
+    // Hut and clearing props
+    // -------------------------------------------------------------------------
+
+    const hut = new THREE.Group();
+    hut.name = "BabaYagaHut";
+    hut.position.set(-1.35, 0, 0.2);
+    assetRoot.add(hut);
+
+    box(hut, [4.15, 0.24, 3.45], M.darkWood, [0, 0.43, 0]);
+    box(hut, [3.6, 2.45, 3.0], M.wood, [0, 1.72, 0]);
+
+    // Front plank battens.
+    for (let x = -1.55; x <= 1.56; x += 0.42) {
+      box(hut, [0.09, 2.22, 0.10], M.plank, [x, 1.68, 1.54]);
+    }
+
+    // Main door and frame.
+    box(hut, [1.38, 1.95, 0.12], M.door, [0, 1.56, 1.59]);
+    box(hut, [0.10, 2.10, 0.15], M.darkWood, [-0.76, 1.56, 1.64]);
+    box(hut, [0.10, 2.10, 0.15], M.darkWood, [0.76, 1.56, 1.64]);
+    box(hut, [1.62, 0.11, 0.15], M.darkWood, [0, 2.56, 1.64]);
+    box(hut, [1.62, 0.11, 0.15], M.darkWood, [0, 0.56, 1.64]);
+    ico(hut, 0.065, 0, M.iron, [0.42, 1.56, 1.71]);
+
+    // Two front windows.
+    for (const x of [-1.2, 1.2]) {
+      box(hut, [0.80, 0.78, 0.09], M.window, [x, 2.28, 1.61]);
+
+      box(hut, [0.91, 0.09, 0.13], M.darkWood, [x, 2.69, 1.66]);
+      box(hut, [0.91, 0.09, 0.13], M.darkWood, [x, 1.87, 1.66]);
+      box(hut, [0.09, 0.86, 0.13], M.darkWood, [x - 0.43, 2.28, 1.66]);
+      box(hut, [0.09, 0.86, 0.13], M.darkWood, [x + 0.43, 2.28, 1.66]);
+    }
+
+    // Side window.
+    box(hut, [0.10, 0.82, 0.82], M.window, [1.83, 2.28, -0.15]);
+    box(hut, [0.14, 0.93, 0.09], M.darkWood, [1.87, 2.28, -0.55]);
+    box(hut, [0.14, 0.93, 0.09], M.darkWood, [1.87, 2.28, 0.25]);
+
+    // Small entrance lantern.
+    box(hut, [0.18, 0.28, 0.18], M.ironShade, [0.91, 2.16, 1.75]);
+    box(hut, [0.12, 0.18, 0.12], M.window, [0.91, 2.16, 1.86]);
+
+    // Steps.
+    box(hut, [1.72, 0.16, 0.60], M.snowShade, [0, 0.20, 1.91]);
+    box(hut, [1.50, 0.16, 0.45], M.snow, [0, 0.39, 1.69]);
+
+    // Hip roof and snow cap.
+    const roof = addMesh(
+      makeRoofGeometry(4.18, 3.08, 3.00, 4.18),
+      M.darkWood,
+      hut
+    );
+    roof.name = "HutRoof";
+
+    const snowRoof = addMesh(
+      makeRoofGeometry(4.05, 2.95, 3.13, 4.25),
+      M.snow,
+      hut
+    );
+    snowRoof.name = "SnowOnRoof";
+
+    // Irregular snow chunks along the eave.
+    for (let i = 0; i < 10; i++) {
+      ico(
+        hut,
+        0.35,
+        1,
+        M.snow,
+        [-1.85 + i * 0.41, 3.03, 1.47],
+        [1.0, 0.30, 0.55],
+        [0, i * 0.8, i % 2 ? 0.15 : -0.1]
+      );
+    }
+
+    // Chimney stone backing and individual low-poly bricks.
+    const chimney = new THREE.Group();
+    chimney.name = "Chimney";
+    chimney.position.set(0, 0, -0.25);
+    hut.add(chimney);
+
+    box(chimney, [0.78, 2.12, 0.84], M.mortar, [0, 4.08, 0]);
+
+    for (let row = 0; row < 8; row++) {
+      const y = 3.16 + row * 0.25;
+
+      box(chimney, [0.70, 0.21, 0.31], M.stone, [0, y, 0.16]);
+      box(chimney, [0.70, 0.21, 0.31], M.stone, [0, y, -0.62]);
+      box(chimney, [0.28, 0.21, 0.54], M.stone, [-0.36, y, -0.23]);
+      box(chimney, [0.28, 0.21, 0.54], M.stone, [0.36, y, -0.23]);
+    }
+
+    box(chimney, [1.03, 0.16, 0.97], M.darkWood, [0, 5.20, 0]);
+    box(chimney, [0.95, 0.09, 0.89], M.snow, [0, 5.31, 0]);
+
+    // Static low-poly smoke puffs.
+    const smokePuffs = [
+      [-0.05, 5.58, -0.25, 0.72],
+      [0.08, 5.95, -0.28, 0.62],
+      [-0.12, 6.31, -0.24, 0.52],
+      [0.12, 6.65, -0.22, 0.42],
+      [0.02, 6.98, -0.18, 0.31]
+    ];
+
+    for (const p of smokePuffs) {
+      ico(
+        chimney,
+        1,
+        1,
+        M.smoke,
+        [p[0], p[1], p[2]],
+        [p[3], p[3] * 0.82, p[3] * 0.72],
+        [0.1, 0.3, -0.1]
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Snowy pine trees
+    // -------------------------------------------------------------------------
+
+    function addPine(x, z, scale, rotation = 0) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(scale);
+      tree.rotation.y = rotation;
+      assetRoot.add(tree);
+
+      cylinder(tree, 0.13, 0.18, 1.15, 7, M.darkWood, [0, 0.55, 0]);
+
+      cone(tree, 0.82, 2.25, 8, M.pine, [0, 1.55, 0]);
+      cone(tree, 0.65, 1.95, 8, M.pineDark, [0, 2.28, 0]);
+      cone(tree, 0.47, 1.60, 8, M.pine, [0, 2.95, 0]);
+
+      cone(tree, 0.65, 1.80, 8, M.snow, [0, 1.63, 0]);
+      cone(tree, 0.47, 1.50, 8, M.snow, [0, 2.38, 0]);
+      cone(tree, 0.31, 1.20, 8, M.snow, [0, 3.08, 0]);
+    }
+
+    addPine(-4.8, -2.65, 1.18, 0.2);
+    addPine(-5.85, -1.35, 0.88, -0.5);
+
+    // -------------------------------------------------------------------------
+    // Crate and stacked firewood
+    // -------------------------------------------------------------------------
+
+    const crate = new THREE.Group();
+    crate.name = "WoodCrate";
+    crate.position.set(-3.65, 0, 2.25);
+    crate.rotation.y = 0.18;
+    assetRoot.add(crate);
+
+    box(crate, [0.92, 0.72, 0.82], M.darkWood, [0, 0.38, 0]);
+
+    for (let i = 0; i < 3; i++) {
+      box(crate, [0.95, 0.12, 0.85], M.plank, [0, 0.12 + i * 0.24, 0]);
+      box(crate, [0.08, 0.76, 0.86], M.plank, [-0.38, 0.38, 0]);
+      box(crate, [0.08, 0.76, 0.86], M.plank, [0.38, 0.38, 0]);
+    }
+
+    const logData = [
+      [-4.45, 0.43, 1.05, 0.18, Math.PI / 2],
+      [-4.30, 0.61, 1.10, -0.16, Math.PI / 2],
+      [-4.52, 0.79, 1.02, 0.12, Math.PI / 2]
+    ];
+
+    for (const l of logData) {
+      cylinder(
+        assetRoot,
+        0.16,
+        0.18,
+        1.25,
+        8,
+        M.darkWood,
+        [l[0], l[1], l[2]],
+        [0, 0, l[4]]
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Fox
+    // -------------------------------------------------------------------------
+
+    const fox = new THREE.Group();
+    fox.name = "Fox";
+    fox.position.set(3.45, 0, 2.0);
+    fox.rotation.y = -0.35;
+    assetRoot.add(fox);
+
+    ico(fox, 1, 1, M.fox, [0, 0.67, 0], [0.60, 0.45, 0.83]);
+    ico(fox, 1, 1, M.foxLight, [-0.25, 0.65, 0.48], [0.35, 0.40, 0.43]);
+
+    ico(fox, 1, 1, M.fox, [-0.56, 1.07, 0.04], [0.42, 0.39, 0.40]);
+    ico(fox, 1, 1, M.foxLight, [-0.72, 0.94, 0.08], [0.25, 0.18, 0.20]);
+
+    cone(fox, 0.18, 0.48, 5, M.fox, [-0.56, 1.43, -0.03], [0, 0, -0.12]);
+    cone(fox, 0.15, 0.40, 5, M.fox, [-0.52, 1.39, 0.10], [0, 0, 0.18]);
+
+    for (const x of [-0.32, 0.32]) {
+      for (const z of [-0.48, 0.48]) {
+        cylinder(fox, 0.075, 0.095, 0.49, 6, M.darkWood, [x, 0.27, z]);
+        ico(fox, 0.10, 0, M.darkWood, [x, 0.04, z], [1, 0.45, 1]);
+      }
+    }
+
+    // Curved tail made from faceted sections.
+    ico(fox, 0.32, 1, M.fox, [0, 0.72, 0.65], [0.85, 0.85, 1.1]);
+    ico(fox, 0.29, 1, M.foxLight, [0.03, 0.90, 0.91], [0.85, 0.90, 1.05]);
+    ico(fox, 0.24, 1, M.fox, [0.06, 1.08, 1.10], [0.85, 0.90, 1.0]);
+    ico(fox, 0.18, 1, M.foxLight, [0.10, 1.23, 1.18], [0.85, 0.90, 0.95]);
+
+    // Eyes and nose.
+    ico(fox, 0.055, 0, M.eye, [-0.69, 1.15, 0.25], [1, 1, 0.65]);
+    ico(fox, 0.055, 0, M.eye, [-0.43, 1.15, 0.39], [1, 1, 0.65]);
+    ico(fox, 0.075, 0, M.iron, [-0.78, 0.91, 0.22], [1, 0.75, 0.75]);
+
+    // -------------------------------------------------------------------------
+    // Raven
+    // -------------------------------------------------------------------------
+
+    const raven = new THREE.Group();
+    raven.name = "Raven";
+    raven.position.set(4.95, 0, -1.35);
+    raven.rotation.y = 0.2;
+    assetRoot.add(raven);
+
+    ico(raven, 1, 1, M.raven, [0, 0.60, 0], [0.46, 0.52, 0.65]);
+    ico(raven, 1, 1, M.raven, [-0.30, 0.67, 0.04], [0.36, 0.39, 0.37]);
+
+    cone(raven, 0.15, 0.44, 5, M.beak, [-0.64, 0.64, 0.04], [0, 0, Math.PI / 2]);
+
+    ico(raven, 0.055, 0, M.eye, [-0.40, 0.75, 0.35], [1, 1, 0.7]);
+    ico(raven, 0.055, 0, M.eye, [-0.40, 0.75, -0.25], [1, 1, 0.7]);
+
+    ico(raven, 1, 1, M.raven, [-0.05, 0.61, 0.42], [0.34, 0.38, 0.16]);
+    ico(raven, 1, 1, M.raven, [-0.05, 0.61, -0.42], [0.34, 0.38, 0.16]);
+
+    // Wings.
+    for (const z of [-0.43, 0.43]) {
+      ico(raven, 0.35, 1, M.raven, [-0.12, 0.63, z], [1.1, 0.72, 0.32]);
+      ico(raven, 0.30, 1, M.raven, [-0.32, 0.48, z * 1.15], [0.85, 0.55, 0.22]);
+    }
+
+    // Tail feathers.
+    for (let i = 0; i < 3; i++) {
+      const feather = box(
+        raven,
+        [0.12, 0.40, 0.72],
+        i === 1 ? M.beak : M.ironShade,
+        [0.18 + i * 0.10, 0.55, 0.68],
+        [0.15, 0, (i - 1) * -0.14]
+      );
+      feather.rotation.x = -0.18;
+    }
+
+    // Legs and feet.
+    for (const x of [-0.18, 0.18]) {
+      cylinder(raven, 0.035, 0.045, 0.32, 5, M.ironShade, [x, 0.19, 0]);
+      box(raven, [0.20, 0.05, 0.14], M.ironShade, [x, 0.03, 0]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Ossuill
+    // -------------------------------------------------------------------------
+
+    const ossoil = new THREE.Group();
+    ossoil.name = "Ossuill";
+    ossoil.position.set(0.95, 0, 3.5);
+    ossoil.rotation.y = -0.15;
+    assetRoot.add(ossoil);
+
+    ico(ossoil, 1, 1, M.raven, [0, 0.43, 0], [0.55, 0.29, 0.46]);
+    ico(ossoil, 1, 1, M.raven, [-0.32, 0.48, 0.08], [0.34, 0.31, 0.33]);
+
+    cone(ossoil, 0.12, 0.36, 5, M.beak, [-0.61, 0.45, 0.08], [0, 0, Math.PI / 2]);
+
+    ico(ossoil, 0.05, 0, M.eye, [-0.40, 0.53, 0.28], [1, 1, 0.65]);
+    ico(ossoil, 0.05, 0, M.eye, [-0.40, 0.53, -0.12], [1, 1, 0.65]);
+
+    ico(ossoil, 1, 1, M.raven, [-0.05, 0.42, 0.39], [0.35, 0.21, 0.18]);
+    ico(ossoil, 1, 1, M.raven, [-0.05, 0.42, -0.39], [0.35, 0.21, 0.18]);
+
+    // Wings.
+    for (const z of [-0.39, 0.39]) {
+      ico(ossoil, 0.32, 1, M.raven, [-0.02, 0.42, z], [1.1, 0.55, 0.30]);
+      ico(ossoil, 0.26, 1, M.raven, [-0.22, 0.32, z * 1.1], [0.95, 0.42, 0.22]);
+    }
+
+    // Legs.
+    for (const x of [-0.25, 0.25]) {
+      cylinder(ossoil, 0.03, 0.04, 0.29, 5, M.ironShade, [x, 0.17, 0]);
+      box(ossoil, [0.17, 0.05, 0.13], M.ironShade, [x, 0.025, 0]);
+    }
+
+    // Tail.
+    ico(ossoil, 0.28, 1, M.raven, [0.15, 0.45, 0.53], [0.9, 0.65, 1.0]);
+    ico(ossoil, 0.23, 1, M.raven, [0.31, 0.48, 0.71], [0.85, 0.70, 1.0]);
+
+    // -------------------------------------------------------------------------
+    // Snowflakes
+    // -------------------------------------------------------------------------
+
+    function createSnowflakeGeometry() {
+      const positions = [];
+
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const direction = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+        const side = new THREE.Vector3(-Math.sin(angle), Math.cos(angle), 0);
+        const tip = direction.clone().multiplyScalar(0.36);
+        const near = side.clone().multiplyScalar(0.12);
+        const far = side.clone().multiplyScalar(-0.12);
+
+        positions.push(0, 0, 0);
+        positions.push(...tip.toArray());
+        positions.push(near.x, near.y, 0);
+
+        positions.push(0, 0, 0);
+        positions.push(tip.x, tip.y, 0);
+        positions.push(far.x, far.y, 0);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    const snowflakes = addMesh(
+      createSnowflakeGeometry(),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        toneMapped: false
+      })
+    );
+
+    for (let i = 0; i < 34; i++) {
+      const snowflake = snowflakes.clone();
+      snowflake.position.set(
+        (Math.random() - 0.5) * 13,
+        0.6 + Math.random() * 6.7,
+        (Math.random() - 0.5) * 11
+      );
+      snowflake.rotation.set(
+        (Math.random() - 0.5) * 0.35,
+        Math.random() * Math.PI * 2,
+        (Math.random() - 0.5) * 0.35
+      );
+      const scale = 0.55 + Math.random() * 1.0;
+      snowflake.scale.setScalar(scale);
+      assetRoot.add(snowflake);
+    }
+
+    // -------------------------------------------------------------------------
+    // Export GLB
+    // -------------------------------------------------------------------------
+
+    const exportButton = document.getElementById("export");
+    const status = document.getElementById("status");
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      // Export only the asset, excluding the camera, editor lights, and sky shell.
+      const exportScene = new THREE.Scene();
+      exportScene.name = "DuskWinterScene";
+
+      const exportedAsset = assetRoot.clone(true);
+      exportedAsset.name = "WinterSceneModel";
+      exportScene.add(exportedAsset);
+      exportScene.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        exportScene,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "dusk-winter-scene.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.disabled = false;
+          status.textContent = "Exported dusk-winter-scene.glb";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed. See the browser console.";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          truncateDrawRange: true
+        }
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

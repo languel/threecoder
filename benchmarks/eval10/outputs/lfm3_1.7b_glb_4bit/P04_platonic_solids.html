@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Platonic Solids</title>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 34%, #26333c 0%, #15191d 48%, #090d16 100%);
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      color: #d8e3df;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 9px;
+      color: #c5ccb6;
+    }
+
+    #export-button {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 10;
+      border: 0;
+      border-radius: 7px;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #8ebfc2, #315c84);
+      box-shadow: 0 4px 14px rgb(41 55 48 / 20%);
+      color: #17180d;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 850;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    #export-button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    #export-button:active {
+      transform: translateY(0);
+    }
+
+    #export-button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    @media (max-width: 620px) {
+      #status {
+        top: 12px;
+      }
+
+      #export-button {
+        top: 12px;
+        right: 12px;
+      }
+    }
+  </style>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x071916);
+    scene.fog = new THREE.Fog(0x071916, 13, 24);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-0.4, 0.65, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 3.5;
+    controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // Studio lighting is kept separate from the exported asset.
+    scene.add(new THREE.HemisphereLight(0x9bc3df, 0x071916, 2.1));
+
+    const keyLight = new THREE.DirectionalLight(0xfff0d8, 4.5);
+    keyLight.position.set(-3.5, 7, 5.5);
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x4d9bff, 2.1);
+    rimLight.position.set(4, 4, -5);
+    scene.add(rimLight);
+
+    const warmFill = new THREE.PointLight(0xffc48f, 18, 8, 2);
+    warmFill.position.set(0, 3.5, 2);
+    scene.add(warmFill);
+
+    // Pedestal materials.
+    const baseMaterials = [
+      { name: "Titanium", color: 0x87939b, metalness: 0.88 },
+      { name: "Powdercoat", color: 0xaab8c1, metalness: 0.72 },
+      { name: "Brushed steel", color: 0x60606f, metalness: 0.82 },
+      { name: "Dark steel", color: 0x302d31, metalness: 0.88 }
+    ];
+
+    const pedestalMaterials = [
+      { name: "Base_A", color: 0xb6c4b1, metalness: 0.9 },
+      { name: "Base_B", color: 0x8c8993, metalness: 0.9 },
+      { name: "Base_C", color: 0x59616d, metalness: 0.92 },
+      { name: "Base_D", color: 0x4d5e4f, metalness: 0.9 },
+      { name: "Base_E", color: 0xb3a98d, metalness: 0.9 }
+    ];
+
+    const platformMaterials = [
+      { name: "Rounded_Red_Platform", color: 0xd5c8b3, metalness: 0.72 },
+      { name: "Rounded_Bright_Red", color: 0xe2b98f, metalness: 0.72 },
+      { name: "Rounded_Blue_Platform", color: 0x8d9a75, metalness: 0.7 },
+      { name: "Rounded_Vent_Platform", color: 0x4e5f50, metalness: 0.65 }
+    ];
+
+    // Exportable asset root.
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "LowPolySolidScults";
+    scene.add(assetRoot);
+
+    function addMesh(geometry, material, name, parent = assetRoot) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(
+      radius,
+      length,
+      segments = 4,
+      material,
+      name,
+      parent = assetRoot
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(
+          radius,
+          radius,
+          length,
+          segments,
+          1,
+          false
+        ),
+        material,
+        name,
+        parent
+      );
+    }
+
+    function addSphere(
+      radius,
+      material,
+      name,
+      parent = assetRoot
+    ) {
+      return addMesh(
+        new THREE.SphereGeometry(radius, 10, 6),
+        material,
+        name,
+        parent
+      );
+    }
+
+    function addTorus(
+      radius,
+      tube,
+      material,
+      name,
+      parent = assetRoot
+    ) {
+      return addCylinder(
+        radius,
+        tube * Math.PI * 2,
+        4,
+        material,
+        name,
+        parent
+      );
+    }
+
+    // ------------------------------------------------------------------
+    // Tetrahedron
+    // ------------------------------------------------------------------
+
+    const tetra = new THREE.Group();
+    tetra.name = "Tetrahedron";
+    assetRoot.add(tetra);
+
+    var base = addCylinder(
+      0.18,
+      0.18,
+      0.12,
+      baseMaterials[0],
+      "Base_A",
+      tetra
+    );
+    base.position.y = 0.48;
+
+    var baseB = addCylinder(
+      0.155,
+      0.155,
+      0.11,
+      baseMaterials[1],
+      "Base_B",
+      tetra
+    );
+    baseB.position.y = -0.18;
+
+    var baseC = addCylinder(
+      0.145,
+      0.145,
+      0.12,
+      baseMaterials[2],
+      "Base_C",
+      tetra
+    );
+    baseC.position.y = 0.35;
+
+    var baseD = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[3],
+      "Base_D",
+      tetra
+    );
+    baseD.position.y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Cube
+    // ------------------------------------------------------------------
+
+    const cube = new THREE.Group();
+    cube.name = "Cube";
+    assetRoot.add(cube);
+
+    const c = addCylinder(
+      0.16,
+      0.16,
+      0.12,
+      baseMaterials[0],
+      "Base_C",
+      cube
+    );
+    c.position.y = 0.48;
+
+    const cB = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[1],
+      "Base_B",
+      cube
+    );
+    cB.position.y = -0.18;
+
+    const cC = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[2],
+      "Base_C",
+      cube
+    );
+    cC.position.y = 0.35;
+
+    const cD = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[3],
+      "Base_D",
+      cube
+    );
+    cD.position.y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Octahedron
+    // ------------------------------------------------------------------
+
+    const octahedron = new THREE.Group();
+    octahedron.name = "Octahedron";
+    assetRoot.add(octahedron);
+
+    var base = addCylinder(
+      0.18,
+      0.18,
+      0.12,
+      baseMaterials[0],
+      "Base_A",
+      octahedron
+    );
+    base.position.y = 0.48;
+
+    var baseB = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[1],
+      "Base_B",
+      octahedron
+    );
+    baseB.position.y = -0.18;
+
+    var baseC = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[2],
+      "Base_C",
+      octahedron
+    );
+    baseC.position.y = 0.35;
+
+    var baseD = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[3],
+      "Base_D",
+      octahedron
+    );
+    baseD.position.y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Dodecahedron
+    // ------------------------------------------------------------------
+
+    const dodeca = new THREE.Group();
+    dodeca.name = "Dodecahedron";
+    assetRoot.add(dodeca);
+
+    var base = addCylinder(
+      0.18,
+      0.18,
+      0.12,
+      baseMaterials[0],
+      "Base_A",
+      dodeca
+    );
+    base.position.y = 0.48;
+
+    var baseB = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[1],
+      "Base_B",
+      dodeca
+    );
+    baseB.position.y = -0.18;
+
+    var baseC = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[2],
+      "Base_C",
+      dodeca
+    );
+    baseC.position.y = 0.35;
+
+    var baseD = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[3],
+      "Base_D",
+      dodeca
+    );
+    baseD.position.y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Icosahedron
+    // ------------------------------------------------------------------
+
+    const icosahedron = new THREE.Group();
+    icosahedron.name = "Icosahedron";
+    assetRoot.add(icosahedron);
+
+    var base = addCylinder(
+      0.18,
+      0.18,
+      0.12,
+      baseMaterials[0],
+      "Base_A",
+      icosahedron
+    );
+    base.position.y = 0.48;
+
+    var baseB = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[1],
+      "Base_B",
+      icosahedron
+    );
+    baseB.position.y = -0.18;
+
+    var baseC = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[2],
+      "Base_C",
+      icosahedron
+    );
+    baseC.position.y = 0.35;
+
+    var baseD = addCylinder(
+      0.145,
+      0.145,
+      0.11,
+      baseMaterials[3],
+      "Base_D",
+      icosahedron
+    );
+    baseD.position.y = -0.18;
+
+    // ------------------------------------------------------------------
+    // Pedestal platform
+    // Each platform is a separate low-poly object.
+    // ------------------------------------------------------------------
+
+    function createPlatform(centerX, centerZ, radius) {
+      const platform = new THREE.Group();
+      platform.name = `Platform_${centerX.toFixed(2)}`;
+      assetRoot.add(platform);
+
+      // Rounded top: a circular disk with a raised central face.
+      addSphere(
+        0.145,
+        platformMaterials[0],
+        `Platform_Red_${centerX.toFixed(2)}`,
+        platform
+      );
+
+      // Raised central face.
+      addCylinder(
+        0.15,
+        0.11,
+        0.16,
+        baseMaterials[2],
+        `Platform_Central_${centerX.toFixed(2)}`,
+        platform
+      );
+
+      // Rounded perimeter.
+      const perimeter = addTorus(
+        radius * 1.05,
+        0.045,
+        platformMaterials[1],
+        `Platform_Rim_${centerX.toFixed(2)}`,
+        platform
+      );
+      perimeter.rotation.x = Math.PI / 2;
+      perimeter.position.y = 0.13;
+
+      // Dark inner ribs.
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        addTorus(
+          radius * 0.88,
+          0.025,
+          baseMaterials[3],
+          `Platform_Rib_${centerX.toFixed(2)}_${i}`,
+          platform
+        );
+      }
+
+      return platform;
+    }
+
+    // ------------------------------------------------------------------
+    // Export
+    // ------------------------------------------------------------------
+
+    const exportButton = document.querySelector("#export-button");
+    const status = document.querySelector("#status");
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      assetRoot.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        assetRoot,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "low_poly_solids.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          status.textContent = "Downloaded low_poly_solids.glb";
+          exportButton.disabled = false;
+        },
+        (error) => {
+          console.error("GLB export failed:", error);
+          status.textContent = "Export failed. See browser console.";
+          exportButton.disabled = false;
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        }
+      );
+    });
+
+    // ------------------------------------------------------------------
+    // Render loop and responsive resizing
+    // ------------------------------------------------------------------
+
+    function render() {
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    render();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

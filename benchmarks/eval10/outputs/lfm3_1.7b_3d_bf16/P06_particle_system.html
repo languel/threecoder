@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spiral Ember — Lantern</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e7e3d8;
+      --muted: #9ca4a5;
+      --accent: #ffd27a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 52% 28%, #b8d1d7 0%, #f0f4e8 48%, #dfc8cf 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active { cursor: grabbing; }
+
+    .title-card {
+      position: fixed;
+      top: 24px;
+      left: 26px;
+      z-index: 2;
+      max-width: 340px;
+      padding: 16px 19px 17px;
+      color: var(--ink);
+      background: linear-gradient(135deg, rgba(20, 18, 15, 0.82), rgba(22, 19, 17, 0.76));
+      border: 1px solid rgba(255, 235, 194, 0.2);
+      border-radius: 14px;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(25px, 4vw, 37px);
+      font-weight: 400;
+      letter-spacing: -0.035em;
+    }
+
+    .description {
+      max-width: 280px;
+      margin: 10px 0 15px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .controls span {
+      padding: 7px 9px;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 235, 194, 0.3);
+      border-radius: 999px;
+      padding: 10px 15px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 235, 194, 0.65);
+      background: rgba(255, 255, 255, 0.11);
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 14px;
+        left: 14px;
+        padding: 13px 15px;
+      }
+
+      .description { max-width: calc(100vw - 28px); }
+      .controls { right: 10px; bottom: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="Interactive carved stone lantern scene with animated firefly and embers"></canvas>
+
+  <div class="title-card">
+    <div class="eyebrow">No. 07 · Arcane Garden</div>
+    <h1>Spiral<br />Ember</h1>
+    <p class="description">A timeless bronze vessel with a carved stone bowl, glowing embers, and a floating firefly.</p>
+  </div>
+
+  <div class="controls">
+    <span>Drag to orbit · Scroll or pinch to zoom</span>
+    <button id="reset" type="button">Reset view</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera and lighting
+    // -------------------------------------------------------------------------
+
+    const canvas = document.querySelector("#scene");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xb7d1d8);
+    scene.fog = new THREE.Fog(0xb7d1d8, 19, 43);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const hemiLight = new THREE.HemisphereLight(0xe6f5ff, 0x6b7358, 2.15);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff4d9, 3.25);
+    keyLight.position.set(-4.5, 8, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00025;
+    keyLight.shadow.normalBias = 0.025;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xc8d9e6, 1.35);
+    fillLight.position.set(4, 4, -5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffb96e, 1.45);
+    rimLight.position.set(-3, 2, -7);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Procedural textures
+    // -------------------------------------------------------------------------
+
+    function makeStoneTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#aeb8bd";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 110; i++) {
+        const y = Math.random() * canvas.height;
+        const amplitude = 1 + Math.random() * 3;
+
+        ctx.strokeStyle = `rgba(${Math.random() > 0.5 ? "255,255,255" : "70,58,53"},${
+          0.025 + Math.random() * 0.07
+        })`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.4;
+
+        const x = Math.random() * canvas.width;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.035) * amplitude,
+          y + Math.cos(y * 0.025) * amplitude
+        );
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 18; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+
+        ctx.strokeStyle = "rgba(48, 37, 26, 0.11)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.035) * 4,
+          y + Math.cos(y * 0.025) * 4
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 2.5);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    function makeGlowTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(
+        128,
+        128,
+        18,
+        128,
+        128,
+        92
+      );
+
+      gradient.addColorStop(0, "rgba(255,235,194,1)");
+      gradient.addColorStop(0.45, "rgba(255,226,173,0.78)");
+      gradient.addColorStop(1, "rgba(255,189,146,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 512);
+
+      for (let i = 0; i < 5; i++) {
+        const y = 80 + Math.random() * 360;
+        const radius = 8 + Math.random() * 18;
+
+        ctx.strokeStyle = `rgba(255,235,194,${0.08 + Math.random() * 0.16})`;
+        ctx.lineWidth = 1.5 + Math.random() * 2.5;
+
+        for (let ring = 0; ring < 4; ring++) {
+          const r = 36 + ring * radius;
+          ctx.beginPath();
+          ctx.arc(128, 128, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+
+      return texture;
+    }
+
+    function makeStoneBowlTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#c8d0d1";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 130; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(55, 45, 35, ${0.025 + Math.random() * 0.075})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.035) * 4,
+          y + Math.cos(y * 0.025) * 3
+        );
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 9; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(55, 45, 35, 0.11)";
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.035) * 8,
+          y - (y > 250 ? -3 : 3)
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+
+      return texture;
+    }
+
+    function makeGlowEmberTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(256, 128, 0, 256, 128, 140);
+      gradient.addColorStop(0, "rgba(255,210,148,1)");
+      gradient.addColorStop(0.45, "rgba(255,180,105,0.72)");
+      gradient.addColorStop(1, "rgba(255,125,58,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 256);
+
+      for (let i = 0; i < 9; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 35 + Math.random() * 90;
+
+        ctx.strokeStyle = `rgba(255,210,148,${0.08 + Math.random() * 0.18})`;
+        ctx.lineWidth = 1 + Math.random() * 2;
+
+        ctx.beginPath();
+        ctx.moveTo(
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius
+        );
+        ctx.lineTo(
+          Math.cos(angle) * radius * (1 + Math.random() * 0.25),
+          Math.sin(angle) * radius * (1 + Math.random() * 0.25)
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+
+      return texture;
+    }
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#b9c0ca";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 18000; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        const light = Math.random() > 0.5;
+
+        ctx.fillStyle = light
+          ? "rgba(255,255,255,0.025)"
+          : "rgba(55,45,35,0.025)";
+
+        ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    function makeWoodTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 128;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#8a5b3f";
+      ctx.fillRect(0, 0, 512, 128);
+
+      for (let i = 0; i < 190; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 128;
+
+        const radius = 1 + Math.random() * 3;
+        ctx.strokeStyle = `rgba(54, 35, 22, ${0.018 + Math.random() * 0.055})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      map: makeStoneTexture(),
+      color: 0xffffff,
+      roughness: 0.92,
+      metalness: 0
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      map: makeStoneBowlTexture(),
+      color: 0xffffff,
+      roughness: 0.96,
+      metalness: 0
+    });
+
+    const warmStoneMaterial = new THREE.MeshStandardMaterial({
+      map: makeStoneTexture(),
+      color: 0xe2d7b9,
+      roughness: 0.88
+    });
+
+    const emberMaterial = new THREE.MeshStandardMaterial({
+      map: makeGlowEmberTexture(),
+      emissive: 0xffa64f,
+      emissiveIntensity: 1.25,
+      roughness: 0.35,
+      metalness: 0.05
+    });
+
+    const emberTipMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffb64f,
+      emissive: 0xff5e1a,
+      emissiveIntensity: 1.2,
+      roughness: 0.3
+    });
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      map: makeGroundTexture(),
+      color: 0xffffff,
+      roughness: 1
+    });
+
+    // -------------------------------------------------------------------------
+    // Lantern geometry and carved details
+    // -------------------------------------------------------------------------
+
+    function createStoneBowlGeometry() {
+      const shape = new THREE.Shape();
+
+      // A rounded bowl profile.
+      shape.moveTo(-0.48, -0.18);
+      shape.lineTo(0.48, -0.18);
+      shape.quadraticCurveTo(0.48, 0.18, 0, 0.18);
+      shape.lineTo(0, 0.18);
+      shape.quadraticCurveTo(-0.16, 0.18, -0.42, 0);
+
+      // A small cut-out at the lower rim.
+      shape.moveTo(-0.38, 0.22);
+      shape.bezierCurveTo(-0.48, 0.22, -0.25, 0.12, -0.08, 0);
+
+      // The bottom of the bowl is lifted to create a raised opening.
+      shape.moveTo(0.18, 0.22);
+      shape.lineTo(-0.08, 0.22);
+      shape.bezierCurveTo(-0.25, 0.12, -0.38, 0);
+
+      // A dark inner cut that preserves the opening's shape.
+      const hole = new THREE.Path();
+      hole.moveTo(-0.19, 0.22);
+      hole.lineTo(-0.13, 0.12);
+      hole.lineTo(0.13, 0.12);
+      hole.lineTo(0.19, 0.22);
+
+      shape.holes.push(hole);
+
+      // A small, raised carved rim on the upper edge.
+      const rim = new THREE.Path();
+      rim.moveTo(-0.2, 1.18);
+      rim.lineTo(0.2, 1.18);
+      rim.bezierCurveTo(0.23, 1.38, 0, 1.43, -0.2, 1.18);
+
+      shape.holes.push(rim);
+
+      // Thin golden rim around the carved opening.
+      const rimGlow = new THREE.Path();
+      rimGlow.moveTo(-0.12, 1.22);
+      rimGlow.lineTo(0, 1.24);
+      rimGlow.lineTo(0.12, 1.22);
+
+      shape.holes.push(rimGlow);
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.12,
+        steps: 1,
+        curveSegments: 72,
+        bevelEnabled: true,
+        bevelThickness: 0.045,
+        bevelSize: 0.045,
+        bevelSegments: 3
+      });
+
+      geometry.translate(0, 0, -0.06);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    function createCandleGeometry() {
+      const shape = new THREE.Shape();
+      shape.moveTo(-0.5, 1.25);
+      shape.lineTo(0.5, 1.25);
+      shape.lineTo(0.58, 2.65);
+      shape.lineTo(0, 3.05);
+      shape.lineTo(-0.58, 2.65);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.1,
+        bevelEnabled: true,
+        bevelThickness: 0.025,
+        bevelSize: 0.025,
+        bevelSegments: 3
+      });
+
+      geometry.translate(0, 0, -0.05);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    // -------------------------------------------------------------------------
+    // Stone lantern
+    // -------------------------------------------------------------------------
+
+    const bowl = new THREE.Mesh(
+      createStoneBowlGeometry(),
+      stoneMaterial
+    );
+
+    bowl.position.set(0, 1.78, -0.25);
+    bowl.scale.set(1.02, 1.12, 1.08);
+    bowl.castShadow = true;
+    bowl.receiveShadow = true;
+
+    const bowlDark = new THREE.Mesh(
+      createStoneBowlGeometry(),
+      darkStoneMaterial
+    );
+
+    bowlDark.position.set(0, 1.78, -0.25 + 0.04);
+    bowlDark.scale.set(0.88, 1.05, 0.88);
+    bowlDark.castShadow = true;
+    scene.add(bowlDark);
+
+    const bowlRim = new THREE.Mesh(
+      createStoneBowlGeometry(),
+      warmStoneMaterial
+    );
+
+    bowlRim.position.set(0, 1.78, -0.25 + 0.2);
+    bowlRim.scale.set(1, 1.08, 1);
+    bowlRim.castShadow = true;
+    scene.add(bowlRim);
+
+    const candle = new THREE.Mesh(
+      createCandleGeometry(),
+      emberMaterial
+    );
+
+    candle.position.set(0, 2.28, -0.25 + 0.38);
+    candle.scale.y = 0.72;
+    candle.castShadow = true;
+    scene.add(candle);
+
+    const wax = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.075, 0.12, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0xffd39c,
+        roughness: 0.85
+      })
+    );
+
+    wax.position.set(0, 2.45, -0.25 + 0.38);
+    wax.castShadow = true;
+    scene.add(wax);
+
+    // -------------------------------------------------------------------------
+    // Floating embers and firefly
+    // -------------------------------------------------------------------------
+
+    const emberCount = 18;
+    const emberPositions = new Float32Array(emberCount * 3);
+    const emberUpsets = [];
+
+    function createEmber(x, y, z) {
+      const root = new THREE.Mesh(
+        new THREE.ConeGeometry(0.075, 0.14, 8),
+        emberMaterial
+      );
+
+      root.position.set(x, y, z + 0.13);
+      root.scale.z = 0.65;
+      root.castShadow = true;
+      scene.add(root);
+
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.035, 0.24, 8),
+        emberTipMaterial
+      );
+
+      tip.position.set(x, y, z + 0.31);
+      tip.scale.z = 0.7;
+      tip.castShadow = true;
+      scene.add(tip);
+
+      return root;
+    }
+
+    function createFirefly(x, y, z, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(x, y, z);
+      scene.add(group);
+
+      const body = new THREE.Mesh(
+        new THREE.SphereGeometry(0.43, 28, 20),
+        emberMaterial
+      );
+
+      body.scale.set(scale, scale, 1);
+      body.castShadow = true;
+      group.add(body);
+
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 24, 16),
+        emberTipMaterial
+      );
+
+      glow.position.y = 0.38;
+      glow.scale.setScalar(scale * 1.65);
+      glow.castShadow = true;
+      group.add(glow);
+
+      return { group, body, glow };
+    }
+
+    const firefly = createFirefly(-1.55, 2.42, 0.25, 1.08);
+    const embers = [];
+
+    for (let i = 0; i < emberCount; i++) {
+      const x = -0.45 + Math.random() * 1.05;
+      const y = 2.48 + Math.random() * 0.16;
+      const z = -0.25 + Math.random() * 0.55;
+
+      const root = createEmber(x, y, z);
+      embers.push({
+        position: root.position,
+        x,
+        y,
+        z,
+        type: i % 3 === 0 ? "spiral" : "pulse"
+      });
+    }
+
+    const particleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff8a5b,
+      emissive: 0xff4d1a,
+      emissiveIntensity: 1.35,
+      roughness: 0.3
+    });
+
+    function addParticle(position, scale, material) {
+      const particle = new THREE.Mesh(
+        new THREE.SphereGeometry(scale, 10, 7),
+        material
+      );
+
+      particle.position.set(position[0], position[1], position[2]);
+      particle.scale.setScalar(scale);
+      particle.castShadow = true;
+      return particle;
+    }
+
+    // -------------------------------------------------------------------------
+    // Ground and ambient atmosphere
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      groundMaterial
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.025;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(40, 64, 32),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          uTime: { value: 0 },
+          uDistance: { value: 38 }
+        },
+        vertexShader: `
+          varying float vWave;
+          void main() {
+            vec3 p = position;
+            float wave = sin(p.x * 0.12 + p.z * 0.025) * 0.055;
+            p.y += wave;
+            vWave = wave;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float uTime;
+          uniform float uDistance;
+          varying float vWave;
+
+          void main() {
+            float pulse = sin(vWave * 6.0 + uTime * 1.2);
+            float glow = pow(pulse, 18.0);
+            gl_FragColor = vec4(0.72, 0.72, 0.72, glow);
+          }
+        `
+      })
+    );
+
+    atmosphere.scale.set(1, 1, 1);
+    atmosphere.renderOrder = 2;
+    scene.add(atmosphere);
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls: orbit, zoom and pinch-to-zoom
+    // -------------------------------------------------------------------------
+
+    const target = new THREE.Vector3(0, 1.05, -0.05);
+    let theta = 0.72;
+    let phi = 1.12;
+    let radius = 18;
+    var dragging = false;
+    var pinchDistance = 0;
+
+    var resetView = function() {
+      theta = 0.72;
+      phi = 1.12;
+      radius = 18;
+      target.set(0, 1.05, -0.05);
+    }
+
+    
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      window._dragLastX = event.clientX;
+      window._dragLastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      const dx = event.clientX - (window._dragLastX || event.clientX); window._window._dragLastX = event.clientX;
+      const dy = event.clientY - (window._dragLastY || event.clientY); window._window._dragLastY = event.clientY;
+      window._dragLastX = event.clientX;
+      window._dragLastY = event.clientY;
+
+      theta -= dx * 0.006;
+      phi = THREE.MathUtils.clamp(phi + dy * 0.005, 0.38, 1.46);
+    });
+
+    function endDrag(event) {
+      dragging = false;
+
+      if (event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+
+        radius = THREE.MathUtils.clamp(
+          radius * Math.exp(event.deltaY * 0.001),
+          9,
+          28
+        );
+      },
+      { passive: false }
+    );
+
+    canvas.addEventListener("dblclick", resetView);
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    var dragging = false;
+    var pinchDistance = 0;
+
+    
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      window._dragLastX = event.clientX;
+      window._dragLastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      const dx = event.clientX - (window._dragLastX || event.clientX); window._window._dragLastX = event.clientX;
+      const dy = event.clientY - (window._dragLastY || event.clientY); window._window._dragLastY = event.clientY;
+      window._dragLastX = event.clientX;
+      window._dragLastY = event.clientY;
+
+      theta -= dx * 0.006;
+      phi = THREE.MathUtils.clamp(phi + dy * 0.005, 0.38, 1.46);
+    });
+
+    var resetView = function() {
+      target.set(0, 1.05, -0.05);
+      theta = 0.72;
+      phi = 1.12;
+      radius = 18;
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      radius = THREE.MathUtils.clamp(
+        radius * Math.exp(event.deltaY * 0.001),
+        9,
+        28
+      );
+    }, { passive: false });
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener("resize", resize);
+
+    let elapsed = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = elapsed * 0.001;
+
+      // Gentle ambient motion.
+      atmosphere.position.x =
+        Math.sin(time * 0.025) * 0.08;
+      atmosphere.position.z =
+        Math.cos(time * 0.018 + 1.2) * 0.07;
+
+      embers.forEach((ember, i) => {
+        const pulse = 1 + Math.sin(time * 3.5 + i) * 0.18;
+
+        if (ember.type === "spiral") {
+          const radius = 0.12 + Math.sin(time * 4.2 + i) * 0.035;
+          ember.position.x =
+            -0.45 + Math.cos(time * 3.2 + i) * radius;
+          ember.position.z =
+            0.25 + Math.sin(time * 2.1 + i) * radius;
+        } else {
+          ember.position.y =
+            2.48 + Math.sin(time * 4.6 + i) * pulse * 0.13;
+
+          if (ember.type === "pulse") {
+            ember.position.z =
+              0.25 + Math.sin(time * 1.8 + i) * pulse;
+          } else {
+            ember.position.x =
+              -0.45 + Math.cos(time * 2.4 + i) * 0.035;
+            ember.position.y =
+              2.48 + Math.sin(time * 3.7 + i) * pulse * 0.075;
+            ember.position.z =
+              0.25 + Math.cos(time * 1.6 + i) * 0.035;
+          }
+        }
+
+        if (ember.body) {
+          ember.body.scale.y = 1 + Math.sin(time * 0.5 + (ember.x || 0)) * 0.12;
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

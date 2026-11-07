@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cozy Winter Cabin Snowglobe</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #aab8b2;
+    }
+
+    body {
+      color: #f7f5e9;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      max-width: min(350px, calc(100vw - 40px));
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: linear-gradient(
+        145deg,
+        rgba(55, 45, 36, 0.92),
+        rgba(45, 31, 26, 0.72)
+      );
+      box-shadow: 0 8px 30px rgba(18, 12, 7, 0.22);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin-bottom: 5px;
+      color: #dbe5c9;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 28px);
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin: 7px 0 0;
+      color: #aab8b2;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      gap: 9px;
+      padding: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 16px;
+      background: linear-gradient(135deg, #ffd49b, #f7c96d);
+      color: #d9a66f;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 5px 16px rgba(254, 160, 65, 0.22);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.025em;
+      cursor: pointer;
+      transition:
+        transform 150ms ease,
+        filter 150ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.35);
+      opacity: 0.78;
+      transform: none;
+    }
+
+    #status {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: rgba(45, 31, 26, 0.78);
+      color: #d9a66f;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        padding: 13px 15px;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      button {
+        padding: 10px 13px;
+      }
+
+      #status {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="panel">
+    <div class="eyebrow">Low-poly character asset</div>
+    <h1>Cozy Winter Cabin Snowglobe</h1>
+    <p class="subtitle">
+      A carved wooden base, warm glass windows, a tiny snowman,
+      drifting snowflakes, and a cozy dusk winter atmosphere.
+    </p>
+
+    <div class="actions">
+      <button id="export" type="button">Export GLB</button>
+    </div>
+  </div>
+
+  <div id="status">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xaab8b2);
+    scene.fog = new THREE.Fog(0xaab8b2, 10, 24);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.35, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 4.5;
+    controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemisphere = new THREE.HemisphereLight(0xffe2df, 0x9d8c78, 1.45);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff4ee, 3.2);
+    keyLight.position.set(5.5, 8.5, 7.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00035;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x9ec7ff, 1.55);
+    rimLight.position.set(-6, 5, -7);
+    scene.add(rimLight);
+
+    const warmFill = new THREE.PointLight(0xffa84d, 18, 12, 2);
+    warmFill.position.set(-3.5, 3.1, 4.5);
+    scene.add(warmFill);
+
+    // Studio floor is only part of the display and is not included in the GLB.
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 60),
+      new THREE.MeshStandardMaterial({
+        color: 0x8cb3b5,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.015;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ---------------------------------------------------------------------
+    // Character hierarchy
+    // ---------------------------------------------------------------------
+
+    const body = new THREE.Group();
+    body.name = "Carved_Wooden_Base";
+    scene.add(body);
+
+    var head = new THREE.Group();
+    head.name = "Head_And_Glass";
+    body.add(head);
+
+    var nose = new THREE.Group();
+    nose.name = "Nose";
+    head.add(nose);
+
+    const eyes = new THREE.Group();
+    eyes.name = "Eyes";
+    head.add(eyes);
+
+    const snowman = new THREE.Group();
+    snowman.name = "Tiny_Snowman";
+    body.add(snowman);
+
+    const driftingSnow = new THREE.Group();
+    driftingSnow.name = "Drifting_Snowflakes";
+    body.add(driftingSnow);
+
+    const gem = new THREE.Group();
+    gem.name = "Warm_Glass_Gem";
+    head.add(gem);
+
+    // Carved wooden base.
+    const base = new THREE.Group();
+    base.name = "Carved_Wooden_Base";
+    body.add(base);
+
+    for (let i = 0; i < 30; i++) {
+      const angle = (i / 30) * Math.PI * 2;
+      const radius = 3.35 + (i % 3) * 0.035;
+
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+
+      const woodMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8a5d45,
+        roughness: 0.82,
+        metalness: 0.02,
+        flatShading: true
+      });
+
+      const timber = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.105 + (i % 7) * 0.012, 0.115 + (i + 1) % 7 * 0.012, 0.018, 8),
+        woodMaterial
+      );
+
+      timber.position.set(x, y, 0.022);
+      timber.castShadow = true;
+      timber.receiveShadow = true;
+      base.add(timber);
+    }
+
+    // Dark planks visible between the carved edges.
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const x = Math.cos(angle) * 3.25;
+      const y = Math.sin(angle) * 3.25;
+
+      const woodMaterial = new THREE.MeshStandardMaterial({
+        color: 0x9c5b40,
+        roughness: 0.88,
+        metalness: 0.03,
+        flatShading: true
+      });
+
+      const plank = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.13 + (i % 3) * 0.018, 0.018),
+        woodMaterial
+      );
+
+      plank.position.set(x, y, 0.034);
+      plank.castShadow = true;
+      plank.receiveShadow = true;
+      base.add(plank);
+    }
+
+    // Dark interior boards give the base a readable carved profile.
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const x = Math.cos(angle) * 3.12;
+      const y = Math.sin(angle) * 3.12;
+
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(0.018, 0.055 + (i % 3) * 0.012, 0.018),
+        i % 2 === 0 ? woodMaterial : darkWoodMaterial
+      );
+
+      board.position.set(x, y, 0.035);
+      board.castShadow = true;
+      board.receiveShadow = true;
+      base.add(board);
+    }
+
+    // ---------------------------------------------------------------------
+    // Carved wooden front boards and window frame
+    // ---------------------------------------------------------------------
+
+    const upperFrontWall = new THREE.Mesh(
+      new THREE.BoxGeometry(1.62, 0.12, 0.16),
+      woodMaterial
+    );
+    upperFrontWall.position.y = 3.48;
+    body.add(upperFrontWall);
+
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(2.02, 0.14, 0.18),
+      new THREE.MeshStandardMaterial({
+        color: 0x1a2d30,
+        roughness: 0.9,
+        metalness: 0
+      })
+    );
+    frame.position.y = 3.48;
+    body.add(frame);
+
+    // Raised front planks.
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const x = Math.cos(angle) * 1.72;
+      const y = Math.sin(angle) * 1.72;
+
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(0.065, 0.105 + (i % 3) * 0.018, 0.012),
+        i % 2 === 0 ? woodMaterial : darkWoodMaterial
+      );
+
+      board.position.set(x, y, 0.052);
+      board.castShadow = true;
+      board.receiveShadow = true;
+      body.add(board);
+    }
+
+    // Four window frames.
+    const frontWindow = new THREE.Mesh(
+      new THREE.BoxGeometry(2.02, 1.16, 0.12),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffe5a4,
+        emissiveIntensity: 1.35,
+        roughness: 0.3,
+        metalness: 0.18
+      })
+    );
+    frontWindow.position.y = 3.48;
+    body.add(frontWindow);
+
+    const leftWindow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 1.16, 1.08),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffe5a4,
+        emissiveIntensity: 1.35,
+        roughness: 0.3,
+        metalness: 0.18
+      })
+    );
+    leftWindow.position.set(-1.02, 3.48, 0);
+    body.add(leftWindow);
+
+    const rightWindow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 1.16, 1.08),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffe5a4,
+        emissiveIntensity: 1.35,
+        roughness: 0.3,
+        metalness: 0.18
+      })
+    );
+    rightWindow.position.set(1.02, 3.48, 0);
+    body.add(rightWindow);
+
+    const backWindow = new THREE.Mesh(
+      new THREE.BoxGeometry(2.02, 1.16, 0.12),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffe5a4,
+        emissiveIntensity: 1.35,
+        roughness: 0.3,
+        metalness: 0.18
+      })
+    );
+    backWindow.position.y = 3.48;
+    body.add(backWindow);
+
+    // ---------------------------------------------------------------------
+    // Head, nose, and eyes
+    // ---------------------------------------------------------------------
+
+    var head = new THREE.Group();
+    head.name = "Head_And_Glass";
+    head.position.y = 5.25;
+    head.castShadow = true;
+    body.add(head);
+
+    const skull = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.38, 1),
+      new THREE.MeshStandardMaterial({
+        color: 0xdce9ff,
+        emissive: 0xffe4a4,
+        emissiveIntensity: 0.65,
+        roughness: 0.48,
+        metalness: 0.08
+      })
+    );
+    skull.position.y = 5.16;
+    head.add(skull);
+
+    var nose = new THREE.Group();
+    nose.name = "Nose";
+    nose.position.y = 5.19;
+    nose.castShadow = true;
+    head.add(nose);
+
+    const eyeGeometry = new THREE.BoxGeometry(0.052, 0.018, 0.009);
+    const leftEye = new THREE.Mesh(eyeGeometry, new THREE.PointLight(0xffdfb4, 1.3, 8));
+    nose.add(leftEye.position.set(-0.075, 5.195, 0.035));
+
+    const rightEye = new THREE.Mesh(eyeGeometry, new THREE.PointLight(0xffdfb4, 1.3, 8));
+    nose.add(rightEye.position.set(0.075, 5.195, 0.035));
+
+    // ---------------------------------------------------------------------
+    // Pine trees
+    // ---------------------------------------------------------------------
+
+    function addTree(parent, position, radiusX = 0.34, radiusZ = 0.31) {
+      const tree = new THREE.Group();
+      tree.position.set(position.x, position.y, position.z);
+      parent.add(tree);
+
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(radiusX, radiusX * 1.12, 2.15, 8),
+        woodMaterial
+      );
+      trunk.rotation.x = Math.PI / 2;
+      trunk.position.y = 0.02;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      tree.add(trunk);
+
+      const branches = [
+        { x: -0.9, y: 1.35, z: 0.13 },
+        { x: 0.0, y: 2.05, z: 0.12 },
+        { x: 0.9, y: 1.35, z: 0.13 }
+      ];
+
+      for (const branch of branches) {
+        const angle = (branch.x / radiusX) * Math.PI * 2;
+        const side = Math.sign(branch.z);
+        const x = branch.x + side * branch.z * 0.07;
+
+        const branchShape = new THREE.Shape();
+        branchShape.moveTo(x, 0.02);
+        branchShape.lineTo(x, -0.08);
+        branchShape.lineTo(x, 0.02);
+        branchShape.lineTo(x + side * branch.z * 0.13, -0.12);
+        branchShape.lineTo(x + side * branch.z * 0.18, 0.035);
+        branchShape.lineTo(x + side * branch.z * 0.19, 0.08);
+        branchShape.lineTo(x + side * branch.z * 0.13, 0.02);
+        branchShape.closePath();
+
+        const branch = new THREE.Mesh(
+          new THREE.ShapeGeometry(branchShape),
+          woodMaterial
+        );
+        branch.position.y = 0.25;
+        tree.add(branch);
+      }
+
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2;
+
+        const radius = 0.31 + (i % 3) * 0.025;
+        const x = position.x + Math.cos(angle) * radius;
+        const y = position.y + Math.sin(angle) * radius;
+        const z = position.z + side * radius * 0.13;
+
+        const branch = new THREE.Mesh(
+          new THREE.ConeGeometry(0.075, 1.35, 4),
+          woodMaterial
+        );
+        branch.position.set(x, y, z);
+        tree.add(branch);
+      }
+
+      return tree;
+    }
+
+    addTree(body, new THREE.Vector3(-2.5, 2.78, 0));
+    addTree(body, new THREE.Vector3(2.6, 2.72, 0));
+
+    // ---------------------------------------------------------------------
+    // Tiny snowman
+    // ---------------------------------------------------------------------
+
+    const man = new THREE.Group();
+    man.name = "Snowman";
+    man.position.y = 5.15;
+    man.rotation.z = -0.25;
+    man.rotation.x = -0.08;
+    man.rotation.y = -0.28;
+    body.add(man);
+
+    var head = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.105, 1),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffd8a5,
+        emissiveIntensity: 0.65,
+        roughness: 0.4,
+        metalness: 0.2
+      })
+    );
+    head.position.y = -0.08;
+    man.add(head);
+
+    var nose = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.026, 1),
+      new THREE.MeshStandardMaterial({
+        color: 0xffd8a5,
+        emissive: 0xffd8a5,
+        emissiveIntensity: 0.7,
+        roughness: 0.35
+      })
+    );
+    nose.position.y = -0.12;
+    man.add(nose);
+
+    const ears = [
+      { position: new THREE.Vector3(-0.055, -0.02, 0.115), scale: 0.18 },
+      { position: new THREE.Vector3(0.055, -0.02, 0.115), scale: 0.18 }
+    ];
+
+    for (const ear of ears) {
+      const ear = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.17, 1),
+        new THREE.MeshStandardMaterial({
+          color: 0xffd8a5,
+          emissive: 0xffd8a5,
+          emissiveIntensity: 0.65,
+          roughness: 0.4,
+          metalness: 0.2
+        })
+      );
+      ear.position.copy(ear.position);
+      ear.scale.set(scale.x, scale.y, scale.z);
+      man.add(ear);
+    }
+
+    // Small hat and beak.
+    const hat = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.17, 0.12, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0xe7c9a1,
+        roughness: 0.78,
+        metalness: 0.08
+      })
+    );
+    hat.position.y = 2.38;
+    man.add(hat);
+
+    const beak = new THREE.Mesh(
+      new THREE.ConeGeometry(0.11, 0.18, 4),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffd8a5,
+        emissiveIntensity: 0.65,
+        roughness: 0.38
+      })
+    );
+    beak.position.y = 2.05;
+    man.add(beak);
+
+    // ---------------------------------------------------------------------
+    // Drifting snowflakes
+    // ---------------------------------------------------------------------
+
+    function addSnowflake(position, scale = 1) {
+      const group = new THREE.Group();
+      group.position.copy(position);
+      driftingSnow.add(group);
+
+      const shape = new THREE.Shape();
+      shape.moveTo(0.42, 0.3);
+      shape.lineTo(0.18, -0.45);
+      shape.lineTo(0.42, -0.35);
+      shape.lineTo(0.16, 0.25);
+      shape.closePath();
+
+      const geometry = new THREE.ShapeGeometry(shape);
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(scale * 0.12, scale * 0.38, 4),
+        new THREE.MeshStandardMaterial({
+          color: 0xf3b7ff,
+          emissive: 0xffffff,
+          emissiveIntensity: 1.1,
+          roughness: 0.22,
+          metalness: 0.55
+        })
+      );
+
+      tip.position.y = 0.02;
+      tip.rotation.z = Math.PI / 4;
+      tip.position.y = 0.025;
+      group.add(tip);
+
+      const base = new THREE.Mesh(
+        new THREE.ConeGeometry(1, 0.12, 4),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.38
+        })
+      );
+      base.position.y = 0.055;
+      group.add(base);
+    }
+
+    for (let i = 0; i < 40; i++) {
+      const angle = (i / 40) * Math.PI * 2;
+      const radius = 1.75 + (i % 7) * 0.035;
+
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+
+      const group = new THREE.Group();
+      group.position.set(x, y, 0);
+      driftingSnow.add(group);
+
+      const shape = new THREE.Shape();
+      shape.moveTo(0.35, 0.25);
+      shape.lineTo(0.15, -0.55);
+      shape.lineTo(0.35, -0.2);
+      shape.lineTo(0.13, 0.3);
+      shape.closePath();
+
+      const geometry = new THREE.ShapeGeometry(shape);
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.14, 0.42, 4),
+        new THREE.MeshStandardMaterial({
+          color: 0xf3b7ff,
+          emissive: 0xffffff,
+          emissiveIntensity: 1.15,
+          roughness: 0.24,
+          metalness: 0.65
+        })
+      );
+
+      tip.position.y = 0.02;
+      tip.rotation.z = Math.PI / 4;
+      tip.position.y = 0.025;
+      group.add(tip);
+
+      const base = new THREE.Mesh(
+        new THREE.ConeGeometry(1, 0.14, 4),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.38
+        })
+      );
+      base.position.y = 0.055;
+      group.add(base);
+    }
+
+    // ---------------------------------------------------------------------
+    // GLB export
+    // ---------------------------------------------------------------------
+
+    const exportButton = document.getElementById("export");
+    const status = document.getElementById("status");
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      // Export only the character hierarchy. The studio floor, lights,
+      // camera, and helpers are intentionally excluded.
+      const exportScene = new THREE.Scene();
+      exportScene.name = "Cozy_Winter_Cabin_Snowglobe";
+      exportScene.add(body);
+      exportScene.add(head);
+      exportScene.add(nose);
+      exportScene.add(eyes);
+      exportScene.add(snowman);
+      exportScene.add(driftingSnow);
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        exportScene,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "cozy_winter_cabin_snowglobe.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          exportButton.disabled = false;
+          status.textContent = "Exported GLB";
+        },
+        (error) => {
+          console.error("GLB export failed:", error);
+          exportButton.disabled = false;
+          status.textContent = "Export Failed";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

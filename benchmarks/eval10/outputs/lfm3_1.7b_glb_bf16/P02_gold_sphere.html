@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brushed Gold Sphere — Three.js GLB Asset</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #111820;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 10;
+      max-width: min(360px, calc(100vw - 44px));
+      padding: 17px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 14px;
+      background: linear-gradient(
+        145deg,
+        rgba(23, 29, 30, 0.9),
+        rgba(17, 20, 21, 0.78)
+      );
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: #e9a66d;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 34px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: #9aa77e;
+      font-size: 12px;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 13px;
+    }
+
+    .tag {
+      padding: 5px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      color: #b8c4c5;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .export-wrap {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 10;
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 9px;
+      color: #7a889c;
+      font-size: 11px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 10;
+      padding: 8px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(17, 20, 21, 0.65);
+      color: #9aa77e;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        padding: 15px;
+      }
+
+      .export-wrap {
+        right: 12px;
+        bottom: 12px;
+      }
+
+      #hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <section class="panel">
+    <div class="eyebrow">Asset asset · Low-poly environment prop</div>
+    <h1>Brushed Gold Sphere</h1>
+    <div class="subtitle">Static gold sphere resting on a dark circular stone pedestal.</div>
+    <div class="tags">
+      <span class="tag">Low Poly</span>
+      <span class="tag">Rig-free</span>
+      <span class="tag">GLB Ready</span>
+      <span class="tag">Game Asset</span>
+      <span class="tag">PBR Materials</span>
+    </div>
+  </section>
+
+  <div class="export-wrap">
+    <button id="exportButton" type="button" disabled>Export GLB</button>
+    <div id="status">Static asset · Drag to orbit · Scroll to zoom</div>
+  </div>
+
+  <div class="hint">Drag to orbit · Right-drag to pan · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const canvas = document.querySelector("#canvas");
+    const exportButton = document.querySelector("#exportButton");
+    const status = document.querySelector("#status");
+
+    // ------------------------------------------------------------
+    // Renderer and camera
+    // ------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    canvas.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x111820);
+    scene.fog = new THREE.Fog(0x111820, 8, 18);
+
+    const camera = new THREE.PerspectiveCamera(
+      34,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.5, 3.25, 7.2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.08, -0.02);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3.4;
+    controls.maxDistance = 13;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // ------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x9db5c8, 0x2b1d20, 2.25));
+
+    const keyLight = new THREE.DirectionalLight(0xeaffc, 3.1);
+    keyLight.position.set(4.5, 7, 6.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00025;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x4cb8d0, 1.35);
+    rimLight.position.set(-5, 4, -5);
+    scene.add(rimLight);
+
+    const warmFill = new THREE.PointLight(0xffb55c, 18, 9, 2);
+    warmFill.position.set(3, 2.7, -3);
+    scene.add(warmFill);
+
+    // ------------------------------------------------------------
+    // Exportable asset
+    // ------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "BrushedGoldSphere";
+    asset.userData.description =
+      "Low-poly brushed-gold sphere on a dark circular stone pedestal.";
+    scene.add(asset);
+
+    const materials = {
+      stone: new THREE.MeshStandardMaterial({
+        color: 0x20262b,
+        metalness: 0.72,
+        roughness: 0.38,
+        flatShading: true
+      }),
+      stoneDark: new THREE.MeshStandardMaterial({
+        color: 0x111a1e,
+        metalness: 0.76,
+        roughness: 0.46,
+        flatShading: true
+      }),
+      stoneEdge: new THREE.MeshStandardMaterial({
+        color: 0x303b3d,
+        metalness: 0.82,
+        roughness: 0.3,
+        flatShading: true
+      }),
+      gold: new THREE.MeshStandardMaterial({
+        color: 0xc19a47,
+        metalness: 0.94,
+        roughness: 0.28,
+        flatShading: true
+      }),
+      goldEdge: new THREE.MeshStandardMaterial({
+        color: 0xa66f2c,
+        metalness: 1.0,
+        roughness: 0.24,
+        flatShading: true
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0xb79a32,
+        metalness: 0.78,
+        roughness: 0.36,
+        flatShading: true
+      })
+    };
+
+    function addMesh(
+      geometry,
+      material,
+      name,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0],
+      scale = [1, 1, 1]
+    ) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      mesh.scale.set(...scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      asset.add(mesh);
+      return mesh;
+    }
+
+    function cylinderBetween(
+      start,
+      end,
+      radius,
+      material,
+      name,
+      segments = 8
+    ) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        length,
+        segments,
+        1,
+        false
+      );
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      asset.add(mesh);
+
+      return mesh;
+    }
+
+    var sphere = function(
+      radius,
+      material,
+      name,
+      position,
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(
+        new THREE.SphereGeometry(radius, 12, 8),
+        material,
+        name,
+        position,
+        rotation,
+        scale
+      );
+    }
+
+    function ring(
+      radius,
+      tube,
+      material,
+      name,
+      position,
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(
+        new THREE.TorusGeometry(radius, tube, 6, 12),
+        material,
+        name,
+        position,
+        rotation,
+        scale
+      );
+    }
+
+    function cylinder(
+      radius,
+      depth,
+      material,
+      name,
+      position,
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(radius, radius, depth, 12),
+        material,
+        name,
+        position,
+        rotation,
+        scale
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Pedestal frame and stone layers
+    // ------------------------------------------------------------
+
+    const pedestal = new THREE.Group();
+    pedestal.name = "Pedestal";
+    asset.add(pedestal);
+
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.02, 1.04, 0.16, 12),
+      materials.stone
+    );
+    base.position.y = -0.08;
+    pedestal.add(base);
+
+    const topFoot = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.02, 1.02, 0.14, 12),
+      materials.stoneDark
+    );
+    topFoot.position.y = 0.16;
+    pedestal.add(topFoot);
+
+    const stoneEdge = new THREE.Mesh(
+      new THREE.TorusGeometry(1.08, 0.045, 6, 12),
+      materials.stoneEdge
+    );
+    stoneEdge.rotation.x = Math.PI / 2;
+    stoneEdge.position.y = 0.16;
+    pedestal.add(stoneEdge);
+
+    const innerStone = new THREE.Mesh(
+      new THREE.TorusGeometry(1.08, 0.015, 6, 12),
+      materials.stoneDark
+    );
+    innerStone.rotation.x = Math.PI / 2;
+    innerStone.position.y = 0.16;
+    pedestal.add(innerStone);
+
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const radius = 1.08;
+      const point = new THREE.Vector3(
+        Math.cos(angle) * radius,
+        0.16 + Math.sin(angle) * radius,
+        Math.sin(angle) * radius
+      );
+      const edge = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, 0.13, 0.035),
+        materials.stoneEdge
+      );
+      edge.position.copy(point);
+      edge.rotation.z = angle;
+      pedestal.add(edge);
+    }
+
+    const stoneBand = new THREE.Mesh(
+      new THREE.TorusGeometry(1.08, 0.026, 6, 12),
+      materials.stoneEdge
+    );
+    stoneBand.rotation.x = Math.PI / 2;
+    stoneBand.position.y = 0.16;
+    pedestal.add(stoneBand);
+
+    // ------------------------------------------------------------
+    // Gold sphere and surrounding stone edge
+    // ------------------------------------------------------------
+
+    const goldSphere = new THREE.Group();
+    goldSphere.name = "GoldSphere";
+    goldSphere.position.y = -0.08;
+    pedestal.add(goldSphere);
+
+    const sphereRadius = 1.16;
+    var sphere = new THREE.SphereGeometry(
+      sphereRadius,
+      12,
+      8
+    );
+    sphere.name = "GoldSphere";
+    goldSphere.add(sphere);
+
+    const goldSphereEdge = new THREE.Mesh(
+      new THREE.TorusGeometry(sphereRadius, 0.035, 6, 12),
+      materials.goldEdge
+    );
+    goldSphereEdge.rotation.x = Math.PI / 2;
+    goldSphereEdge.position.y = -0.08;
+    goldSphere.add(goldSphereEdge);
+
+    // ------------------------------------------------------------
+    // Exportable stone pedestal
+    // ------------------------------------------------------------
+
+    const pedestalStone = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.02, 1.04, 0.16, 12),
+      materials.stone
+    );
+    pedestalStone.position.y = -0.08;
+    pedestal.add(pedestalStone);
+
+    const pedestalStoneDark = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.02, 1.04, 0.14, 12),
+      materials.stoneDark
+    );
+    pedestalStoneDark.position.y = 0.16;
+    pedestal.add(pedestalStoneDark);
+
+    const pedestalTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.02, 1.02, 0.14, 12),
+      materials.stoneEdge
+    );
+    pedestalTop.position.y = 0.16;
+    pedestal.add(pedestalTop);
+
+    const pedestalTopBand = new THREE.Mesh(
+      new THREE.TorusGeometry(1.08, 0.042, 6, 12),
+      materials.stoneEdge
+    );
+    pedestalTopBand.rotation.x = Math.PI / 2;
+    pedestalTopBand.position.y = 0.16;
+    pedestal.add(pedestalTopBand);
+
+    const pedestalTopRim = new THREE.Mesh(
+      new THREE.TorusGeometry(1.08, 0.035, 6, 12),
+      materials.stoneEdge
+    );
+    pedestalTopRim.rotation.x = Math.PI / 2;
+    pedestalTopRim.position.y = 0.16;
+    pedestal.add(pedestalTopRim);
+
+    // ------------------------------------------------------------
+    // Export
+    // ------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Building binary GLB…";
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        asset,
+        (result) => {
+          try {
+            const blob = new Blob([result], {
+              type: "model/gltf-binary"
+            });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "brushed_gold_sphere.glb";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+            status.textContent =
+              "GLB exported successfully — static asset only.";
+          } catch (error) {
+            console.error(error);
+            status.textContent = "Export failed. Check the browser console.";
+          } finally {
+            exportButton.disabled = false;
+          }
+        },
+        (error) => {
+          console.error(error);
+          status.textContent =
+            "Export failed. Check the browser console.";
+          exportButton.disabled = false;
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+
+    // ------------------------------------------------------------
+    // Resize and render loop
+    // ------------------------------------------------------------
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    window.addEventListener("resize", onResize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

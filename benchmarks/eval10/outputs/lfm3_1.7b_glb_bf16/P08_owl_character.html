@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Barn Owl Character</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #e9c9c4;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      z-index: 10;
+      color: #f4dfe7;
+      pointer-events: none;
+    }
+
+    .info {
+      max-width: 340px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 10px 30px rgba(40, 35, 20, 0.15);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: #d8a67c;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 34px);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .description {
+      margin: 10px 0 15px;
+      color: #c99a91;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tags {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tag {
+      padding: 6px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.48);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.73);
+      color: #d9c4b8;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .tag strong {
+      color: #d9c2a6;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    button {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 10px;
+      background: #f4dfe7;
+      color: #391b1e;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(43, 31, 15, 0.22);
+      transition:
+        transform 120ms ease,
+        background 120ms ease,
+        opacity 120ms ease;
+    }
+
+    button:hover {
+      background: #ffd8a7;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #status {
+      position: fixed;
+      right: 24px;
+      bottom: 22px;
+      z-index: 10;
+      max-width: 310px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.48);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      color: #d9c4b8;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    .hint {
+      position: fixed;
+      right: 24px;
+      bottom: 60px;
+      z-index: 10;
+      color: rgba(48, 38, 25, 0.55);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 620px) {
+      .info {
+        top: 14px;
+        left: 14px;
+        max-width: 300px;
+      }
+
+      #status {
+        right: 14px;
+        bottom: 16px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <section class="panel info">
+    <div class="eyebrow">Low-poly character asset</div>
+    <h1>Gnarled Owl</h1>
+    <p class="description">
+      A stylized barn owl resting on a low-poly gnarled branch. The character
+      performs gentle head-tilting and subtle bobbing in idle animation.
+    </p>
+
+    <div class="tags">
+      <span class="tag">Low Poly</span>
+      <span class="tag">GLB Ready</span>
+      <span class="tag">Animated</span>
+      <span class="tag">Idle Animation</span>
+    </div>
+
+    <button id="exportButton" type="button">Export GLB</button>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+  <div id="status">Ready to export</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xe9c9c4);
+    scene.fog = new THREE.Fog(0xe9c9c4, 10, 24);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(7.6, 5.2, 8.4);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-0.1, 1.35, -0.05);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 5.2;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    const hemisphere = new THREE.HemisphereLight(0xf4dfb7, 0x6f4d2e, 2.1);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff1d8, 3.1);
+    keyLight.position.set(-6, 12, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -7;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 24;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd9a6, 2.1);
+    rimLight.position.set(7, 5, -6);
+    scene.add(rimLight);
+
+    // Preview-only ground plane.
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({
+        color: 0xe4c98b,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Exportable character root.
+    const owlRoot = new THREE.Group();
+    owlRoot.name = "GnarledBarnOwl";
+    scene.add(owlRoot);
+
+    const materials = {
+      skin: new THREE.MeshStandardMaterial({
+        name: "Skin",
+        color: 0xd99a6f,
+        roughness: 0.94,
+        metalness: 0
+      }),
+      skinDark: new THREE.MeshStandardMaterial({
+        name: "SkinDark",
+        color: 0xa96c52,
+        roughness: 0.98,
+        metalness: 0
+      }),
+      eye: new THREE.MeshStandardMaterial({
+        name: "Eyes",
+        color: 0xffb52a,
+        roughness: 0.25,
+        metalness: 0.55
+      }),
+      beak: new THREE.MeshStandardMaterial({
+        name: "Beak",
+        color: 0xe8d3c2,
+        roughness: 0.65,
+        metalness: 0
+      }),
+      feather: new THREE.MeshStandardMaterial({
+        name: "Feathers",
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0
+      }),
+      featherDark: new THREE.MeshStandardMaterial({
+        name: "FeatherDark",
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0
+      })
+    };
+
+    function addMesh(geometry, material, name, parent = owlRoot) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addBox(name, size, position, material, parent = owlRoot) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(
+      name,
+      radiusTop,
+      radiusBottom,
+      height,
+      segments,
+      position,
+      material,
+      parent = owlRoot
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addDodeca(name, scale, position, material, parent = owlRoot) {
+      return addBox(
+        name,
+        scale[0],
+        scale[1],
+        scale[2],
+        material,
+        parent
+      );
+    }
+
+    // Body and neck.
+    addCylinder(
+      "Body",
+      0.34,
+      0.34,
+      0.48,
+      8,
+      [0, 2.04, 0],
+      materials.skin
+    );
+
+    addCylinder(
+      "Neck",
+      0.115,
+      0.115,
+      0.12,
+      6,
+      [0, 1.72, 0],
+      materials.skinDark
+    );
+
+    // Neck supports and head.
+    addCylinder(
+      "Head_Core",
+      0.085,
+      0.085,
+      0.18,
+      6,
+      [0, 2.43, 0],
+      materials.skinDark
+    );
+
+    addDodeca("Eye_Center", [0.055, 0.018, 0.017], [0, 2.475, 0.115], materials.eye);
+
+    for (let i = -3; i <= 3; i++) {
+      const z = i * 0.055;
+      addCylinder(
+        `Eye_Socket_${i + 3}`,
+        0.048,
+        0.048,
+        0.045,
+        6,
+        [0, 2.465, z],
+        materials.skinDark
+      );
+    }
+
+    addDodeca("Eye_Pupil", [0.022, 0.012, 0.018], [0, 2.465, 0.132], materials.eye);
+
+    // Large low-poly gnarled branch.
+    const branch = new THREE.Group();
+    branch.name = "GnarledBranch";
+    owlRoot.add(branch);
+
+    const branchPoints = [
+      [0.02, -0.03],
+      [-0.01, -0.08],
+      [-0.025, -0.18],
+      [-0.04, -0.30],
+      [-0.035, -0.37],
+      [-0.04, -0.43],
+      [-0.02, -0.51],
+      [-0.01, -0.58]
+    ];
+
+    for (let i = 0; i < branchPoints.length; i++) {
+      addCylinder(
+        `Branch_${i + 1}`,
+        0.025,
+        0.025,
+        0.12,
+        5,
+        [branchPoints[i][0], branchPoints[i][1], 0],
+        materials.feather
+      );
+    }
+
+    addCylinder(
+      "Branch_Upper",
+      0.035,
+      0.035,
+      0.18,
+      5,
+      [-0.04, -0.29, 0],
+      materials.featherDark
+    );
+
+    // Small branch tips.
+    const tipGeometry = new THREE.BufferGeometry();
+    tipGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute([
+        0.02, -0.40, 0.015,
+        -0.04, -0.55, 0.015,
+        -0.03, -0.70, 0.015
+      ], 3)
+    );
+    tipGeometry.computeVertexNormals();
+
+    addCylinder(
+      "Branch_Tip",
+      0.035,
+      0.035,
+      0.25,
+      5,
+      [-0.06, -0.67, 0.01],
+      materials.featherDark
+    );
+
+    // Body and neck.
+    addCylinder(
+      "Body_Core",
+      0.34,
+      0.34,
+      0.48,
+      8,
+      [0, 2.04, 0],
+      materials.skin
+    );
+
+    addCylinder(
+      "Neck",
+      0.115,
+      0.115,
+      0.12,
+      6,
+      [0, 1.72, 0],
+      materials.skinDark
+    );
+
+    // Neck support.
+    const neckPoints = [
+      [-0.05, -0.04],
+      [-0.01, -0.10],
+      [0.00, -0.14],
+      [0.01, -0.16],
+      [0.02, -0.18],
+      [0.03, -0.20]
+    ];
+
+    for (let i = 0; i < neckPoints.length; i++) {
+      addCylinder(
+        `Neck_Support_${i + 1}`,
+        0.018,
+        0.018,
+        0.09,
+        4,
+        [neckPoints[i][0], neckPoints[i][1], 0],
+        materials.skinDark
+      );
+    }
+
+    // Head.
+    addCylinder(
+      "Head_Core",
+      0.085,
+      0.085,
+      0.18,
+      6,
+      [0, 2.43, 0],
+      materials.skinDark
+    );
+
+    for (let i = -3; i <= 3; i++) {
+      const z = i * 0.055;
+      addCylinder(
+        `Head_Skull_${i + 3}`,
+        0.018,
+        0.018,
+        0.075,
+        6,
+        [0, 2.465, z],
+        materials.skinDark
+      );
+    }
+
+    // Eyes.
+    for (let i = -1; i <= 1; i++) {
+      addCylinder(
+        `Eye_Socket_${i + 3}`,
+        0.048,
+        0.048,
+        0.045,
+        6,
+        [0, 2.465, i * 0.115],
+        materials.skinDark
+      );
+    }
+
+    addDodeca("Eye_Pupil", [0.022, 0.012, 0.018], [0, 2.465, 0.132], materials.eye);
+
+    // Large low-poly gnarled feathers.
+    const featherGeometry = new THREE.BufferGeometry();
+    featherGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute([
+        -0.17, -0.22, 0.05, 0.13, 0.08, 0.28,
+         0.16, -0.18, 0.03, 0.12, 0.07, 0.17,
+         -0.12, -0.16, 0.08, 0.10, 0.02, 0.11,
+          0.09, -0.13, 0.05, 0.09, 0.04, 0.08
+      ], 3)
+    );
+    featherGeometry.computeVertexNormals();
+
+    addCylinder(
+      "Large_Feather",
+      0.013,
+      0.013,
+      0.65,
+      4,
+      [-0.12, -0.16, 0.08],
+      materials.feather
+    );
+
+    addCylinder(
+      "Large_Feather_Tip",
+      0.012,
+      0.012,
+      0.14,
+      4,
+      [-0.12, -0.16, 0.18],
+      materials.featherDark
+    );
+
+    addDodeca("Small_Feather_Left", [0.018, 0.018, 0.018], [-0.055, -0.15, 0.14], materials.featherDark);
+    addDodeca("Small_Feather_Right", [0.018, 0.018, 0.018], [0.055, -0.15, 0.14], materials.featherDark);
+
+    addCylinder(
+      "Left_Beak",
+      0.105,
+      0.105,
+      0.18,
+      8,
+      [-0.12, -0.16, 0.28],
+      materials.beak
+    );
+
+    addCylinder(
+      "Right_Beak",
+      0.105,
+      0.105,
+      0.18,
+      8,
+      [0.12, -0.16, 0.28],
+      materials.beak
+    );
+
+    // Gentle idle head-tilting animation.
+    const animationTimes = [0, 1, 2, 3];
+
+    function createAnimationTrack(name, samples, times, sampleGap) {
+      const sampleCount = 48;
+      const values = [];
+
+      for (let i = 0; i <= sampleCount; i++) {
+        const t = (i / sampleCount) * 1;
+        const value = THREE.MathUtils.lerp(0, 0.025, t);
+        values.push(value);
+      }
+
+      return new THREE.VectorKeyframeTrack(
+        `${name}.position`,
+        animationTimes,
+        samples
+      );
+    }
+
+    // Gentle idle bob.
+    const bobTimes = [0, 1, 2, 3];
+    const bobTracks = [
+      createAnimationTrack("Bird_Head_Bob",
+        samples: [
+          [0.00, -0.04],
+          [-0.035, -0.10],
+          [-0.08, -0.18],
+          [-0.12, -0.30],
+          [-0.09, -0.43],
+          [-0.02, -0.57],
+          [-0.01, -0.64]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Left_Shoulder",
+        samples: [
+          [-0.08, 0.09],
+          [-0.12, 0.18],
+          [-0.10, 0.30],
+          [-0.07, 0.47],
+          [-0.02, 0.60],
+          [0.00, 0.65]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Right_Shoulder",
+        samples: [
+          [0.09, -0.08],
+          [0.12, -0.13],
+          [0.10, -0.22],
+          [0.06, -0.36],
+          [-0.02, -0.43],
+          [-0.01, -0.48]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Back_Shoulder",
+        samples: [
+          [-0.08, -0.10],
+          [-0.12, -0.13],
+          [-0.10, -0.22],
+          [-0.06, -0.36],
+          [0.02, -0.43],
+          [0.01, -0.48]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Face_Perchure",
+        samples: [
+          [-0.08, 0.04],
+          [-0.10, 0.05],
+          [-0.07, 0.02],
+          [0.00, 0.01]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Left",
+        samples: [
+          [-0.09, -0.13],
+          [-0.10, -0.16],
+          [-0.08, -0.19],
+          [-0.05, -0.18],
+          [-0.02, -0.15]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Right",
+        samples: [
+          [0.09, -0.10],
+          [0.10, -0.10],
+          [0.06, -0.18],
+          [0.04, -0.19],
+          [-0.02, -0.15]
+        ],
+        times: bobTimes,
+        sampleGap: 0.025
+      )
+    ];
+
+    const idleTracks = [createAnimationTrack("Bird_Head_Bob", samples, times, 0.025)];
+    const idleClip = new THREE.AnimationClip("Gentle_Idle_Bob", 3, idleTracks);
+
+    const headPoseTimes = [0, 1, 2, 3];
+    const headPoseValues = [];
+    const backPoseValues = [];
+
+    function headPoseAt(time) {
+      const t = THREE.MathUtils.clamp(time, 0, 1);
+      return new THREE.Vector3(
+        -0.12 + THREE.MathUtils.lerp(-0.08, -0.09, t),
+        2.43 + THREE.MathUtils.lerp(2.13, 2.43, t),
+        -0.04 + THREE.MathUtils.lerp(-0.09, -0.11, t)
+      );
+    }
+
+    function backPoseAt(time) {
+      const t = THREE.MathUtils.clamp(time, 0, 1);
+      return new THREE.Vector3(
+        -0.08 + THREE.MathUtils.lerp(-0.08, -0.09, t),
+        2.13,
+        -0.04 + THREE.MathUtils.lerp(-0.09, -0.11, t)
+      );
+    }
+
+    for (let i = 0; i < 3; i++) {
+      headPoseValues.push(headPoseAt(hHeadPoseTimes[i]));
+
+      backPoseValues.push(backPoseAt(hBackPoseTimes[i]));
+    }
+
+    const headTracks = [
+      createAnimationTrack("Bird_Head_Pose",
+        samples: [
+          new THREE.Vector3(-0.12, 2.43, -0.04),
+          new THREE.Vector3(-0.09, 2.13, -0.04),
+          new THREE.Vector3(-0.07, 2.18, -0.04),
+          new THREE.Vector3(-0.05, 2.16, -0.04),
+          new THREE.Vector3(-0.02, 2.14, -0.04),
+          new THREE.Vector3(0.00, 2.13, -0.04),
+          new THREE.Vector3(0.03, 2.16, -0.04),
+          new THREE.Vector3(0.06, 2.14, -0.04),
+          new THREE.Vector3(0.08, 2.16, -0.04),
+          new THREE.Vector3(0.09, 2.13, -0.04)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Back_Pose",
+        samples: [
+          new THREE.Vector3(-0.08, 2.13, -0.04),
+          new THREE.Vector3(-0.10, 2.14, -0.04),
+          new THREE.Vector3(-0.09, 2.16, -0.04),
+          new THREE.Vector3(-0.06, 2.13, -0.04),
+          new THREE.Vector3(-0.01, 2.14, -0.04),
+          new THREE.Vector3(0.00, 2.13, -0.04),
+          new THREE.Vector3(0.03, 2.16, -0.04),
+          new THREE.Vector3(0.06, 2.13, -0.04),
+          new THREE.Vector3(0.08, 2.16, -0.04),
+          new THREE.Vector3(0.09, 2.13, -0.04)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Face_Perchure",
+        samples: [
+          new THREE.Vector3(-0.08, 2.43, 0.132),
+          new THREE.Vector3(-0.10, 2.13, 0.132),
+          new THREE.Vector3(-0.07, 2.18, 0.132),
+          new THREE.Vector3(-0.05, 2.16, 0.132),
+          new THREE.Vector3(-0.02, 2.14, 0.132),
+          new THREE.Vector3(0.00, 2.13, 0.132),
+          new THREE.Vector3(0.03, 2.16, 0.132),
+          new THREE.Vector3(0.06, 2.13, 0.132),
+          new THREE.Vector3(0.08, 2.16, 0.132),
+          new THREE.Vector3(0.09, 2.13, 0.132)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Left",
+        samples: [
+          new THREE.Vector3(-0.10, 2.465, 0.115),
+          new THREE.Vector3(-0.08, 2.475, 0.115),
+          new THREE.Vector3(-0.05, 2.465, 0.115),
+          new THREE.Vector3(-0.02, 2.465, 0.115),
+          new THREE.Vector3(0.00, 2.465, 0.115),
+          new THREE.Vector3(0.03, 2.465, 0.115),
+          new THREE.Vector3(0.06, 2.465, 0.115),
+          new THREE.Vector3(0.08, 2.465, 0.115),
+          new THREE.Vector3(0.09, 2.465, 0.115)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Right",
+        samples: [
+          new THREE.Vector3(0.10, 2.465, 0.115),
+          new THREE.Vector3(0.08, 2.465, 0.115),
+          new THREE.Vector3(0.06, 2.465, 0.115),
+          new THREE.Vector3(0.02, 2.465, 0.115),
+          new THREE.Vector3(-0.00, 2.465, 0.115),
+          new THREE.Vector3(-0.03, 2.465, 0.115),
+          new THREE.Vector3(-0.06, 2.465, 0.115),
+          new THREE.Vector3(-0.08, 2.465, 0.115),
+          new THREE.Vector3(-0.02, 2.465, 0.115)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      )
+    ];
+
+    const idleAction = new THREE.AnimationAction(idleClip);
+    idleAction.setLoop(THREE.LoopRepeat, Infinity);
+    idleAction.play();
+
+    // Gentle wing bob.
+    const wingTimes = [0, 1, 2, 3];
+    const wingPoseTimes = [0, 1, 2, 3];
+
+    for (let i = -2; i <= 2; i++) {
+      const x = i * 0.13;
+
+      addCylinder(
+        `Wing_${i + 3}`,
+        0.025,
+        0.025,
+        0.62,
+        4,
+        [x, 1.72, 0],
+        materials.feather
+      );
+
+      addCylinder(
+        `Wing_Cap_${i + 3}`,
+        0.018,
+        0.018,
+        0.06,
+        4,
+        [x, 1.72, 0.305],
+        materials.featherDark
+      );
+    }
+
+    // Head tilt and secondary bob.
+    const headPoseTimes = [0, 0.5, 1, 1.5, 2, 2.5, 3];
+
+    function headPoseAt(time) {
+      const t = THREE.MathUtils.clamp(time, 0, 1);
+      return new THREE.Vector3(
+        -0.12 + THREE.MathUtils.lerp(-0.08, -0.09, t),
+        2.43 + THREE.MathUtils.lerp(2.13, 2.43, t),
+        -0.04 + THREE.MathUtils.lerp(-0.09, -0.11, t)
+      );
+    }
+
+    const headTracks = [
+      createAnimationTrack("Bird_Head_Pose",
+        samples: [
+          new THREE.Vector3(-0.12, 2.43, -0.04),
+          new THREE.Vector3(-0.09, 2.13, -0.04),
+          new THREE.Vector3(-0.07, 2.18, -0.04),
+          new THREE.Vector3(-0.05, 2.16, -0.04),
+          new THREE.Vector3(-0.02, 2.14, -0.04),
+          new THREE.Vector3(0.00, 2.13, -0.04),
+          new THREE.Vector3(0.03, 2.16, -0.04),
+          new THREE.Vector3(0.06, 2.13, -0.04),
+          new THREE.Vector3(0.08, 2.16, -0.04),
+          new THREE.Vector3(0.09, 2.13, -0.04)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Head_Bob",
+        samples: [
+          new THREE.Vector3(-0.12, 2.43, -0.04),
+          new THREE.Vector3(-0.09, 2.13, -0.04),
+          new THREE.Vector3(-0.07, 2.18, -0.04),
+          new THREE.Vector3(-0.05, 2.16, -0.04),
+          new THREE.Vector3(-0.02, 2.14, -0.04),
+          new THREE.Vector3(0.00, 2.13, -0.04),
+          new THREE.Vector3(0.03, 2.16, -0.04),
+          new THREE.Vector3(0.06, 2.13, -0.04),
+          new THREE.Vector3(0.08, 2.16, -0.04),
+          new THREE.Vector3(0.09, 2.13, -0.04)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Back_Pose",
+        samples: [
+          new THREE.Vector3(-0.08, 2.13, -0.04),
+          new THREE.Vector3(-0.10, 2.14, -0.04),
+          new THREE.Vector3(-0.09, 2.16, -0.04),
+          new THREE.Vector3(-0.06, 2.13, -0.04),
+          new THREE.Vector3(-0.01, 2.14, -0.04),
+          new THREE.Vector3(0.00, 2.13, -0.04),
+          new THREE.Vector3(0.03, 2.16, -0.04),
+          new THREE.Vector3(0.06, 2.13, -0.04),
+          new THREE.Vector3(0.08, 2.16, -0.04),
+          new THREE.Vector3(0.09, 2.13, -0.04)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Left",
+        samples: [
+          new THREE.Vector3(-0.10, 2.465, 0.115),
+          new THREE.Vector3(-0.08, 2.475, 0.115),
+          new THREE.Vector3(-0.05, 2.465, 0.115),
+          new THREE.Vector3(-0.02, 2.465, 0.115),
+          new THREE.Vector3(0.00, 2.465, 0.115),
+          new THREE.Vector3(0.03, 2.465, 0.115),
+          new THREE.Vector3(0.06, 2.465, 0.115),
+          new THREE.Vector3(0.08, 2.465, 0.115),
+          new THREE.Vector3(0.09, 2.465, 0.115)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      ),
+      createAnimationTrack("Bird_Eye_Right",
+        samples: [
+          new THREE.Vector3(0.10, 2.465, 0.115),
+          new THREE.Vector3(0.08, 2.465, 0.115),
+          new THREE.Vector3(0.06, 2.465, 0.115),
+          new THREE.Vector3(0.02, 2.465, 0.115),
+          new THREE.Vector3(-0.00, 2.465, 0.115),
+          new THREE.Vector3(-0.03, 2.465, 0.115),
+          new THREE.Vector3(-0.06, 2.465, 0.115),
+          new THREE.Vector3(-0.08, 2.465, 0.115),
+          new THREE.Vector3(-0.02, 2.465, 0.115)
+        ],
+        times: headPoseTimes,
+        sampleGap: 0.025
+      )
+    ];
+
+    const wingAction = new THREE.AnimationAction(idleClip);
+    wingAction.setLoop(THREE.LoopRepeat, Infinity);
+    wingAction.play();
+
+    function updateRender() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(updateRender);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      try {
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(owlRoot, {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          embedImages: true
+        });
+
+        const blob = new Blob([result], {
+          type: "model/gltf-binary"
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "low-poly-barn-owl.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        status.textContent = "Exported low-poly-barn-owl.glb";
+      } catch (error) {
+        console.error("GLB export failed:", error);
+        status.textContent = "Export failed — see browser console";
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

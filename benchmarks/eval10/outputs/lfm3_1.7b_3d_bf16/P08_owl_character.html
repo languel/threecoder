@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Owl on the Gnarled Branch</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e7f3f8;
+      --muted: rgba(196, 218, 220, 0.68);
+      --paper: rgba(250, 253, 254, 0.72);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dedcde;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(
+          circle at center,
+          transparent 42%,
+          rgba(45, 58, 64, 0.08) 100%
+        );
+    }
+
+    .hud {
+      position: fixed;
+      z-index: 2;
+      pointer-events: none;
+      color: var(--ink);
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+    }
+
+    .title-block {
+      top: 24px;
+      left: 26px;
+      max-width: min(360px, calc(100vw - 52px));
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 28px;
+      height: 1px;
+      content: "";
+      background: var(--ink);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4.2vw, 52px);
+      font-weight: 400;
+      line-height: 0.98;
+      letter-spacing: 0.08em;
+    }
+
+    h1 span {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .subtitle {
+      max-width: 310px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+      letter-spacing: 0.04em;
+    }
+
+    .controls {
+      right: 24px;
+      bottom: 24px;
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(244, 247, 248, 0.12);
+      border-radius: 999px;
+      background: var(--paper);
+      box-shadow: 0 10px 35px rgba(45, 58, 64, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(244, 247, 248, 0.2);
+      border-radius: 999px;
+      padding: 10px 13px;
+      background: rgba(244, 247, 248, 0.78);
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(244, 247, 248, 0.42);
+      transform: translateY(-1px);
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 3;
+      right: 26px;
+      bottom: 27px;
+      color: rgba(244, 247, 248, 0.72);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    .hint kbd {
+      display: inline-grid;
+      width: 7px;
+      height: 9px;
+      margin-right: 5px;
+      border-radius: 999px;
+      background: var(--ink);
+      box-shadow: 0 0 8px rgba(244, 247, 248, 0.2);
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      background: #dedcde;
+      transition: opacity 500ms ease, visibility 500ms ease;
+    }
+
+    .loading.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .loader {
+      width: 32px;
+      height: 32px;
+      margin: 0 auto;
+      border: 2px solid rgba(244, 247, 248, 0.1);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: spin 900ms linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 700px) {
+      .title-block {
+        top: 18px;
+        left: 18px;
+        max-width: calc(100vw - 36px);
+      }
+
+      .subtitle,
+      .hint {
+        display: none;
+      }
+
+      .controls {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+  <div class="vignette"></div>
+
+  <section class="hud title-block">
+    <div class="eyebrow">Field study · 07:34</div>
+    <h1>Owl<br />on the Gnarled Branch</h1>
+    <p class="subtitle">
+      A low-poly owl with a gently tilted head and undulating, rhythmic wings.
+    </p>
+  </section>
+
+  <div class="hint">
+    <kbd>↔</kbd> Drag to orbit &nbsp;·&nbsp; Scroll to zoom<br />
+    Arrow keys rotate · + / − adjust distance
+  </div>
+
+  <nav class="hud controls" aria-label="Scene controls">
+    <button id="reset-view" type="button">Reset view</button>
+  </nav>
+
+  <div id="loading" class="loader">
+    <div class="loader"></div>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const stage = document.querySelector("#stage");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    stage.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xedcce4e);
+    scene.fog = new THREE.Fog(0xedcce4e, 19, 43);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural textures
+    // -------------------------------------------------------------------------
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 512, 0);
+      gradient.addColorStop(0, "#71858e");
+      gradient.addColorStop(0.42, "#657b63");
+      gradient.addColorStop(1, "#4f5658");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 650; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle =
+          `rgba(20, 48, 56, ${Math.random() * 0.08})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 3, y + (Math.random() - 0.5) * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    function makeBranchTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        8,
+        256,
+        256,
+        248
+      );
+
+      gradient.addColorStop(0, "#75453e");
+      gradient.addColorStop(0.42, "#55483d");
+      gradient.addColorStop(1, "#31554a");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 900; i++) {
+        const radius = 2 + Math.random() * 6;
+
+        ctx.beginPath();
+        ctx.moveTo(256 + Math.random() * 100, 256 + Math.random() * 100);
+
+        for (let y = 0; y <= 512; y += 64) {
+          const x =
+            256 +
+            (Math.random() - 0.5) * radius;
+
+          ctx.lineTo(x, y);
+        }
+
+        ctx.strokeStyle = `rgba(20, 45, 50, ${0.035 + Math.random() * 0.1})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.4;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 1);
+
+      return texture;
+    }
+
+    var makeGroundMaterial = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#c9d3d5");
+      gradient.addColorStop(0.42, "#71858e");
+      gradient.addColorStop(1, "#4f5658");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 320; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(20, 48, 56, ${Math.random() * 0.12})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.4;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 2, y + (Math.random() - 0.5) * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+
+      return texture;
+    }
+
+    var makeGroundMaterialDark = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#3c536b");
+      gradient.addColorStop(0.42, "#1a2937");
+      gradient.addColorStop(1, "#17111d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(145, 205, 220, ${Math.random() * 0.12})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + (Math.random() - 0.5) * 3,
+          y + (Math.random() - 0.5) * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 3);
+
+      return texture;
+    }
+
+    function makeBarkTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        0,
+        0,
+        256
+      );
+
+      gradient.addColorStop(0, "#60403b");
+      gradient.addColorStop(0.42, "#5f5d4b");
+      gradient.addColorStop(1, "#3b3e2a");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 512);
+
+      for (let i = 0; i < 130; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(36, 42, 39, ${Math.random() * 0.08})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + (Math.random() - 0.5) * 2,
+          y + (Math.random() - 0.5) * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 4);
+
+      return texture;
+    }
+
+    function makeFloorTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#dfe4e8";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 220; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(40, 72, 82, ${Math.random() * 0.13})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.random() * 8 - 4,
+          y + (Math.random() - 0.5) * 3
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+
+      return texture;
+    }
+
+    var makeGroundMaterial = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#dce8e5");
+      gradient.addColorStop(0.42, "#71858e");
+      gradient.addColorStop(1, "#4f5658");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 320; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(20, 48, 56, 0.08)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 3, y + (Math.random() - 0.5) * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+
+      return texture;
+    }
+
+    var makeGroundMaterialDark = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#243a34");
+      gradient.addColorStop(0.42, "#1b2937");
+      gradient.addColorStop(1, "#17111d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(145, 205, 220, 0.12)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + (Math.random() - 0.5) * 2,
+          y + (Math.random() - 0.5) * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 3);
+
+      return texture;
+    }
+
+    function makeBranch(centerY, radius, material) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(
+        128,
+        128,
+        20,
+        128,
+        128,
+        140
+      );
+
+      gradient.addColorStop(0, "#75453e");
+      gradient.addColorStop(0.48, "#55483d");
+      gradient.addColorStop(1, "#31554a");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 256);
+
+      for (let i = 0; i < 900; i++) {
+        const radiusX = 40 + Math.random() * (512 - 80);
+        const y = 25 + Math.random() * 225;
+
+        ctx.beginPath();
+        ctx.arc(
+          radiusX,
+          y,
+          2 + Math.random() * 8,
+          0,
+          Math.PI * 2
+        );
+        ctx.strokeStyle = `rgba(20, 45, 50, ${Math.random() * 0.09})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.5;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 1);
+
+      return texture;
+    }
+
+    var makeGroundMaterialDark = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#243a34");
+      gradient.addColorStop(0.42, "#1b2937");
+      gradient.addColorStop(1, "#17111d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(145, 205, 220, 0.12)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + (Math.random() - 0.5) * 3,
+          y + (Math.random() - 0.5) * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 3);
+
+      return texture;
+    }
+
+    var makeGroundMaterial = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#dce8e5";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 220; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(20, 48, 56, 0.08)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.random() * 4 - 2,
+          y + (Math.random() - 0.5) * 3
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+
+      return texture;
+    }
+
+    var makeGroundMaterialDark = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#243a34");
+      gradient.addColorStop(0.42, "#1b2937");
+      gradient.addColorStop(1, "#17111d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = "rgba(145, 205, 220, 0.12)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + (Math.random() - 0.5) * 3,
+          y + (Math.random() - 0.5) * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 3);
+
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // Procedural sky
+    // -------------------------------------------------------------------------
+
+    function makeSkyTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+      gradient.addColorStop(0, "#c8dce6");
+      gradient.addColorStop(0.50, "#71858e");
+      gradient.addColorStop(1, "#3c496b");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      for (let i = 0; i < 140; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 512;
+
+        const glow = Math.random() > 0.5;
+
+        ctx.strokeStyle = glow
+          ? "rgba(60, 83, 92, 0.45)"
+          : "rgba(20, 48, 56, 0.35)";
+
+        ctx.lineWidth = 1.2 + Math.random() * 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.bezierCurveTo(
+          x + (Math.random() - 0.5) * 12,
+          y + (Math.random() - 0.5) * 7,
+          x + (Math.random() - 0.5) * 18,
+          y + (Math.random() - 0.5) * 3,
+          x + (Math.random() - 0.5) * 8,
+          y + Math.random() * 2
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    function makeSky() {
+      const material = new THREE.SpriteMaterial({
+        map: makeSkyTexture(),
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false
+      });
+
+      const sky = new THREE.Sprite(material);
+      sky.position.set(0, 0, -70);
+      scene.add(sky);
+
+      const sun = new THREE.SpotLight(
+        0xc8e7ef,
+        0xfff1d5,
+        0.75,
+        0.72,
+        0.65,
+        0.55
+      );
+
+      sun.position.set(-30, 42, -23);
+      sun.target.position.set(0, 0, -19);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -24;
+      sun.shadow.camera.right = 24;
+      sun.shadow.camera.top = 28;
+      sun.shadow.camera.bottom = -18;
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 90;
+      sun.shadow.normalBias = 0.025;
+      scene.add(sun, sun.target);
+    }
+
+    makeSky();
+
+    // -------------------------------------------------------------------------
+    // Ground and lighting
+    // -------------------------------------------------------------------------
+
+    const groundMaterial = makeGroundMaterial();
+    const groundMaterialDark = makeGroundMaterialDark();
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80),
+      groundMaterial
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.12;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const hemisphere = new THREE.HemisphereLight(
+      0xe7f2ff,
+      0x687a70,
+      1.65
+    );
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffedcf, 3.25);
+    sun.position.set(-16, 29, 18);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -24;
+    sun.shadow.camera.right = 24;
+    sun.shadow.camera.top = 28;
+    sun.shadow.camera.bottom = -18;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 65;
+    sun.shadow.bias = -0.00035;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xc8dce5, 0.85);
+    fill.position.set(18, 15, 10);
+    scene.add(fill);
+
+    // -------------------------------------------------------------------------
+    // Low-poly landscape
+    // -------------------------------------------------------------------------
+
+    function addTree(x, z, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(x, -0.08, z);
+      group.scale.set(scale, scale, scale);
+
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.46, 4.2, 12),
+        groundMaterialDark
+      );
+      trunk.position.y = 2.1;
+      trunk.castShadow = true;
+      group.add(trunk);
+
+      const crown = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.55 + Math.random() * 0.45, 1),
+        groundMaterialDark
+      );
+      crown.position.y = 5.2;
+      crown.scale.set(scale, scale * 0.82, scale);
+      crown.castShadow = true;
+      group.add(crown);
+
+      const branchMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4f4b3a,
+        roughness: 1
+      });
+
+      for (let i = 0; i < 9; i++) {
+        const angle = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+        const length = 0.9 + Math.random() * 2.6;
+
+        const branch = new THREE.Mesh(
+          new THREE.ConeGeometry(length, 0.55, 7),
+          branchMaterial
+        );
+
+        branch.position.set(
+          Math.cos(angle) * length,
+          4.15 + Math.sin(angle) * length * 0.35,
+          Math.sin(angle) * length * 0.72
+        );
+        branch.scale.y = 0.72;
+        group.add(branch);
+      }
+
+      scene.add(group);
+    }
+
+    addTree(-16, -2.5, 0.9);
+    addTree(10, 4.5, 0.75);
+    addTree(-30, -12, 1.05);
+
+    // -------------------------------------------------------------------------
+    // Gnarled branch with a real-looking knot
+    // -------------------------------------------------------------------------
+
+    const branchMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: makeBranchTexture(),
+      roughness: 0.92,
+      metalness: 0
+    });
+
+    const knotMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1b3d3e,
+      roughness: 1
+    });
+
+    const branchGroup = new THREE.Group();
+    branchGroup.position.set(-18, 0.25, -5.8);
+    scene.add(branchGroup);
+
+    var knot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 12, 8),
+      knotMaterial
+    );
+    knot.scale.z = 1.35;
+    knot.position.y = 0.36;
+    branchGroup.add(knot);
+
+    // A soft, irregular knot.
+    const knotGeometry = new THREE.SphereGeometry(0.2, 12, 8);
+    var knot = new THREE.Mesh(knotGeometry, knotMaterial);
+    knot.castShadow = true;
+    branchGroup.add(knot);
+
+    // -------------------------------------------------------------------------
+    // Owl anatomy
+    // -------------------------------------------------------------------------
+
+    const owl = new THREE.Group();
+    scene.add(owl);
+
+    const bodyMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.34,
+      metalness: 0,
+      bumpMap: makeBarkTexture(),
+      bumpScale: 0.06,
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.4
+    });
+
+    const wingMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.48,
+      metalness: 0,
+      bumpMap: makeBarkTexture(),
+      bumpScale: 0.1,
+      clearcoat: 0.2
+    });
+
+    const eyeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x080a0e,
+      emissive: 0x000000,
+      emissiveIntensity: 0.55,
+      roughness: 0.3
+    });
+
+    const eyeGlowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffd7a5,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    const mouthMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.65
+    });
+
+    // -------------------------------------------------------------------------
+    // Head and eye
+    // -------------------------------------------------------------------------
+
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 24, 16),
+      bodyMaterial
+    );
+    head.position.set(0, 1.55, 0.13);
+    head.scale.y = 0.82;
+    head.castShadow = true;
+    head.receiveShadow = true;
+    owl.add(head);
+
+    const eyeGeometry = new THREE.SphereGeometry(0.09, 16, 10);
+    const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    eye.position.set(0, 1.93, 0.21);
+    eye.scale.set(0.58, 0.34, 0.3);
+    eye.castShadow = true;
+    eye.receiveShadow = true;
+    owl.add(eye);
+
+    const eyeGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.11, 16, 10),
+      eyeGlowMaterial
+    );
+    eyeGlow.position.set(0, 2.02, 0.22);
+    owl.add(eyeGlow);
+
+    const mouth = new THREE.Mesh(
+      new THREE.ConeGeometry(0.34, 0.17, 12),
+      mouthMaterial
+    );
+    mouth.position.set(0.24, 1.93, 0.15);
+    mouth.scale.y = 0.72;
+    mouth.castShadow = true;
+    owl.add(mouth);
+
+    const eyeBase = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 10, 8),
+      bodyMaterial
+    );
+    eyeBase.position.set(0, 1.93, 0.205);
+    eyeBase.scale.set(0.9, 0.28, 0.28);
+    eyeBase.castShadow = true;
+    owl.add(eyeBase);
+
+    // -------------------------------------------------------------------------
+    // Eyeshadow and subtle facial details
+    // -------------------------------------------------------------------------
+
+    const eyeShadowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false
+    });
+
+    const eyeShadow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.095, 12, 8),
+      eyeShadowMaterial
+    );
+    eyeShadow.position.set(0, 1.98, 0.23);
+    owl.add(eyeShadow);
+
+    const lowerEyebrowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.7
+    });
+
+    const lowerEyebrow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 10, 8),
+      lowerEyebrowMaterial
+    );
+    lowerEyebrow.position.set(0.19, 1.94, 0.105);
+    owl.add(lowerEyebrow);
+
+    const innerEyeShadow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 10, 8),
+      eyeShadowMaterial
+    );
+    innerEyeShadow.position.set(-0.115, 1.98, 0.205);
+    owl.add(innerEyeShadow);
+
+    // -------------------------------------------------------------------------
+    // Body and head
+    // -------------------------------------------------------------------------
+
+    const body = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.24, 3.08, 8, 12),
+      bodyMaterial
+    );
+    body.position.set(0, 2.18, 0.17);
+    body.scale.z = 0.82;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    owl.add(body);
+
+    var headMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 24, 16),
+      bodyMaterial
+    );
+    headMesh.position.set(0, 3.25, 0.13);
+    headMesh.scale.y = 0.82;
+    headMesh.castShadow = true;
+    headMesh.receiveShadow = true;
+    owl.add(headMesh);
+
+    const eyePivot = new THREE.Group();
+    eyePivot.position.set(0, 3.28, 0.205);
+    eyePivot.rotation.z = -0.12;
+    owl.add(eyePivot);
+
+    const eyeCollar = new THREE.Mesh(
+      new THREE.TorusGeometry(0.13, 0.055, 8, 28),
+      bodyMaterial
+    );
+    eyeCollar.position.set(0, 0, -0.07);
+    owl.add(eyeCollar);
+
+    const headMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.48
+    });
+
+    var headMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 24, 16),
+      headMaterial
+    );
+    headMesh.position.set(0, 3.25, 0.13);
+    headMesh.castShadow = true;
+    headMesh.receiveShadow = true;
+    owl.add(headMesh);
+
+    const brow = new THREE.Mesh(
+      new THREE.TorusGeometry(0.17, 0.052, 8, 28),
+      bodyMaterial
+    );
+    brow.position.set(0, 3.38, -0.075);
+    brow.castShadow = true;
+    owl.add(brow);
+
+    // -------------------------------------------------------------------------
+    // Feathered wings
+    // -------------------------------------------------------------------------
+
+    function makeWingGeometry() {
+      const segments = 24;
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const angle = t * Math.PI * 2;
+
+        const halfWidth = 0.13 + Math.sin(Math.PI * t) * 0.12;
+        const width = 0.16 + (1 - t) * 0.12;
+
+        const baseY = 3.12 + Math.sin(angle) * 0.1;
+        const tipY = 4.55 - Math.cos(angle) * 0.13;
+
+        const top = 2.5 + Math.sin(angle) * 0.1;
+        const bottom = 2.15 - Math.cos(angle) * 0.12;
+
+        const left = t < 0.5
+          ? width / 2
+          : 0;
+        const right = t > 0.5
+          ? width / 2
+          : 0;
+
+        positions.push(
+          left + 0.018,
+          top - bottom,
+          left,
+          right,
+          -left + 0.018,
+          tipY - bottom,
+          right,
+          -right + 0.018
+        );
+
+        uvs.push(0, t * 2, 1, t * 2);
+
+        if (i < segments) {
+          const a = i * 4;
+          const b = (i + 1) * 4;
+
+          indices.push(a, b, a + 1, b, b + 1, a + 1);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    function addWing(angle) {
+      const group = new THREE.Group();
+      group.position.set(
+        Math.cos(angle) * 0.13,
+        3.12 + Math.sin(angle) * 0.1,
+        0.15
+      );
+      group.scale.y = 0.82;
+      scene.add(group);
+
+      const mesh = new THREE.Mesh(
+        makeWingGeometry(),
+        wingMaterial
+      );
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tail and head feathers
+    // -------------------------------------------------------------------------
+
+    const tailPositions = [];
+    const tailIndices = [];
+
+    for (let i = 0; i < 11; i++) {
+      const angle = i / 10 * Math.PI * 2;
+      const taper = 1 - Math.pow(Math.sin(angle), 0.72);
+
+      const width = 0.14 + taper * 0.12;
+      const halfWidth = 0.075 * taper;
+
+      const baseY = 3.25 + Math.sin(angle) * 0.16;
+      const tipY = 4.55 - Math.cos(angle) * 0.13;
+      const lowerY = 2.5 + Math.sin(angle) * 0.1;
+
+      tailPositions.push(
+        halfWidth,
+        baseY,
+        -halfWidth,
+        width / 2,
+        tipY,
+        -width / 2,
+        width / 2,
+        tipY,
+        -width / 2
+      );
+
+      tailIndices.push(
+        0, 1, 3, 1, 3, 2
+      );
+    }
+
+    const tailGeometry = new THREE.BufferGeometry();
+    tailGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(tailPositions, 3)
+    );
+    tailGeometry.setIndex(tailIndices);
+    tailGeometry.computeVertexNormals();
+
+    const tail = new THREE.Mesh(tailGeometry, bodyMaterial);
+    tail.castShadow = true;
+    tail.receiveShadow = true;
+    scene.add(tail);
+
+    // -------------------------------------------------------------------------
+    // Subtle underbelly movement
+    // -------------------------------------------------------------------------
+
+    const bellyPoints = [];
+    const bellySegments = 24;
+
+    for (let i = 0; i <= bellySegments; i++) {
+      const t = i / bellySegments;
+      const angle = t * Math.PI * 2 + Math.sin(t * Math.PI) * 0.1;
+
+      bellyPoints.push(
+        -0.055 + Math.sin(angle) * 0.1,
+        3.12 + Math.sin(angle) * 0.08,
+        0.13 + Math.cos(angle) * 0.08
+      );
+    }
+
+    const bellyGeometry = new THREE.BufferGeometry();
+    bellyGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(bellyPoints, 3)
+    );
+
+    const belly = new THREE.Mesh(bellyGeometry, bodyMaterial);
+    belly.castShadow = true;
+    belly.receiveShadow = true;
+    scene.add(belly);
+
+    // -------------------------------------------------------------------------
+    // Gentle head-tilting animation
+    // -------------------------------------------------------------------------
+
+    const headDirection = new THREE.Vector3(-0.15, 0.12, -0.18);
+    const headUp = new THREE.Vector3(0, 1, 0);
+
+    const headPivot = headMesh;
+    function updateHead() {
+      const vertical = headDirection.y;
+      const horizontal = Math.abs(headDirection.x) < 0.75;
+
+      headPivot.rotation.z =
+        -vertical * 2.4 +
+        (horizontal ? 1.35 : 0);
+
+      eyePivot.rotation.z =
+        -headDirection.z * 0.42;
+    }
+
+    // -------------------------------------------------------------------------
+    // Wing-bobbing animation
+    // -------------------------------------------------------------------------
+
+    const wingPhases = [0.3, 0.7, 1.5, 2.1];
+    const wingAmplitudes = [0.18, 0.11];
+
+    function bobWings(time) {
+      const phase = time % 6;
+
+      for (const angle of wingPhases) {
+        const phaseA = (phase - angle + 3) % 6;
+
+        const position =
+          Math.sin(phaseA * 2.1) * wingAmplitudes[angle] +
+          Math.cos(phaseA * 2.1) * wingAmplitudes[angle * 0.7];
+
+        const horizontal =
+          Math.sin(angle) * 0.12 +
+          Math.cos(angle) * 0.10;
+
+        const vertical = 4.55 - Math.cos(angle) * 0.13;
+
+        const tipY = 4.55 + horizontal;
+        const lowerY = 2.5 + Math.sin(angle) * 0.1;
+
+        const wing = new THREE.Mesh(
+          makeWingGeometry(),
+          wingMaterial
+        );
+
+        wing.position.set(
+          Math.cos(angle) * 0.13 + position,
+          (lowerY + tipY) * 0.5,
+          -Math.sin(angle) * 0.12
+        );
+        wing.scale.y = 0.82;
+        wing.castShadow = true;
+        wing.receiveShadow = true;
+        scene.add(wing);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls: orbit, zoom, keyboard, and reset
+    // -------------------------------------------------------------------------
+
+    const orbit = {
+      target: new THREE.Vector3(0, 0.9, -1.5),
+      radius: 13.7,
+      theta: 0.68,
+      phi: 1.12
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(orbit.phi);
+
+      camera.position.set(
+        orbit.target.x +
+          orbit.radius * sinPhi * Math.sin(orbit.theta),
+        orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+        orbit.target.z +
+          orbit.radius * sinPhi * Math.cos(orbit.theta)
+      );
+
+      camera.lookAt(orbit.target);
+    }
+
+    function resetView() {
+      orbit.target.set(0, 0.9, -1.5);
+      orbit.radius = 13.7;
+      orbit.theta = 0.68;
+      orbit.phi = 1.12;
+      updateCamera();
+    }
+
+    const pointers = new Map();
+    let dragMode = 0;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+
+    renderer.domElement.addEventListener("contextmenu", event => {
+      event.preventDefault();
+    });
+
+    renderer.domElement.addEventListener("pointerdown", event => {
+      renderer.domElement.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (pointers.size === 1) {
+        dragMode =
+          event.button === 2 || event.shiftKey ? 2 : 0;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+      } else if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        dragMode =
+          Math.atan2(b.y - a.y, b.x - a.x);
+        lastPointerX = (a.x + b.x) * 0.5;
+        lastPointerY = (a.y + b.y) * 0.5;
+      }
+    });
+
+    renderer.domElement.addEventListener("pointermove", event => {
+      if (!pointers.has(event.pointerId)) return;
+
+      const previous = pointers.get(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (pointers.size === 1) {
+        const dx = event.clientX - lastPointerX;
+        const dy = event.clientY - lastPointerY;
+
+        orbit.theta -= dx * 0.006;
+        orbit.phi = THREE.MathUtils.clamp(
+          orbit.phi + dy * 0.005,
+          0.48,
+          Math.PI - 0.48
+        );
+
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+      } else if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+
+        orbit.theta -= Math.atan2(dy, dx);
+        orbit.phi = THREE.MathUtils.clamp(
+          orbit.phi + dx * 0.005,
+          0.48,
+          Math.PI - 0.48
+        );
+
+        lastPointerX = (a.x + b.x) * 0.5;
+        lastPointerY = (a.y + b.y) * 0.5;
+      }
+
+      updateCamera();
+    });
+
+    function endPointer(event) {
+      pointers.delete(event.pointerId);
+      lastPointerX = 0;
+      lastPointerY = 0;
+    }
+
+    renderer.domElement.addEventListener("pointerup", endPointer);
+    renderer.domElement.addEventListener("pointercancel", endPointer);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      event => {
+        event.preventDefault();
+        orbit.radius = THREE.MathUtils.clamp(
+          orbit.radius * Math.exp(event.deltaY * 0.001),
+          7.5,
+          24
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetView);
+
+    document.querySelector("#reset-view").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft") orbit.theta += 0.08;
+      if (event.key === "ArrowRight") orbit.theta -= 0.08;
+      if (event.key === "ArrowUp") {
+        orbit.phi = Math.max(0.48, orbit.phi - 0.06);
+      }
+      if (event.key === "ArrowDown") {
+        orbit.phi = Math.min(Math.PI - 0.48, orbit.phi + 0.06);
+      }
+      if (event.key === "+" || event.key === "=") {
+        orbit.radius = Math.max(7.5, orbit.radius - 0.8);
+      }
+      if (event.key === "-") {
+        orbit.radius = Math.min(24, orbit.radius + 0.8);
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and animation
+    // -------------------------------------------------------------------------
+
+    function onResize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener("resize", onResize);
+
+    let previousTime = performance.now();
+    let firstFrame = true;
+
+    function animate(time) {
+      const deltaTime = Math.min((time - previousTime) / 1000, 0.05);
+      previousTime = time;
+
+      bobWings(time);
+
+      updateHead();
+      updateCamera();
+
+      renderer.render(scene, camera);
+
+      if (firstFrame) {
+        firstFrame = false;
+        requestAnimationFrame(() => {
+          document.querySelector("#loading").classList.add("hidden");
+        });
+      }
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crimson, Cobalt & Emerald</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #090b0f;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .title {
+      position: fixed;
+      top: clamp(24px, 5vw, 64px);
+      left: clamp(24px, 5vw, 72px);
+      z-index: 2;
+      pointer-events: none;
+      color: #f2eee9;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #8d96a3;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 56px);
+      font-weight: 500;
+      letter-spacing: -0.045em;
+      line-height: 0.98;
+    }
+
+    h1 span {
+      display: block;
+      color: #66717e;
+      font-weight: 300;
+    }
+
+    .rule {
+      width: 48px;
+      height: 1px;
+      margin-top: 22px;
+      background: linear-gradient(90deg, #ef5350, transparent);
+    }
+
+    .hint {
+      position: fixed;
+      right: clamp(20px, 4vw, 56px);
+      bottom: clamp(20px, 4vw, 48px);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #77818e;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      pointer-events: none;
+    }
+
+    .mouse {
+      position: relative;
+      width: 17px;
+      height: 25px;
+      border: 1px solid #66717e;
+      border-radius: 9px;
+    }
+
+    .mouse::after {
+      content: "";
+      position: absolute;
+      top: 5px;
+      left: 7px;
+      width: 2px;
+      height: 6px;
+      border-radius: 2px;
+      background: #ef5350;
+    }
+
+    @media (max-width: 640px) {
+      .title {
+        top: 24px;
+      }
+
+      .hint {
+        right: 20px;
+        bottom: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title">
+    <p class="eyebrow">Material Study · 03</p>
+    <h1>Opposed<br /><span>Colors & Forms</span></h1>
+    <div class="rule"></div>
+  </div>
+
+  <div class="hint">
+    <span class="mouse"></span>
+    <span>Drag to orbit · Scroll to zoom</span>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x090b0f);
+    scene.fog = new THREE.Fog(0x090b0f, 16, 32);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural reflection environment
+    // -------------------------------------------------------------------------
+
+    const envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x171b22);
+
+    function environmentPanel(color, intensity, position, scale, rotation) {
+      const material = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(color).multiplyScalar(intensity),
+        side: THREE.DoubleSide
+      });
+
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(scale[0], scale[1]),
+        material
+      );
+
+      panel.position.set(...position);
+      panel.rotation.set(...rotation);
+      envScene.add(panel);
+    }
+
+    environmentPanel(0xffffff, 4.0, [0, 5, 0], [8, 4], [Math.PI / 2, 0, 0]);
+    environmentPanel(0x8eb7ff, 2.4, [-5, 1, 3], [3, 6], [0, 0, 0]);
+    environmentPanel(0xff4d48, 2.0, [5, 0, 2], [3, 5], [0, 0, 0]);
+    environmentPanel(0x43e6c1, 1.7, [0, -3, 4], [5, 3], [0, 0, 0]);
+    environmentPanel(0x202833, 1.1, [0, 0, -5], [8, 5], [0, 0, 0]);
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromScene(envScene, 0.04).texture;
+    pmrem.dispose();
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x9baec8, 0x17110d, 1.25));
+
+    const keyLight = new THREE.DirectionalLight(0xffe6df, 4.2);
+    keyLight.position.set(-5, 8, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -7;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.0002;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x5c8dff, 3.4);
+    rimLight.position.set(6, 4, -5);
+    scene.add(rimLight);
+
+    const warmLight = new THREE.PointLight(0xff4b42, 28, 12, 2);
+    warmLight.position.set(-3.8, 2.2, 3.2);
+    scene.add(warmLight);
+
+    const emeraldLight = new THREE.PointLight(0x43e6c1, 22, 9, 2);
+    emeraldLight.position.set(3.8, 1.5, 2.8);
+    scene.add(emeraldLight);
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const plinthMaterial = new THREE.MeshStandardMaterial({
+      color: 0x20262d,
+      roughness: 0.76,
+      metalness: 0.18
+    });
+
+    const plinthTopMaterial = new THREE.MeshStandardMaterial({
+      color: 0x30363e,
+      roughness: 0.58,
+      metalness: 0.25
+    });
+
+    const crimsonMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x9d1717,
+      roughness: 0.48,
+      metalness: 0.02,
+      clearcoat: 0.0,
+      clearcoatRoughness: 0.72
+    });
+
+    const cobaltMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x075b9f,
+      roughness: 0.12,
+      metalness: 0.08,
+      clearcoat: 1,
+      clearcoatRoughness: 0.08
+    });
+
+    const emeraldMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x247f68,
+      roughness: 0.18,
+      metalness: 0.62,
+      clearcoat: 0.65,
+      clearcoatRoughness: 0.14,
+      flatShading: true
+    });
+
+    const plinth = new THREE.Group();
+    scene.add(plinth);
+
+    // A rounded rectangular base built with an extruded shape.
+    const baseShape = new THREE.Shape();
+    const baseRadius = 0.32;
+    const baseHalfWidth = 5.15;
+    const baseHalfDepth = 2.65;
+
+    baseShape.moveTo(-baseHalfWidth, -baseHalfDepth + baseRadius);
+    baseShape.lineTo(baseHalfWidth - baseRadius, -baseHalfDepth);
+    baseShape.quadraticCurveTo(baseHalfWidth, -baseHalfDepth, baseHalfWidth, -baseHalfDepth + baseRadius);
+    baseShape.lineTo(baseHalfWidth, baseHalfDepth - baseRadius);
+    baseShape.quadraticCurveTo(baseHalfWidth, baseHalfDepth, baseHalfWidth - baseRadius, baseHalfDepth);
+    baseShape.lineTo(-baseHalfWidth + baseRadius, baseHalfDepth);
+    baseShape.quadraticCurveTo(-baseHalfWidth, baseHalfDepth, -baseHalfWidth, baseHalfDepth - baseRadius);
+    baseShape.lineTo(-baseHalfWidth, -baseHalfDepth + baseRadius);
+    baseShape.quadraticCurveTo(-baseHalfWidth, -baseHalfDepth, -baseHalfWidth + baseRadius, -baseHalfDepth);
+
+    const baseGeometry = new THREE.ExtrudeGeometry(baseShape, {
+      depth: 0.42,
+      bevelEnabled: true,
+      bevelSegments: 4,
+      steps: 1,
+      bevelSize: 0.12,
+      bevelThickness: 0.12,
+      curveSegments: 12
+    });
+
+    baseGeometry.rotateX(-Math.PI / 2);
+    baseGeometry.computeVertexNormals();
+
+    const base = new THREE.Mesh(baseGeometry, plinthMaterial);
+    base.position.y = -0.26;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    plinth.add(base);
+
+    // Inset top slab.
+    const topShape = new THREE.Shape();
+    const topRadius = 0.24;
+    const topHalfWidth = 4.72;
+    const topHalfDepth = 2.24;
+
+    topShape.moveTo(-topHalfWidth, -topHalfDepth + topRadius);
+    topShape.lineTo(topHalfWidth - topRadius, -topHalfDepth);
+    topShape.quadraticCurveTo(topHalfWidth, -topHalfDepth, topHalfWidth, -topHalfDepth + topRadius);
+    topShape.lineTo(topHalfWidth, topHalfDepth - topRadius);
+    topShape.quadraticCurveTo(topHalfWidth, topHalfDepth, topHalfWidth - topRadius, topHalfDepth);
+    topShape.lineTo(-topHalfWidth + topRadius, topHalfDepth);
+    topShape.quadraticCurveTo(-topHalfWidth, topHalfDepth, -topHalfWidth, topHalfDepth - topRadius);
+    topShape.lineTo(-topHalfWidth, -topHalfDepth + topRadius);
+    topShape.quadraticCurveTo(-topHalfWidth, -topHalfDepth, -topHalfWidth + topRadius, -topHalfDepth);
+
+    const topGeometry = new THREE.ExtrudeGeometry(topShape, {
+      depth: 0.12,
+      bevelEnabled: true,
+      bevelSegments: 3,
+      steps: 1,
+      bevelSize: 0.055,
+      bevelThickness: 0.045,
+      curveSegments: 12
+    });
+
+    topGeometry.rotateX(-Math.PI / 2);
+    topGeometry.computeVertexNormals();
+
+    const top = new THREE.Mesh(topGeometry, plinthTopMaterial);
+    top.position.y = 0.025;
+    top.receiveShadow = true;
+    plinth.add(top);
+
+    // -------------------------------------------------------------------------
+    // Objects
+    // -------------------------------------------------------------------------
+
+    const objects = new THREE.Group();
+    scene.add(objects);
+
+    // Matte crimson cube.
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(1.55, 1.55, 1.55),
+      crimsonMaterial
+    );
+    cube.position.set(-2.55, 0.83, 0);
+    cube.rotation.y = -0.12;
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+    objects.add(cube);
+
+    // Glossy cobalt sphere.
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.92, 96, 64),
+      cobaltMaterial
+    );
+    sphere.position.set(0, 0.83, 0);
+    sphere.rotation.z = 0.18;
+    sphere.castShadow = true;
+    sphere.receiveShadow = true;
+    objects.add(sphere);
+
+    // Emerald tetrahedron.
+    const tetrahedron = new THREE.Mesh(
+      new THREE.TetrahedronGeometry(0.92, 0),
+      emeraldMaterial
+    );
+    tetrahedron.position.set(2.55, 0.83, 0);
+    tetrahedron.rotation.set(0.35, -0.4, 0.18);
+    tetrahedron.castShadow = true;
+    tetrahedron.receiveShadow = true;
+    objects.add(tetrahedron);
+
+    // -------------------------------------------------------------------------
+    // Custom camera controls: orbit, zoom, and damping
+    // -------------------------------------------------------------------------
+
+    const controls = {
+      target: new THREE.Vector3(0, 0.85, 0),
+      radius: 9.2,
+      theta: 0.68,
+      phi: 1.18,
+      desiredRadius: 9.2,
+      desiredTheta: 0.68,
+      desiredPhi: 1.18,
+      dragging: false,
+      pointerX: 0,
+      pointerY: 0,
+      pinchDistance: 0
+    };
+
+    function updateCamera() {
+      controls.radius +=
+        (controls.desiredRadius - controls.radius) * 0.085;
+      controls.theta +=
+        (controls.desiredTheta - controls.theta) * 0.085;
+      controls.phi +=
+        (controls.desiredPhi - controls.phi) * 0.085;
+
+      const sinPhiRadius = Math.sin(controls.phi) * controls.radius;
+
+      camera.position.set(
+        controls.target.x + sinPhiRadius * Math.sin(controls.theta),
+        controls.target.y + Math.cos(controls.phi) * controls.radius,
+        controls.target.z + sinPhiRadius * Math.cos(controls.theta)
+      );
+
+      camera.lookAt(controls.target);
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      controls.dragging = true;
+      controls.pointerX = event.clientX;
+      controls.pointerY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!controls.dragging) return;
+
+      const dx = event.clientX - controls.pointerX;
+      const dy = event.clientY - controls.pointerY;
+
+      controls.pointerX = event.clientX;
+      controls.pointerY = event.clientY;
+
+      controls.desiredTheta -= dx * 0.006;
+      controls.desiredPhi = THREE.MathUtils.clamp(
+        controls.desiredPhi - dy * 0.005,
+        0.48,
+        Math.PI - 0.48
+      );
+    });
+
+    function endDrag(event) {
+      controls.dragging = false;
+      if (event.pointerId !== undefined && renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        controls.desiredRadius = THREE.MathUtils.clamp(
+          controls.desiredRadius + event.deltaY * 0.006,
+          5.6,
+          14
+        );
+      },
+      { passive: false }
+    );
+
+    // Basic two-finger pinch support.
+    const activePointers = new Map();
+    let previousPinchDistance = 0;
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      activePointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      if (activePointers.size === 2) {
+        const points = [...activePointers.values()];
+        previousPinchDistance = Math.hypot(
+          points[0].x - points[1].x,
+          points[0].y - points[1].y
+        );
+      }
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!activePointers.has(event.pointerId)) return;
+
+      activePointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      if (activePointers.size === 2) {
+        const points = [...activePointers.values()];
+        const distance = Math.hypot(
+          points[0].x - points[1].x,
+          points[0].y - points[1].y
+        );
+
+        if (previousPinchDistance > 0) {
+          const scale = previousPinchDistance / Math.max(distance, 1);
+          controls.desiredRadius = THREE.MathUtils.clamp(
+            controls.desiredRadius * scale,
+            5.6,
+            14
+          );
+        }
+
+        previousPinchDistance = distance;
+      }
+    });
+
+    function removePointer(event) {
+      activePointers.delete(event.pointerId);
+      previousPinchDistance = 0;
+    }
+
+    renderer.domElement.addEventListener("pointerup", removePointer);
+    renderer.domElement.addEventListener("pointercancel", removePointer);
+
+    // -------------------------------------------------------------------------
+    // Resize and animation
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+
+      // Very subtle, restrained movement keeps the scene calm and product-like.
+      if (!controls.dragging) {
+        controls.desiredTheta += Math.sin(elapsed * 0.16) * 0.00012;
+        controls.desiredPhi += Math.cos(elapsed * 0.13) * 0.0001;
+      }
+
+      updateCamera();
+
+      renderer.render(scene, camera);
+    }
+
+    updateCamera();
+    animate();
+  </script>
+</body>
+</html>

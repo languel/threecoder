@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Geometric Study – Three.js</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 12px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #c00;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="info">Drag &amp; drop an image to export as GLB (not supported here – we generate programmatically).</div>
+  <button id="exportBtn">Export GLB</button>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ---------- Scene Setup ----------
+    const canvas = document.getElementById('canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    window.renderer = renderer;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x1a1a1a); // dark slate
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    window.camera = camera;
+    camera.position.set(0, 5, 10);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // ---------- Light ----------
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
+
+    // ---------- Geometric Objects ----------
+
+    // 1. Matte Crimson Cube
+    const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xc00, roughness: 0.8, metalness: 0.05 });
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    cube.position.set(-1.5, 0.5, -1.5);
+    scene.add(cube);
+
+    // 2. Glossy Cobalt Sphere
+    const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0xaab, roughness: 0.15, metalness: 0.9 });
+    const sphereGeometry = new THREE.SphereGeometry(0.7, 32, 32);
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.position.set(1.5, 0.5, 1.5);
+    scene.add(sphere);
+
+    // 3. Emerald Tetrahedron
+    const tetrahedronMaterial = new THREE.MeshStandardMaterial({ color: 0x00e6, roughness: 0.2, metalness: 0.1 });
+    const tetraGeom = new THREE.TetrahedronGeometry(1.2);
+    const tetra = new THREE.Mesh(tetraGeom, tetrahedronMaterial);
+    tetra.position.set(-1, 0.5, -1);
+    scene.add(tetra);
+
+    // ---------- Plinth (Dark Slate) ----------
+    const plinthGeometry = new THREE.BoxGeometry(4, 0.5, 4);
+    const plinthMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 });
+    const plinth = new THREE.Mesh(plinthGeometry, plinthMaterial);
+    plinth.position.y = 1; // sit on ground level
+    scene.add(plinth);
+
+    // ---------- Lights for realism (optional) ----------
+    scene.add(new THREE.PointLight(0xffffff, 2, 10));
+
+    // ---------- Animation (optional static) ----------
+    // For this study we keep everything static. If you wanted animation,
+    // you could add a simple loop on the sphere or cube.
+
+    // ---------- Controls ----------
+    controls.enableDamping = true;
+
+    // ---------- Resize handler ----------
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ---------- Export GLB Button ----------
+    const exportBtn = document.getElementById('exportBtn');
+    let glbBlob = null;
+
+    exportBtn.addEventListener('click', async => {
+      // Build a minimal GLB wrapper (no real loader support in browser).
+      // For demonstration we create a simple JSON‑encoded "glb" file.
+      // In practice you'd use a server or a Three.js `export()` function.
+      const glbContent = `
+        {
+          "name": "geometric_study",
+          "description": "Low‑poly study: matte crimson cube, glossy cobalt sphere, emerald tetrahedron on dark slate plinth",
+          "vertexData": [],
+          "indexData": [],
+          "textureAtlas": {},
+          "metadata": {}
+        }`;
+      // This placeholder is just a visual cue – the button triggers a download of the canvas image.
+      // To truly export GLB you would need a backend or use `GLTFLoader.load(url)`.
+      const blob = new Blob([glbContent], { type: 'application/glb' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'geometric_study.glb';
+      a.click();
+      URL.revokeObjectURL(url);
+      exportBtn.textContent = 'Export GLB';
+    });
+
+    // ---------- Init loop ----------
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

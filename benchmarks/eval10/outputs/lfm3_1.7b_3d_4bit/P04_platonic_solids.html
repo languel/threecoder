@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Platonic Solids — Three.js</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #090a0f;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas.dragging { cursor: grabbing; }
+
+    .title-card {
+      position: fixed;
+      top: clamp(20px, 4vw, 42px);
+      left: clamp(22px, 4vw, 48px);
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .eyebrow {
+      margin-bottom: 8px;
+      color: #dce5e9;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(21px, 3.8vw, 34px);
+      line-height: 1.08;
+      letter-spacing: 0.035em;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: #757b7d;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    #reset {
+      position: fixed;
+      right: clamp(18px, 3vw, 34px);
+      bottom: clamp(20px, 3vw, 32px);
+      z-index: 3;
+      padding: 10px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      color: #dce5e9;
+      background: rgba(5, 8, 7, 0.34);
+      box-shadow: 0 7px 25px rgba(0, 0, 0, 0.2);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+
+    #reset:hover {
+      border-color: #dce5e9;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .hint {
+      position: fixed;
+      left: clamp(22px, 3vw, 48px);
+      bottom: clamp(20px, 3vw, 32px);
+      z-index: 2;
+      color: #8da6a5;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 700px) {
+      .hint { display: none; }
+      .subtitle { margin-bottom: 8px; }
+
+      .title-card { top: 20px; left: 22px; }
+      #reset { right: 18px; bottom: 18px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <section class="title-card">
+    <p class="eyebrow">Platonic solids · geometric study</p>
+    <h1>Five Solids</h1>
+    <p class="subtitle">A rotating collection of the five regular polyhedra.</p>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Double-click to reset</div>
+  <button id="reset" type="button">Reset view</button>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const stage = document.getElementById("stage");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene with five Platonic solids"
+    );
+    stage.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x090a0f);
+    scene.fog = new THREE.Fog(0x090a0f, 22, 48);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural studio environment to give the solids a soft metallic halo.
+    // -------------------------------------------------------------------------
+
+    function createEnvironment() {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        128, 128, 0,
+        128, 128, 128
+      );
+
+      gradient.addColorStop(0, "#9ec5dc");
+      gradient.addColorStop(0.45, "#c6dce5");
+      gradient.addColorStop(1, "#dce3ef");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    const environmentTexture = createEnvironment();
+
+    const environmentTarget = new THREE.MeshBasicMaterial({
+      map: environmentTexture,
+      transparent: true,
+      opacity: 0.32
+    });
+
+    const environment = new THREE.Mesh(
+      new THREE.CircleGeometry(10, 72),
+      environmentTarget
+    );
+
+    environment.position.set(0, 4, 0);
+    scene.add(environment);
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0xc8e7ed, 0x6a7b73, 1.25);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff4df, 3.2);
+    keyLight.position.set(-3.5, 9, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -4.5;
+    keyLight.shadow.camera.right = 4.5;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 18;
+    keyLight.shadow.bias = -0.00035;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x9fc9dc, 1.15);
+    fillLight.position.set(4, 4, -4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd6a2, 1.1);
+    rimLight.position.set(-2, 4, 3);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Shared geometry and colors
+    // -------------------------------------------------------------------------
+
+    function makeCylinderGeometry(radius, height, material, segments = 24) {
+      var radius = Math.max(0.001, radius - 0.002);
+      var height = Math.max(0.001, height - 0.002);
+
+      return new THREE.CylinderGeometry(
+        radius,
+        radius,
+        height,
+        segments
+      );
+    }
+
+    function makeCylinderGeometryBetween(start, end, radius, material, segments = 20) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      return new THREE.CylinderGeometry(
+        radius,
+        radius,
+        length,
+        segments
+      );
+    }
+
+    var makeSphereGeometry = function(radius, material, segments = 48) {
+      const positions = [];
+      const indices = [];
+
+      for (let i = 0; i < segments; i++) {
+        const angle = -Math.PI / 2 + (i / segments) * (Math.PI / 2);
+        const x = Math.sin(angle) * radius;
+        const y = Math.cos(angle) * radius;
+        const z = Math.cos(angle) * radius;
+
+        positions.push(x, y, z);
+      }
+
+      for (let i = 0; i < segments; i++) {
+        const next = (i + 1) % segments;
+        const a = i * 3;
+        const b = next * 3;
+        const c = next + 3;
+        const d = i + 3;
+
+        indices.push(a, b, c);
+        indices.push(b, c, d);
+        indices.push(c, d, a);
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    var makeSphereGeometry = function(size, material) {
+      var radius = size.size;
+
+      var geometry = makeSphereGeometry(
+        radius,
+        material,
+        48
+      );
+
+      return geometry;
+    }
+
+    // -------------------------------------------------------------------------
+    // Solid construction helpers
+    // -------------------------------------------------------------------------
+
+    function signedCubic(x, y, z) {
+      return Math.sign(x) * Math.abs(x);
+    }
+
+    function signedSquare(centerX, centerY, x, y) {
+      return Math.sign(x) * Math.abs(x);
+    }
+
+    function makeSolid(color, radius = 1, material, segments = 48) {
+      const group = new THREE.Group();
+      group.rotation.x = Math.PI / 2;
+      group.scale.set(1, 1, 1);
+
+      const sphereGeometry = makeSphereGeometry(radius, material);
+      const positions = sphereGeometry.attributes.position;
+      const indices = null;
+
+      for (let i = 0; i < segments; i++) {
+        const angle = -Math.PI / 2 + (i / segments) * (Math.PI / 2);
+
+        positions[i * 3] = Math.sin(angle) * radius;
+        positions[i * 3 + 1] = Math.cos(angle) * radius;
+        positions[i * 3 + 2] = Math.cos(angle) * radius;
+
+        positions[i * 3 + 3] = -positions[i * 3];
+      }
+
+      for (let i = 0; i < segments; i++) {
+        const next = (i + 1) % segments;
+
+        indices.push(0, 2 + next, 1 + next);
+        indices.push(1 + next, 2 + next, 0 + next);
+        indices.push(2 + next, 3 + next, 1 + next);
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      var material = new THREE.MeshPhysicalMaterial({
+        color,
+        vertexColors: true,
+        roughness: 0.34,
+        metalness: 0.08,
+        clearcoat: 0.22,
+        clearcoatRoughness: 0.38
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      group.add(mesh);
+      return group;
+    }
+
+    // -------------------------------------------------------------------------
+    // Rounded rectangular pedestal
+    // -------------------------------------------------------------------------
+
+    var createPedestal = function(color, scale = 1) {
+      const group = new THREE.Group();
+      group.rotation.y = -0.12;
+
+      const floorMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.72,
+        metalness: 0
+      });
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.08
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.48,
+        metalness: 0.12
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 0.34, 1.45),
+        baseMaterial
+      );
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 0.34, 1.45),
+        baseMaterial
+      );
+      back.position.set(0, -0.17, 0.72);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(1.25, 0.34, 2.3),
+        baseMaterial
+      );
+      left.position.set(-2.5, -0.17, 0.72);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(1.25, 0.34, 2.3),
+        baseMaterial
+      );
+      right.position.set(2.5, -0.17, 0.72);
+
+      const topRing = new THREE.Mesh(
+        new THREE.TorusGeometry(2.35, 0.14, 8, 64),
+        frameMaterial
+      );
+      topRing.rotation.x = Math.PI / 2;
+      topRing.position.set(0, 0.16, 1.25);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(2.35, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.55, 1.25);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(2.35, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.55, -1.25);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 0.34, 1.45),
+        baseMaterial
+      );
+      bottom.position.set(0, -0.17, 0.72);
+
+      group.add(top, back, left, right, topRing, topCap, backCap, bottom);
+      return group;
+    }
+
+    const cubeColor = [0x3f9fb2, 0xb5c6d0, 0xd7e8e1];
+
+    function makeCube(color) {
+      const group = new THREE.Group();
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.4,
+        metalness: 0.04
+      });
+
+      const cubeGeometry = makeCylinderGeometry(1.2, 1.2, material);
+      const corners = [
+        [-1, -1], [1, -1],
+        [-1, 1], [1, 1]
+      ];
+
+      for (const corner of corners) {
+        const x = corner[0] * 0.5;
+        const y = corner[1] * 0.5;
+        const z = corner[0] * 0.5;
+
+        const cube = new THREE.Mesh(cubeGeometry, material);
+        cube.position.set(x, y, z);
+        cube.scale.set(0.72, 0.72, 0.72);
+        cube.castShadow = true;
+        cube.receiveShadow = true;
+        group.add(cube);
+      }
+
+      return group;
+    }
+
+    function makeOctahedron(color) {
+      const group = new THREE.Group();
+      group.rotation.x = Math.PI / 2;
+
+      var geometry = makeSphereGeometry(1, material);
+      const positions = geometry.attributes.position;
+      const indices = null;
+
+      for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 2 + (i / 6) * (Math.PI / 3);
+
+        positions[i * 3] = Math.sin(angle) * 1.15;
+        positions[i * 3 + 1] = Math.cos(angle) * 1.15;
+        positions[i * 3 + 2] = Math.cos(angle) * 1.15;
+
+        positions[i * 3 + 3] = -positions[i * 3];
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const next = (i + 1) % 6;
+
+        indices.push(0, 2 + next, 1 + next);
+        indices.push(1 + next, 2 + next, 0 + next);
+        indices.push(2 + next, 3 + next, 1 + next);
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.4,
+        metalness: 0.04
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    function makeDodecahedron(color) {
+      const group = new THREE.Group();
+      group.rotation.x = Math.PI / 2;
+
+      var geometry = makeSphereGeometry(1, material);
+      const positions = geometry.attributes.position;
+      const indices = null;
+
+      for (let i = 0; i < 3; i++) {
+        const angle = -Math.PI / 2 + i * (Math.PI / 3);
+        const x = Math.sin(angle) * 1.25;
+        const y = Math.cos(angle) * 1.25;
+        const z = Math.cos(angle) * 1.25;
+
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
+
+        positions[i * 3 + 3] = -x;
+      }
+
+      for (let i = 0; i < 3; i++) {
+        const next = (i + 1) % 3;
+        indices.push(0, 1 + next, 2 + next);
+        indices.push(1 + next, 2 + next, 0 + next);
+        indices.push(2 + next, 3 + next, 1 + next);
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.4,
+        metalness: 0.04
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    function makeIcosahedron(color) {
+      const group = new THREE.Group();
+      group.rotation.y = -0.12;
+
+      var geometry = makeSphereGeometry(1, material);
+      const positions = geometry.attributes.position;
+      const indices = null;
+
+      for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 2 + (i / 6) * (Math.PI / 3);
+
+        positions[i * 3] = Math.sin(angle) * 1.25;
+        positions[i * 3 + 1] = Math.cos(angle) * 1.25;
+        positions[i * 3 + 2] = Math.cos(angle) * 1.25;
+
+        positions[i * 3 + 3] = -positions[i * 3];
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const next = (i + 1) % 6;
+        indices.push(0, 2 + next, 1 + next);
+        indices.push(1 + next, 2 + next, 0 + next);
+        indices.push(2 + next, 3 + next, 1 + next);
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.4,
+        metalness: 0.04
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Solid placement and color palette
+    // -------------------------------------------------------------------------
+
+    const baseColors = [
+      0xd7e8e1,
+      0x3f9fb2,
+      0xb5c6d0,
+      0xd7e8e1,
+      0x4b7180
+    ];
+
+    const cubeColors = [0x3f9fb2, 0xb5c6d0, 0xd7e8e1];
+    const octahedronColors = [-0x2d9fbf, -0x3c9cf3, -0x4a9fa5];
+    const dodecahedronColors = [0xe5efd4, 0xbef0d5, 0xd7d8d3];
+    const icosahedronColors = [-0x2b9fbf, -0x3c9cf3, -0x4a9fa5];
+
+    const solids = [
+      makeCube(cubeColors),
+      makeOctahedron(ocosahedronColors),
+      makeDodecahedron(dodecahedronColors),
+      makeIcosahedron(icosahedronColors)
+    ];
+
+    // -------------------------------------------------------------------------
+    // Pedestals and their colored pedestals
+    // -------------------------------------------------------------------------
+
+    const cubePedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.62, 1.12, 0.18, 48),
+      floorMaterial
+    );
+    cubePedestal.position.set(-3.12, 0.18, -0.72);
+    cubePedestal.castShadow = true;
+    scene.add(cubePedestal);
+
+    const octahedronPedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.16, 1.14, 0.18, 48),
+      floorMaterial
+    );
+    octahedronPedestal.position.set(-3.12, 0.18, 0.72);
+    octahedronPedestal.castShadow = true;
+    scene.add(octahedronPedestal);
+
+    const dodecahedronPedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15, 1.13, 0.18, 48),
+      floorMaterial
+    );
+    dodecahedronPedestal.position.set(-2.72, 0.18, -0.73);
+    dodecahedronPedestal.castShadow = true;
+    scene.add(dodecahedronPedestal);
+
+    const icosahedronPedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.14, 1.13, 0.18, 48),
+      floorMaterial
+    );
+    icosahedronPedestal.position.set(-2.72, 0.18, 0.73);
+    icosahedronPedestal.castShadow = true;
+    scene.add(icosahedronPedestal);
+
+    // -------------------------------------------------------------------------
+    // Rounded rectangular pedestals with a subtle raised base
+    // -------------------------------------------------------------------------
+
+    function createRoundedRect(texture, width, depth) {
+      var geometry = new THREE.PlaneGeometry(width, depth, 4);
+      const positions = geometry.attributes.position;
+      const indices = null;
+
+      for (let i = 0; i < positions.length; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+
+        if (x > -1 && x <= 1) {
+          indices.push(0, i, i + 1);
+        } else {
+          indices.push(0, i + 1, i);
+        }
+      }
+
+      for (let i = 0; i < positions.length; i++) {
+        const next = (i + 1) % positions.length;
+        if (next !== i + width) {
+          indices.push(i + 1, next, next + 1);
+        }
+      }
+
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      return {
+        positions: positions.clone(),
+        indices,
+        width,
+        depth
+      };
+    }
+
+    var createRoundedPedestal = function(color, scale = 1) {
+      const group = new THREE.Group();
+      group.rotation.y = -0.12;
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.68,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.13, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.13, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    var createPedestal = function(color, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(-3.12, 0.18, -0.72);
+      scene.add(group);
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.72,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.14, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.14, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    var createPedestalColor = function(color, radius = 1) {
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      var geometry = makeSphereGeometry(radius, material);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    var createRoundedPedestal = function(color, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(-3.12, 0.18, -0.72);
+      scene.add(group);
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.14, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.14, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    var createPedestalColor = function(color, radius = 1) {
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      var geometry = makeSphereGeometry(radius, material);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    var createRoundedPedestal = function(color, scale) {
+      const offset = 1.2;
+      const halfOffsetX = offset / 2;
+      const halfOffsetY = -offset / 2;
+
+      const group = new THREE.Group();
+      group.position.set(-3.12 + halfOffsetX, 0.18, -0.72);
+      scene.add(group);
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.14, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.14, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    function makeRectangularPedestal(color, radius = 1) {
+      const group = new THREE.Group();
+      group.position.set(-3.12, 0.18, -0.72);
+      scene.add(group);
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.14, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.14, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    function createRoundedRectangularPedestal(color, scale) {
+      const group = new THREE.Group();
+      group.position.set(-3.12, 0.18, -0.72);
+      scene.add(group);
+
+      const baseMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0
+      });
+
+      const frameMaterial = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.58,
+        metalness: 0.1
+      });
+
+      const top = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      top.position.set(0, 0.13, -0.7);
+      top.castShadow = true;
+      group.add(top);
+
+      const back = new THREE.Mesh(
+        new THREE.BoxGeometry(2.85, 0.34, 1.4),
+        baseMaterial
+      );
+      back.position.set(0, 0.13, 0.7);
+      back.castShadow = true;
+      group.add(back);
+
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      left.position.set(-1.37, 0.14, 0.7);
+      left.castShadow = true;
+      group.add(left);
+
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.4),
+        baseMaterial
+      );
+      right.position.set(1.37, 0.14, 0.7);
+      right.castShadow = true;
+      group.add(right);
+
+      for (const x of [-1.45, 1.45]) {
+        const back = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.34, 1.2),
+          baseMaterial
+        );
+        back.position.set(x, 0.14, -1.05);
+        back.castShadow = true;
+        group.add(back);
+      }
+
+      const front = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.34, 1.2),
+        baseMaterial
+      );
+      front.position.set(x, 0.14, 1.05);
+      front.castShadow = true;
+      group.add(front);
+
+      const topCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      topCap.position.set(0, 0.13, 1.2);
+      topCap.castShadow = true;
+      group.add(topCap);
+
+      const backCap = new THREE.Mesh(
+        new THREE.CircleGeometry(1.3, 64),
+        baseMaterial
+      );
+      backCap.position.set(0, 0.13, 1.2);
+      backCap.castShadow = true;
+      group.add(backCap);
+
+      const bottom = new THREE.Mesh(
+        new THREE.BoxGeometry(2.7, 0.34, 1.34),
+        baseMaterial
+      );
+      bottom.position.set(0, 0.13, -1.05);
+      bottom.castShadow = true;
+      group.add(bottom);
+
+      scene.add(group);
+
+      return {
+        group,
+        scale,
+        offsetX: -1.15,
+        offsetY: 0.12
+      };
+    }
+
+    const rectangularPedestals = [
+      createRectangularPedestal(cubeColors[0]),
+      createRectangularPedestal(cubeColors[2]),
+      createRectangularPedestal(icosahedronColors[1]),
+      createRectangularPedestal(icosahedronColors[2])
+    ];
+
+    // -------------------------------------------------------------------------
+    // Solid placement
+    // -------------------------------------------------------------------------
+
+    const solidPositions = [-2.15, -1.45, 0, 1.45, 2.15];
+
+    solids.forEach((solid, i) => {
+      solid.position.set(
+        solid.offsetX + solid.scale * 0.5,
+        0.13 + solid.scale * 0.5,
+        -0.7
+      );
+
+      solid.renderOrder = 1;
+    });
+
+    // -------------------------------------------------------------------------
+    // Lighting the five solids
+    // -------------------------------------------------------------------------
+
+    const solidColors = [
+      [0xd7e8e1],
+      [0x3f9fb2],
+      [0xb5c6d0],
+      [0xd7e8e1],
+      [0x4b7180]
+    ];
+
+    solids.forEach((solid, i) => {
+      const color = solidColors[i];
+      var material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.5,
+        metalness: 0.08
+      });
+
+      const mesh = new THREE.Mesh(solid.group, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    });
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls: orbit, zoom, and reset
+    // -------------------------------------------------------------------------
+
+    const defaults = {
+      theta: 0.48,
+      phi: 1.04,
+      radius: 13.5
+    };
+
+    let theta = defaults.theta;
+    let phi = defaults.phi;
+    var radius = defaults.radius;
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+
+    function updateCamera() {
+      const { theta, phi, radius } = {
+        theta,
+        phi,
+        radius
+      };
+
+      camera.position.set(
+        Math.sin(phi) * radius * Math.sin(theta),
+        radius * Math.cos(phi),
+        Math.cos(phi) * radius * Math.sin(theta)
+      );
+
+      camera.lookAt(0, 0, 0);
+    }
+
+    function resetView() {
+      theta = defaults.theta;
+      phi = defaults.phi;
+      radius = defaults.radius;
+
+      updateCamera();
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.classList.add("dragging");
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - previousX;
+      const dy = event.clientY - previousY;
+
+      previousX = event.clientX;
+      previousY = event.clientY;
+
+      theta -= dx * 0.006;
+      phi = THREE.MathUtils.clamp(phi + dy * 0.005, 0.28, 1.42);
+    });
+
+    function endDrag(event) {
+      dragging = false;
+      renderer.domElement.classList.remove("dragging");
+
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        radius = THREE.MathUtils.clamp(
+          radius * Math.exp(event.deltaY * 0.001),
+          8,
+          28
+        );
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetView);
+    document.getElementById("reset").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      }
+
+      if (event.key === "ArrowLeft") {
+        theta += 0.08;
+      } else if (event.key === "ArrowRight") {
+        theta -= 0.08;
+      } else if (event.key === "ArrowUp") {
+        phi = Math.max(0.28, phi - 0.06);
+      } else if (event.key === "ArrowDown") {
+        phi = Math.min(1.42, phi + 0.06);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // -------------------------------------------------------------------------
+    // Animation: the solids rotate around their own centers
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+
+      solids.forEach((solid, i) => {
+        solid.group.rotation.z = Math.sin(elapsed * 0.18 + i * 0.012) * 0.018;
+        solid.group.rotation.x = Math.cos(elapsed * 0.11 + i * 0.008) * 0.012;
+      });
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    updateCamera();
+    renderer.setAnimation(animate, 1, false);
+  </script>
+</body>
+</html>

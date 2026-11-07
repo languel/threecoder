@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Adventurer</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dce7df;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .title {
+      position: fixed;
+      top: 24px;
+      left: 28px;
+      z-index: 10;
+      color: #263c35;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .title h1 {
+      margin: 0 0 4px;
+      font-size: clamp(20px, 3vw, 34px);
+      font-weight: 750;
+      letter-spacing: -0.04em;
+    }
+
+    .title p {
+      margin: 0;
+      color: #5d7168;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .hint {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 8px 11px;
+      border: 1px solid rgba(38, 60, 53, 0.14);
+      border-radius: 999px;
+      background: rgba(247, 249, 242, 0.64);
+      color: #52665d;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      user-select: none;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 600px) {
+      .title {
+        top: 16px;
+        left: 18px;
+      }
+
+      .hint {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title">
+    <h1>The Forest Wanderer</h1>
+    <p>A quiet moment before the journey</p>
+  </div>
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // ------------------------------------------------------------
+    // Renderer and scene
+    // ------------------------------------------------------------
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xdce7df);
+    scene.fog = new THREE.Fog(0xdce7df, 12, 26);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // ------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------
+    scene.add(new THREE.HemisphereLight(0xf5fbef, 0x66705e, 2.0));
+
+    const sun = new THREE.DirectionalLight(0xfff3d8, 3.1);
+    sun.position.set(5, 9, 6);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -6;
+    sun.shadow.camera.right = 6;
+    sun.shadow.camera.top = 7;
+    sun.shadow.camera.bottom = -5;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 20;
+    sun.shadow.bias = -0.0004;
+    scene.add(sun);
+
+    const rimLight = new THREE.DirectionalLight(0xbdd9d0, 1.3);
+    rimLight.position.set(-5, 4, -6);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+    const materials = {
+      tunic: new THREE.MeshStandardMaterial({
+        color: 0x785743,
+        roughness: 0.92,
+        flatShading: true
+      }),
+      tunicDark: new THREE.MeshStandardMaterial({
+        color: 0x563f31,
+        roughness: 0.95,
+        flatShading: true
+      }),
+      leather: new THREE.MeshStandardMaterial({
+        color: 0x493326,
+        roughness: 0.82,
+        flatShading: true
+      }),
+      leatherLight: new THREE.MeshStandardMaterial({
+        color: 0x75513a,
+        roughness: 0.88,
+        flatShading: true
+      }),
+      scarf: new THREE.MeshStandardMaterial({
+        color: 0xb96542,
+        roughness: 0.96,
+        side: THREE.DoubleSide,
+        flatShading: true
+      }),
+      skin: new THREE.MeshStandardMaterial({
+        color: 0xc98f68,
+        roughness: 0.88,
+        flatShading: true
+      }),
+      hair: new THREE.MeshStandardMaterial({
+        color: 0x342921,
+        roughness: 1,
+        flatShading: true
+      }),
+      eye: new THREE.MeshStandardMaterial({
+        color: 0x171512,
+        roughness: 0.35,
+        flatShading: true
+      }),
+      grass: new THREE.MeshStandardMaterial({
+        color: 0x82966a,
+        roughness: 1,
+        flatShading: true
+      }),
+      grassLight: new THREE.MeshStandardMaterial({
+        color: 0xa4b37d,
+        roughness: 1,
+        flatShading: true
+      })
+    };
+
+    // ------------------------------------------------------------
+    // Geometry helpers
+    // ------------------------------------------------------------
+    function mesh(geometry, material, position, scale, parent) {
+      const object = new THREE.Mesh(geometry, material);
+      if (position) object.position.set(...position);
+      if (scale) object.scale.set(...scale);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function cylinderBetween(start, end, radius, material, radialSegments = 7) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius * 0.82,
+        length,
+        radialSegments,
+        1,
+        false
+      );
+
+      const object = new THREE.Mesh(geometry, material);
+      object.position.copy(start).add(end).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      object.castShadow = true;
+      object.receiveShadow = true;
+      return object;
+    }
+
+    function lowPolySphere(radius, material, position, scale, parent) {
+      return mesh(
+        new THREE.IcosahedronGeometry(radius, 1),
+        material,
+        position,
+        scale,
+        parent
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Ground and environment
+    // ------------------------------------------------------------
+    const ground = mesh(
+      new THREE.PlaneGeometry(40, 40),
+      materials.grass,
+      [0, -0.02, 0],
+      [1, 1, 1],
+      scene
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.castShadow = false;
+
+    // A small clearing made with low-poly circular patches.
+    for (let i = 0; i < 18; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.5 + Math.random() * 2.2;
+      const patch = mesh(
+        new THREE.CircleGeometry(0.12 + Math.random() * 0.24, 5),
+        i % 3 === 0 ? materials.grassLight : materials.grass,
+        [Math.cos(angle) * radius, 0.006, Math.sin(angle) * radius],
+        [1.5, 1, 1],
+        scene
+      );
+      patch.rotation.x = -Math.PI / 2;
+      patch.rotation.z = Math.random() * Math.PI;
+      patch.castShadow = false;
+    }
+
+    // A few stylized rocks and grass clumps.
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0x7d8173,
+      roughness: 1,
+      flatShading: true
+    });
+
+    [
+      [-3.3, 0.25, -1.8, 0.45],
+      [3.2, 0.2, -2.4, 0.38],
+      [-3.6, 0.18, 2.3, 0.32],
+      [3.5, 0.22, 2.1, 0.42]
+    ].forEach(([x, y, z, size]) => {
+      const rock = lowPolySphere(
+        size,
+        rockMaterial,
+        [x, y, z],
+        [1.25, 0.75, 1],
+        scene
+      );
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+    });
+
+    for (let i = 0; i < 24; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 2.5 + Math.random() * 4;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+
+      const blade = mesh(
+        new THREE.ConeGeometry(0.035, 0.35 + Math.random() * 0.25, 3),
+        i % 2 ? materials.grassLight : materials.grass,
+        [x, 0.14, z],
+        [1, 1, 1],
+        scene
+      );
+      blade.rotation.z = (Math.random() - 0.5) * 0.35;
+    }
+
+    // ------------------------------------------------------------
+    // Adventurer
+    // ------------------------------------------------------------
+    const character = new THREE.Group();
+    character.position.y = 0.02;
+    scene.add(character);
+
+    const torsoGroup = new THREE.Group();
+    character.add(torsoGroup);
+
+    // Torso and shoulders.
+    mesh(
+      new THREE.CylinderGeometry(0.82, 1.05, 1.55, 7),
+      materials.tunic,
+      [0, 1.78, 0],
+      [1, 1, 1],
+      torsoGroup
+    );
+
+    const shoulderLeft = lowPolySphere(
+      0.43,
+      materials.tunic,
+      [-0.62, 2.28, 0],
+      [1.15, 0.75, 0.9],
+      torsoGroup
+    );
+    const shoulderRight = lowPolySphere(
+      0.43,
+      materials.tunic,
+      [0.62, 2.28, 0],
+      [1.15, 0.75, 0.9],
+      torsoGroup
+    );
+
+    // Neck.
+    mesh(
+      new THREE.CylinderGeometry(0.2, 0.25, 0.45, 7),
+      materials.skin,
+      [0, 2.61, 0],
+      [1, 1, 1],
+      torsoGroup
+    );
+
+    // Head.
+    const head = lowPolySphere(
+      0.62,
+      materials.skin,
+      [0, 3.25, 0],
+      [0.95, 1.08, 0.92],
+      torsoGroup
+    );
+
+    // Hair cap and side locks.
+    lowPolySphere(
+      0.64,
+      materials.hair,
+      [0, 3.47, -0.02],
+      [1.02, 0.48, 0.9],
+      torsoGroup
+    );
+
+    const hairLockLeft = lowPolySphere(
+      0.29,
+      materials.hair,
+      [-0.36, 3.35, 0.17],
+      [0.8, 0.72, 0.7],
+      torsoGroup
+    );
+    const hairLockRight = lowPolySphere(
+      0.29,
+      materials.hair,
+      [0.36, 3.35, 0.17],
+      [0.8, 0.72, 0.7],
+      torsoGroup
+    );
+
+    // Eyes and brows.
+    mesh(
+      new THREE.SphereGeometry(0.075, 7, 5),
+      materials.eye,
+      [-0.17, 3.34, 0.49],
+      [0.8, 1, 0.45],
+      torsoGroup
+    );
+    mesh(
+      new THREE.SphereGeometry(0.075, 7, 5),
+      materials.eye,
+      [0.17, 3.34, 0.49],
+      [0.8, 1, 0.45],
+      torsoGroup
+    );
+
+    const browLeft = lowPolySphere(
+      0.12,
+      materials.hair,
+      [-0.2, 3.44, 0.52],
+      [0.65, 0.25, 0.18],
+      torsoGroup
+    );
+    const browRight = lowPolySphere(
+      0.12,
+      materials.hair,
+      [0.2, 3.44, 0.52],
+      [0.65, 0.25, 0.18],
+      torsoGroup
+    );
+
+    // Nose.
+    mesh(
+      new THREE.ConeGeometry(0.1, 0.2, 5),
+      materials.skin,
+      [0, 3.13, 0.54],
+      [0.75, 1, 0.55],
+      torsoGroup
+    );
+    mesh(
+      new THREE.ConeGeometry(0.1, 0.2, 5),
+      materials.skin,
+      [0, 3.13, 0.54],
+      [0.75, 1, 0.55],
+      torsoGroup
+    ).rotation.x = Math.PI;
+
+    // Mouth.
+    mesh(
+      new THREE.TorusGeometry(0.075, 0.018, 4, 10),
+      materials.eye,
+      [0, 3.08, 0.52],
+      [1, 0.55, 0.35],
+      torsoGroup
+    );
+
+    // Arms.
+    const armGroup = new THREE.Group();
+    character.add(armGroup);
+
+    const leftShoulder = new THREE.Vector3(-0.64, 2.28, 0.05);
+    const leftElbow = new THREE.Vector3(-1.05, 1.78, 0.1);
+    const leftHand = new THREE.Vector3(-1.1, 1.38, 0.22);
+
+    const rightShoulder = new THREE.Vector3(0.64, 2.28, 0.05);
+    const rightElbow = new THREE.Vector3(1.05, 1.78, 0.1);
+    const rightHand = new THREE.Vector3(1.1, 1.38, 0.22);
+
+    armGroup.add(
+      cylinderBetween(leftShoulder, leftElbow, 0.19, materials.tunicDark, 7),
+      cylinderBetween(leftElbow, leftHand, 0.15, materials.tunicDark, 7)
+    );
+    armGroup.add(
+      cylinderBetween(rightShoulder, rightElbow, 0.19, materials.tunicDark, 7),
+      cylinderBetween(rightElbow, rightHand, 0.15, materials.tunicDark, 7)
+    );
+
+    const leftHandMesh = lowPolySphere(0.16, materials.skin, leftHand, [1, 0.9, 0.9], armGroup);
+    const rightHandMesh = lowPolySphere(0.16, materials.skin, rightHand, [1, 0.9, 0.9], armGroup);
+
+    // Belt.
+    const belt = mesh(
+      new THREE.TorusGeometry(0.77, 0.075, 6, 18),
+      materials.leather,
+      [0, 0.82, 0],
+      [1, 1, 1],
+      character
+    );
+    belt.rotation.x = Math.PI / 2;
+
+    // Belt pouch at the front.
+    lowPolySphere(
+      0.34,
+      materials.leather,
+      [0.38, 0.86, 0.72],
+      [0.9, 1.15, 0.65],
+      character
+    );
+
+    const pouchOpening = mesh(
+      new THREE.CircleGeometry(0.16, 8),
+      materials.leatherLight,
+      [0.38, 0.86, 0.94],
+      [1, 1, 0.18],
+      character
+    );
+    pouchOpening.rotation.y = Math.PI;
+
+    const pouchRivets = [
+      [-0.05, 0.06, 1.0],
+      [0.05, 0.06, 1.0],
+      [0, -0.06, 1.0]
+    ];
+    pouchRivets.forEach(([x, y, z]) => {
+      mesh(
+        new THREE.SphereGeometry(0.025, 6, 4),
+        materials.leatherLight,
+        [0.38 + x, 0.86 + y, 0.94 + z],
+        [1, 1, 0.3],
+        character
+      );
+    });
+
+    // Backpack behind the torso.
+    const backpack = new THREE.Group();
+    backpack.position.set(0, 1.82, -0.62);
+    character.add(backpack);
+
+    lowPolySphere(
+      0.68,
+      materials.leather,
+      [0, 0.16, 0],
+      [1.05, 1.25, 0.48],
+      backpack
+    );
+
+    const backpackFlap = lowPolySphere(
+      0.57,
+      materials.leatherLight,
+      [0, 0.25, 0.32],
+      [0.9, 0.88, 0.18],
+      backpack
+    );
+    backpackFlap.scale.z = 0.45;
+
+    const flapStraps = [
+      [-0.36, 0.18, 0.38],
+      [0, 0.23, 0.46],
+      [0.36, 0.18, 0.38]
+    ];
+    flapStraps.forEach(([x, y, z]) => {
+      const strap = mesh(
+        new THREE.BoxGeometry(0.055, 0.78, 0.055),
+        materials.leather,
+        [x, 0.18, z],
+        [1, 1, 1],
+        backpack
+      );
+      strap.rotation.z = x * 0.2;
+    });
+
+    // Buckle.
+    mesh(
+      new THREE.BoxGeometry(0.24, 0.12, 0.07),
+      materials.leatherLight,
+      [0, 0.08, 0.63],
+      [1, 1, 1],
+      backpack
+    );
+
+    // Shoulder straps.
+    const leftBackShoulder = new THREE.Vector3(-0.62, 2.3, -0.38);
+    const leftBackLower = new THREE.Vector3(-0.94, 1.55, -0.58);
+    const leftBackEnd = new THREE.Vector3(-0.78, 1.15, -0.75);
+
+    const rightBackShoulder = new THREE.Vector3(0.62, 2.3, -0.38);
+    const rightBackLower = new THREE.Vector3(0.94, 1.55, -0.58);
+    const rightBackEnd = new THREE.Vector3(0.78, 1.15, -0.75);
+
+    backpack.add(
+      cylinderBetween(leftBackShoulder, leftBackLower, 0.085, materials.leather, 6),
+      cylinderBetween(leftBackLower, leftBackEnd, 0.075, materials.leather, 6),
+      cylinderBetween(rightBackShoulder, rightBackLower, 0.085, materials.leather, 6),
+      cylinderBetween(rightBackLower, rightBackEnd, 0.075, materials.leather, 6)
+    );
+
+    // Side pouch on the character's right.
+    lowPolySphere(
+      0.28,
+      materials.leather,
+      [0.72, 1.0, -0.35],
+      [0.75, 1.05, 0.55],
+      character
+    );
+
+    // Boots.
+    const bootGeometry = new THREE.CylinderGeometry(0.3, 0.38, 0.7, 7, 1, false);
+    const leftBoot = mesh(
+      bootGeometry,
+      materials.leather,
+      [-0.35, 0.42, 0.28],
+      [1, 1, 1],
+      character
+    );
+    leftBoot.rotation.y = -0.16;
+
+    const rightBoot = mesh(
+      bootGeometry,
+      materials.leather,
+      [0.35, 0.42, 0.28],
+      [1, 1, 1],
+      character
+    );
+    rightBoot.rotation.y = 0.16;
+
+    // Boot toes.
+    const leftToe = lowPolySphere(
+      0.29,
+      materials.leather,
+      [-0.36, 0.48, 0.56],
+      [0.8, 0.7, 0.65],
+      character
+    );
+    const rightToe = lowPolySphere(
+      0.29,
+      materials.leather,
+      [0.36, 0.48, 0.56],
+      [0.8, 0.7, 0.65],
+      character
+    );
+
+    // Boot laces.
+    for (let i = 0; i < 3; i++) {
+      const lace = mesh(
+        new THREE.TorusGeometry(0.045, 0.012, 4, 8),
+        materials.leatherLight,
+        [-0.37, 0.49 + i * 0.065, 0.61],
+        [0.8, 1, 0.4],
+        character
+      );
+      lace.rotation.y = Math.PI;
+    }
+
+    // Legs.
+    const legGroup = new THREE.Group();
+    character.add(legGroup);
+
+    const leftHip = new THREE.Vector3(-0.28, 1.18, 0);
+    const leftKnee = new THREE.Vector3(-0.34, 0.72, 0.02);
+    const leftAnkle = new THREE.Vector3(-0.32, 0.43, 0.18);
+
+    const rightHip = new THREE.Vector3(0.28, 1.18, 0);
+    const rightKnee = new THREE.Vector3(0.34, 0.72, 0.02);
+    const rightAnkle = new THREE.Vector3(0.32, 0.43, 0.18);
+
+    legGroup.add(
+      cylinderBetween(leftHip, leftKnee, 0.27, materials.tunicDark, 7),
+      cylinderBetween(leftKnee, leftAnkle, 0.22, materials.tunicDark, 7),
+      cylinderBetween(rightHip, rightKnee, 0.27, materials.tunicDark, 7),
+      cylinderBetween(rightKnee, rightAnkle, 0.22, materials.tunicDark, 7)
+    );
+
+    const leftShin = lowPolySphere(
+      0.23,
+      materials.skin,
+      [-0.32, 0.43, 0.18],
+      [0.9, 1.05, 0.8],
+      legGroup
+    );
+    const rightShin = lowPolySphere(
+      0.23,
+      materials.skin,
+      [0.32, 0.43, 0.18],
+      [0.9, 1.05, 0.8],
+      legGroup
+    );
+
+    // ------------------------------------------------------------
+    // Stylized scarf ribbon around the neck
+    // ------------------------------------------------------------
+    const scarfCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.32, 2.72, 0.06),
+      new THREE.Vector3(-0.42, 2.91, 0.12),
+      new THREE.Vector3(-0.22, 3.08, 0.15),
+      new THREE.Vector3(0.02, 3.1, 0.18),
+      new THREE.Vector3(0.25, 2.98, 0.14),
+      new THREE.Vector3(0.4, 2.76, 0.08)
+    ]);
+
+    function createScarfRibbon(curve, width = 0.24) {
+      const segments = 28;
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const point = curve.getPoint(t);
+        const tangent = curve.getTangent(t).normalize();
+
+        const side = new THREE.Vector3().crossVectors(
+          tangent,
+          new THREE.Vector3(0, 0, 1)
+        ).normalize();
+
+        const left = point.clone().addScaledVector(side, width * 0.5);
+        const right = point.clone().addScaledVector(side, -width * 0.5);
+
+        positions.push(left.x, left.y, left.z, right.x, right.y, right.z);
+        uvs.push(0, t * 4, 1, t * 4);
+
+        if (i < segments) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      return new THREE.Mesh(geometry, materials.scarf);
+    }
+
+    const scarf = createScarfRibbon(scarfCurve, 0.28);
+    scarf.castShadow = true;
+    scarf.receiveShadow = true;
+    torsoGroup.add(scarf);
+
+    // A loose end of the scarf hanging over the shoulder.
+    const scarfEnd = new THREE.Group();
+    torsoGroup.add(scarfEnd);
+
+    lowPolySphere(
+      0.18,
+      materials.scarf,
+      [-0.68, 2.48, 0.35],
+      [0.7, 1.1, 0.45],
+      scarfEnd
+    );
+
+    const scarfFold = mesh(
+      new THREE.CylinderGeometry(0.07, 0.11, 0.62, 6),
+      materials.scarf,
+      [-0.66, 2.2, 0.45],
+      [1, 1, 0.7],
+      scarfEnd
+    );
+    scarfFold.rotation.z = -0.28;
+
+    // ------------------------------------------------------------
+    // Direct camera controls: orbit and zoom
+    // ------------------------------------------------------------
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+    const spherical = new THREE.Spherical(6.7, Math.PI * 0.36, Math.PI * 0.28);
+
+    function updateCamera() {
+      camera.position.setFromSpherical(spherical).add(new THREE.Vector3(0, 0, 0));
+      camera.lookAt(0, 1.75, 0);
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const deltaX = event.clientX - previousX;
+      const deltaY = event.clientY - previousY;
+
+      spherical.theta -= deltaX * 0.006;
+      spherical.phi = THREE.MathUtils.clamp(
+        spherical.phi + deltaY * 0.005,
+        Math.PI * 0.22,
+        Math.PI * 0.78
+      );
+
+      previousX = event.clientX;
+      previousY = event.clientY;
+      updateCamera();
+    });
+
+    function stopDragging(event) {
+      dragging = false;
+      if (event.pointerId !== undefined && renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", stopDragging);
+    renderer.domElement.addEventListener("pointercancel", stopDragging);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        spherical.radius = THREE.MathUtils.clamp(
+          spherical.radius + event.deltaY * 0.004,
+          4.5,
+          10
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    updateCamera();
+
+    // ------------------------------------------------------------
+    // Animation: subtle idle breathing and natural idle motion
+    // ------------------------------------------------------------
+    const clock = new THREE.Clock();
+    const breathing = new THREE.Group();
+    const breathingParts = [];
+
+    torsoGroup.add(breathing);
+
+    function markBreathingPart(object) {
+      breathingParts.push(object);
+    }
+
+    [
+      mesh(new THREE.CylinderGeometry(...), ...),
+      shoulderLeft,
+      shoulderRight,
+      head,
+      hairLockLeft,
+      hairLockRight,
+      browLeft,
+      browRight,
+      nose,
+      mouth,
+      leftShoulder,
+      leftElbow,
+      leftHand,
+      leftHandMesh,
+      rightShoulder,
+      rightElbow,
+      rightHand,
+      rightHandMesh,
+      leftHip,
+      leftKnee,
+      leftAnkle,
+      leftShin,
+      rightHip,
+      rightKnee,
+      rightAnkle,
+      rightShin
+    ].forEach(markBreathingPart);
+
+    // The character group itself has a very small, relaxed sway.
+    const idlePose = new THREE.Group();
+    character.add(idlePose);
+
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+
+      // Gentle breathing: torso expands and contracts.
+      const breath = Math.sin(elapsed * 1.35) * 0.025;
+      breathing.scale.set(
+        1 + breath * 0.35,
+        1 + breath,
+        1 + breath * 0.35
+      );
+
+      // A small, relaxed sway in the shoulders and head.
+      idlePose.rotation.z = Math.sin(elapsed * 0.62) * 0.018;
+      idlePose.rotation.x = Math.sin(elapsed * 0.47 + 0.8) * 0.009;
+
+      breathingParts.forEach((object, index) => {
+        const phase = elapsed * (index % 2 ? 1.35 : 1.35);
+        object.rotation.z += Math.sin(phase + index * 0.7) * 0.000015;
+      });
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

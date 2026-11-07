@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Animated Low-Poly Barn Owl</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #171b1d;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      color: #f5ead3;
+      background: linear-gradient(135deg, #d69a4c, #a96332);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    #status {
+      min-width: 120px;
+      color: #c7c3b6;
+      font-size: 13px;
+      text-align: right
+    }
+
+    #hint {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 10;
+      color: rgba(255, 255, 255, 0.55);
+      font-size: 12px;
+      pointer-events: none
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="hint">Drag to orbit · Scroll to zoom</div>
+  <div id="status">Ready to export</div>
+  <button id="button" type="button">Export GLB</button>
+  <div id="ui"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x171b1d);
+    scene.fog = new THREE.Fog(0x171b1d, 9, 18);
+
+    const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 100);
+    window.camera = camera;
+    camera.position.set(5.2, 3.7, 7.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    window.renderer = renderer;
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.45, 0);
+    controls.enableDamping = true;
+    controls.minDistance = 4.5;
+    controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemi = new THREE.HemisphereLight(0xb8d4e7, 0x3a271b, 2.0);
+    scene.add(hemi);
+
+    const key = new THREE.DirectionalLight(0xffe0ae, 3.4);
+    key.position.set(4, 7, 5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -5;
+    key.shadow.camera.right = 5;
+    key.shadow.camera.top = 6;
+    key.shadow.camera.bottom = -3;
+    key.shadow.bias = -0.0004;
+    scene.add(key);
+
+    const rim = new THREE.DirectionalLight(0x7ba9d1, 1.5);
+    rim.position.set(-5, 3, -4);
+    scene.add(rim);
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(8, 48),
+      new THREE.MeshStandardMaterial({ color: 0x25292a, roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.025;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const material = (color, options = {}) => new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.82,
+      metalness: 0,
+      flatShading: true,
+      ...options
+    });
+
+    const mats = {
+      body: material(0x654332),
+      bodyLight: material(0x81563d),
+      chest: material(0xb07a4c),
+      belly: material(0xd5b58a),
+      wing: material(0x3f2b25),
+      wingLight: material(0x634033),
+      featherDark: material(0x2b211e),
+      featherMid: material(0x4b3027),
+      featherLight: material(0x754835),
+      head: material(0x704735),
+      face: material(0x9b6949),
+      eye: material(0x100d0c, { roughness: 0.25 }),
+      iris: material(0xc9963e, { roughness: 0.35 }),
+      beak: material(0xd9a24d),
+      ear: material(0x513126),
+      feet: material(0x39271f),
+      claw: material(0x5c4030),
+      branch: material(0x513525),
+      branchLight: material(0x71472f),
+      moss: material(0x4b6039)
+    };
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function mesh(geometry, mat, parent, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1]) {
+      const m = new THREE.Mesh(geometry, mat);
+      m.position.set(...position);
+      m.rotation.set(...rotation);
+      m.scale.set(...scale);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      parent.add(m);
+      return m;
+    }
+
+    function ellipsoid(parent, pos, scale, mat, detail = 1) {
+      return mesh(
+        new THREE.IcosahedronGeometry(1, detail),
+        mat,
+        parent,
+        pos,
+        [0, 0, 0],
+        scale
+      );
+    }
+
+    function cylinderBetween(parent, a, b, radius, mat, radialSegments = 7) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+
+      const m = mesh(
+        new THREE.CylinderGeometry(radius * 0.88, radius, length, radialSegments, 1),
+        mat,
+        parent
+      );
+
+      m.position.copy(start).add(end).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      return m;
+    }
+
+    function coneBetween(parent, a, b, radius, mat, radialSegments = 6) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+
+      const m = mesh(
+        new THREE.ConeGeometry(radius, length, radialSegments, 1),
+        mat,
+        parent
+      );
+
+      m.position.copy(start).add(end).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      return m;
+    }
+
+    function addFeatherLayer(parent, y, z, width, depth, mat) {
+      const feathers = [];
+      const count = Math.max(3, Math.floor(width / 0.24));
+
+      for (let i = 0; i < count; i++) {
+        const x = -width * 0.5 + (i / (count - 1)) * width;
+        const angled = (i % 2 === 0 ? 1 : -1) * 0.16;
+        feathers.push(
+          coneBetween(
+            parent,
+            [x, y - 0.08, z + depth],
+            [x + angled * 0.22, y + 0.34, z - depth * 0.35],
+            0.105,
+            mat,
+            5
+          )
+        );
+      }
+
+      return feathers;
+    }
+
+    // -------------------------------------------------------------------------
+    // Gnarled branch
+    // -------------------------------------------------------------------------
+
+    const branchPivot = new THREE.Group();
+    branchPivot.name = 'BranchPivot';
+    root.add(branchPivot);
+
+    const branchSegments = [
+      [[-2.55, 0.02, 0.05], [-1.45, 0.18, -0.05], 0.15],
+      [[-1.45, 0.18, -0.05], [-0.42, 0.06, 0.12], 0.14],
+      [[-0.42, 0.06, 0.12], [0.58, 0.12, 0.02], 0.125],
+      [[0.58, 0.12, 0.02], [1.65, 0.22, -0.08], 0.11],
+      [[1.65, 0.22, -0.08], [2.62, 0.01, 0.04], 0.095],
+      [[-1.45, 0.18, -0.05], [-1.72, 0.55, -0.12], 0.075],
+      [[-0.42, 0.06, 0.12], [-0.62, 0.48, 0.18], 0.06],
+      [[0.58, 0.12, 0.02], [0.82, 0.52, -0.12], 0.055],
+      [[1.65, 0.22, -0.08], [1.92, 0.58, -0.15], 0.055]
+    ];
+
+    branchSegments.forEach((seg, i) => {
+      cylinderBetween(
+        branchPivot,
+        seg[0],
+        seg[1],
+        seg[2],
+        i % 2 === 0 ? mats.branch : mats.branchLight,
+        7
+      );
+    });
+
+    // Small broken branch forks.
+    cylinderBetween(branchPivot, [-1.28, 0.25, -0.03], [-1.67, 0.54, 0.04], 0.055, mats.branchLight, 6);
+    cylinderBetween(branchPivot, [0.35, 0.15, 0.07], [0.18, 0.52, 0.16], 0.048, mats.branch, 6);
+    cylinderBetween(branchPivot, [1.28, 0.25, -0.05], [1.55, 0.55, -0.13], 0.045, mats.branchLight, 6);
+
+    // Moss clumps.
+    const mossPositions = [
+      [-2.12, 0.08, 0.14],
+      [-1.05, 0.12, 0.12],
+      [0.12, 0.12, 0.15],
+      [1.36, 0.10, 0.11],
+      [2.25, 0.05, 0.08]
+    ];
+
+    mossPositions.forEach((p, i) => {
+      const clump = new THREE.Group();
+      clump.position.set(...p);
+      branchPivot.add(clump);
+
+      for (let j = 0; j < 4; j++) {
+        ellipsoid(
+          clump,
+          [(j - 1.5) * 0.11, (i % 2) * 0.045, (j % 2) * 0.06],
+          [0.12, 0.055, 0.09],
+          mats.moss,
+          0
+        );
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Owl hierarchy
+    // -------------------------------------------------------------------------
+
+    const owl = new THREE.Group();
+    owl.name = 'BarnOwl';
+    owl.position.set(0, 0, 0);
+    root.add(owl);
+
+    const bodyRig = new THREE.Group();
+    bodyRig.name = 'BodyRig';
+    owl.add(bodyRig);
+
+    // Torso and chest.
+    ellipsoid(bodyRig, [0, 1.48, 0], [0.79, 1.02, 0.63], mats.body);
+    ellipsoid(bodyRig, [0, 1.38, 0.42], [0.65, 0.82, 0.28], mats.chest);
+    ellipsoid(bodyRig, [0, 1.12, 0.53], [0.43, 0.52, 0.19], mats.belly);
+
+    addFeatherLayer(bodyRig, 1.08, 0.56, 0.92, 0.22, mats.featherDark);
+    addFeatherLayer(bodyRig, 1.32, 0.54, 0.82, 0.20, mats.featherMid);
+    addFeatherLayer(bodyRig, 1.58, 0.47, 0.65, 0.16, mats.featherLight);
+
+    // Shoulder wings, each mounted on animated pivots.
+    function makeWing(side) {
+      const pivot = new THREE.Group();
+      pivot.name = side < 0 ? 'WingPivotLeft' : 'WingPivotRight';
+      pivot.position.set(side * 0.58, 1.72, -0.02);
+      pivot.rotation.z = side * -0.16;
+      bodyRig.add(pivot);
+
+      ellipsoid(
+        pivot,
+        [side * 0.18, -0.05, -0.03],
+        [0.48, 0.62, 0.22],
+        mats.wing
+      );
+
+      // Layered flight feathers.
+      for (let i = 0; i < 5; i++) {
+        const x = side * (0.13 + i * 0.14);
+        const y = -0.05 + (i % 2) * 0.12;
+        const length = 0.65 - i * 0.055;
+
+        coneBetween(
+          pivot,
+          [x, y, -0.08],
+          [x + side * 0.05, y - 0.12, -0.48 - length * 0.25],
+          0.105,
+          i % 2 === 0 ? mats.wingLight : mats.wing,
+          5
+        );
+      }
+
+      // Small coverts.
+      for (let i = 0; i < 3; i++) {
+        ellipsoid(
+          pivot,
+          [side * (0.12 + i * 0.17), 0.13 - i * 0.07, -0.02],
+          [0.13, 0.10, 0.09],
+          mats.featherMid,
+          0
+        );
+      }
+
+      return pivot;
+    }
+
+    const wingLeft = makeWing(-1);
+    const wingRight = makeWing(1);
+
+    // Head is a separate animated pivot.
+    const headPivot = new THREE.Group();
+    headPivot.name = 'HeadPivot';
+    headPivot.position.set(0, 2.56, 0.03);
+    bodyRig.add(headPivot);
+
+    ellipsoid(headPivot, [0, 0, 0], [0.68, 0.64, 0.61], mats.head);
+    ellipsoid(headPivot, [0, -0.20, 0.35], [0.53, 0.40, 0.25], mats.face);
+
+    // Ear tufts.
+    coneBetween(headPivot, [-0.43, 0.28, -0.02], [-0.61, 0.70, -0.05], 0.19, mats.ear, 5);
+    coneBetween(headPivot, [0.43, 0.28, -0.02], [0.61, 0.70, -0.05], 0.19, mats.ear, 5);
+
+    // Eyes and irises.
+    [-0.28, 0.28].forEach((x) => {
+      ellipsoid(headPivot, [x, 0.08, 0.535], [0.16, 0.18, 0.075], mats.eye, 1);
+      ellipsoid(headPivot, [x, 0.08, 0.605], [0.105, 0.12, 0.035], mats.iris, 1);
+      ellipsoid(headPivot, [x - 0.025, 0.115, 0.638], [0.035, 0.045, 0.018], mats.eye, 0);
+    });
+
+    // Beak and chest feathers.
+    ellipsoid(headPivot, [0, -0.29, 0.58], [0.16, 0.11, 0.15], mats.beak, 0);
+    coneBetween(headPivot, [0, -0.36, 0.57], [0, -0.51, 0.60], 0.095, mats.beak, 5);
+
+    addFeatherLayer(headPivot, -0.24, 0.53, 0.54, 0.13, mats.featherLight);
+    addFeatherLayer(headPivot, -0.40, 0.52, 0.38, 0.11, mats.featherMid);
+
+    // Small cheek discs.
+    [-0.39, 0.39].forEach((x) => {
+      ellipsoid(headPivot, [x, -0.14, 0.455], [0.13, 0.11, 0.055], mats.featherDark, 0);
+    });
+
+    // Tail feathers fanned behind the body.
+    const tailPivot = new THREE.Group();
+    tailPivot.name = 'TailPivot';
+    tailPivot.position.set(0, 0.84, -0.52);
+    bodyRig.add(tailPivot);
+
+    for (let i = -2; i <= 2; i++) {
+      coneBetween(
+        tailPivot,
+        [0, 0, 0],
+        [i * 0.17, -0.52 - Math.abs(i) * 0.06, -0.43],
+        0.11,
+        i % 2 === 0 ? mats.featherDark : mats.featherMid,
+        5
+      );
+    }
+
+    // Legs and feet.
+    function makeLeg(side) {
+      const leg = new THREE.Group();
+      leg.name = side < 0 ? 'LegPivotLeft' : 'LegPivotRight';
+      leg.position.set(side * 0.31, 0.67, 0.12);
+      bodyRig.add(leg);
+
+      cylinderBetween(leg, [0, 0, 0], [side * 0.04, -0.25, 0.08], 0.055, mats.feet, 6);
+
+      const foot = new THREE.Group();
+      foot.position.set(side * 0.04, -0.27, 0.12);
+      leg.add(foot);
+
+      ellipsoid(foot, [0, 0, 0.07], [0.19, 0.085, 0.25], mats.feet, 0);
+
+      [-0.11, 0, 0.11].forEach((x, i) => {
+        coneBetween(
+          foot,
+          [x, 0.01, 0.10],
+          [x * 1.2, -0.035, 0.37],
+          0.035,
+          mats.claw,
+          5
+        );
+      });
+
+      return leg;
+    }
+
+    makeLeg(-1);
+    makeLeg(1);
+
+    // -------------------------------------------------------------------------
+    // Animation
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const t = clock.getElapsedTime();
+
+      // Gentle head tilt.
+      headPivot.rotation.z = Math.sin(t * 1.45) * 0.055;
+      headPivot.rotation.x = Math.sin(t * 1.1) * 0.025;
+
+      // Soft wing bobbing and slight wing movement.
+      wingLeft.rotation.z = -0.16 + Math.sin(t * 2.1) * 0.045;
+      wingRight.rotation.z = 0.16 - Math.cos(t * 1.85) * 0.045;
+      wingLeft.rotation.x = Math.sin(t * 2.4) * 0.025;
+      wingRight.rotation.x = Math.cos(t * 2.1) * 0.025;
+
+      // Body breathing.
+      bodyRig.scale.x = 1 + Math.sin(t * 2.3) * 0.012;
+      bodyRig.scale.y = 1 + Math.sin(t * 1.7) * 0.018;
+
+      // Branch sway. The branch pivot rotates around its base.
+      branchPivot.rotation.z = Math.sin(t * 0.72) * 0.018;
+      branchPivot.rotation.x = Math.cos(t * 0.58) * 0.012;
+
+      // Tail fan motion.
+      tailPivot.rotation.y = Math.sin(t * 1.2) * 0.035;
+
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // -------------------------------------------------------------------------
+    // GLB export
+    // -------------------------------------------------------------------------
+
+    const exportButton = document.getElementById('button');
+    const status = document.getElementById('status');
+
+    exportButton.addEventListener('click', async () => {
+      exportButton.disabled = true;
+      status.textContent = 'Exporting…';
+
+      try {
+        // Ensure the most current animation state is captured by the exporter.
+        const previousTime = performance.now();
+        requestAnimationFrame(() => {
+          const currentTime = performance.now();
+          const delta = Math.abs(currentTime - previousTime) / 1000;
+          requestAnimationFrame(() => previousTime = currentTime);
+
+          const exporter = new GLTFExporter();
+          const animations = [
+            new THREE.AnimationClip('BarnOwl_Idle', 4.0, [
+              new THREE.VectorKeyframeTrack('BodyRig.position', [0, 1, 2, 3, 4], [
+                0, 0, 0,
+                0, 0.018, 0,
+                0, 0, 0,
+                0, -0.018, 0,
+                0, 0, 0
+              ]),
+              new THREE.VectorKeyframeTrack('BodyRig.scale', [0, 1, 2, 3, 4], [
+                1, 1, 1,
+                1.018, 1.025, 1.012,
+                1, 1, 1,
+                0.99, 0.99, 0.99,
+                1, 1, 1
+              ]),
+              new THREE.VectorKeyframeTrack('HeadPivot.rotation', [0, 1, 2, 3, 4], [
+                0, 0, 0,
+                0.025, 0.015, 0.055,
+                0, 0, 0,
+                -0.025, -0.015, -0.055,
+                0, 0, 0
+              ]),
+              new THREE.VectorKeyframeTrack('WingPivotLeft.rotation', [0, 1, 2, 3, 4], [
+                0, 0, -0.16,
+                0.025, 0, -0.19,
+                0, 0, -0.16,
+                -0.025, 0, -0.13,
+                0, 0, -0.16
+              ]),
+              new THREE.VectorKeyframeTrack('WingPivotRight.rotation', [0, 1, 2, 3, 4], [
+                0, 0, 0.16,
+                -0.025, 0, 0.19,
+                0, 0, 0.16,
+                0.025, 0, 0.13,
+                0, 0, 0.16
+              ]),
+              new THREE.VectorKeyframeTrack('TailPivot.rotation', [0, 1, 2, 3, 4], [
+                0, 0, 0,
+                0, 0.035, 0,
+                0, 0, 0,
+                0, -0.035, 0,
+                0, 0, 0
+              ])
+            ]),
+            new THREE.AnimationClip('BarnOwl_WingBob', 2.4, [
+              new THREE.VectorKeyframeTrack('WingPivotLeft.rotation', [0, 1.2, 2.4], [
+                0, 0, -0.16,
+                0, 0, -0.25,
+                0, 0, -0.16
+              ]),
+              new THREE.VectorKeyframeTrack('WingPivotRight.rotation', [0, 1.2, 2.4], [
+                0, 0, 0.16,
+                0, 0, 0.25,
+                0, 0, 0.16
+              ]),
+              new THREE.VectorKeyframeTrack('HeadPivot.rotation', [0, 1.2, 2.4], [
+                0, 0, 0,
+                0.035, 0, 0.04,
+                0, 0, 0
+              ])
+            ])
+          ];
+
+          const result = await exporter.parseAsync(owl, {
+            animations,
+            binary: true,
+            onlyVisible: true,
+            trs: false,
+            includeCustomExtensions: false
+          });
+
+          const blob = new Blob([result], { type: 'model/gltf-binary' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'animated_low_poly_barn_owl.glb';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+          status.textContent = 'GLB downloaded';
+        });
+      } catch (error) {
+        console.error(error);
+        status.textContent = 'Export failed';
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize handling
+    // -------------------------------------------------------------------------
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

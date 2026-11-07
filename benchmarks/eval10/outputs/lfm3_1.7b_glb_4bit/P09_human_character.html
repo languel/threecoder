@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stylized Low-Poly Human Adventurer</title>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #111820;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .hud {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 2;
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      background: rgba(18, 25, 31, 0.78);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      color: #ffd9a8;
+      font-size: clamp(25px, 3vw, 34px);
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: #9fc0c4;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 9px;
+      padding: 12px 18px;
+      background: #e7a66f;
+      box-shadow: 0 5px 14px rgba(255, 171, 102, 0.22);
+      color: #21171d;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition:
+        transform 120ms ease,
+        background 120ms ease,
+        opacity 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: #f4ca8b;
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #status {
+      min-height: 16px;
+      color: #9fc0c4;
+      font-size: 12px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 2;
+      color: rgba(255, 235, 205, 0.72);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 620px) {
+      .hud {
+        top: 12px;
+        left: 12px;
+      }
+
+      .subtitle,
+      #status {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="hud">
+    <h1>Stylized Adventurer</h1>
+    <p class="subtitle">
+      Low-poly character, idle breathing pose, subtle idle animation
+    </p>
+
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <span id="status">Preparing the GLB…</span>
+    </div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const statusElement = document.getElementById("status");
+
+    // ---------------------------------------------------------------------
+    // Renderer and scene
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x111820);
+    scene.fog = new THREE.Fog(0x111820, 12, 28);
+
+    const camera = new THREE.PerspectiveCamera(
+      34,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    camera.position.set(6.7, 4.5, 8.7);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.35, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 5;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    // ---------------------------------------------------------------------
+    // Lighting
+    // ---------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x9fc8dc, 0x252d30, 2.15));
+
+    const keyLight = new THREE.DirectionalLight(0xffe3b7, 4.1);
+    keyLight.position.set(5.5, 9, 7);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x7affd, 1.35);
+    fillLight.position.set(-6, 4, -4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffc59b, 1.15);
+    rimLight.position.set(3, 5, -7);
+    scene.add(rimLight);
+
+    const warm Rim = new THREE.PointLight(0xffe3b7, 18, 14, 2);
+    warm Rim.position.set(-4, 3, 3);
+    scene.add(warm Rim);
+
+    // ---------------------------------------------------------------------
+    // Display-only ground plane
+    // ---------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      new THREE.MeshStandardMaterial({
+        color: 0x101d1c,
+        roughness: 0.96,
+        metalness: 0.04
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.8;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // ---------------------------------------------------------------------
+    // Character root
+    // ---------------------------------------------------------------------
+
+    const character = new THREE.Group();
+    character.name = "Stylized_Character_Root";
+    scene.add(character);
+
+    const materials = {
+      skin: new THREE.MeshStandardMaterial({
+        color: 0x8e7b35,
+        roughness: 0.88,
+        metalness: 0.02
+      }),
+      skinLight: new THREE.MeshStandardMaterial({
+        color: 0xb79c29,
+        roughness: 0.9,
+        metalness: 0.01
+      }),
+      leather: new THREE.MeshStandardMaterial({
+        color: 0x35434d,
+        roughness: 0.96,
+        metalness: 0.02
+      }),
+      leatherDark: new THREE.MeshStandardMaterial({
+        color: 0x3a2b18,
+        roughness: 0.98,
+        metalness: 0.0
+      }),
+      leatherLight: new THREE.MeshStandardMaterial({
+        color: 0x5b4c23,
+        roughness: 0.94,
+        metalness: 0.02
+      }),
+
+      belt: new THREE.MeshStandardMaterial({
+        color: 0xc57e38,
+        roughness: 0.88,
+        metalness: 0.05
+      }),
+      leatherBand: new THREE.MeshStandardMaterial({
+        color: 0x2b1c13,
+        roughness: 0.96,
+        metalness: 0.02
+      }),
+
+      beltDark: new THREE.MeshStandardMaterial({
+        color: 0x20262f,
+        roughness: 0.98,
+        metalness: 0.0
+      }),
+
+      leatherBandLight: new THREE.MeshStandardMaterial({
+        color: 0x3b2d16,
+        roughness: 0.9,
+        metalness: 0.02
+      }),
+
+      leatherBandDarkLight: new THREE.MeshStandardMaterial({
+        color: 0x4f3438,
+        roughness: 0.95,
+        metalness: 0.0
+      }),
+
+      scarf: new THREE.MeshStandardMaterial({
+        color: 0x9eb6df,
+        roughness: 0.92,
+        metalness: 0.02
+      }),
+
+      scarfDark: new THREE.MeshStandardMaterial({
+        color: 0x8d3b1c,
+        roughness: 0.97,
+        metalness: 0.0
+      }),
+
+      backpack: new THREE.MeshStandardMaterial({
+        color: 0x49323c,
+        roughness: 0.96,
+        metalness: 0.02
+      }),
+
+      backpackDark: new THREE.MeshStandardMaterial({
+        color: 0x2f1d10,
+        roughness: 0.98,
+        metalness: 0.0
+      }),
+
+      leather: new THREE.MeshStandardMaterial({
+        color: 0x35434d,
+        roughness: 0.96,
+        metalness: 0.02
+      }),
+
+      leatherLight: new THREE.MeshStandardMaterial({
+        color: 0x5b4c23,
+        roughness: 0.94,
+        metalness: 0.02
+      }),
+
+      scarfLight: new THREE.MeshStandardMaterial({
+        color: 0x9eb6df,
+        roughness: 0.92,
+        metalness: 0.02
+      }),
+      scarfDark: new THREE.MeshStandardMaterial({
+        color: 0x8d3b1c,
+        roughness: 0.97,
+        metalness: 0.0
+      })
+    };
+
+    // ---------------------------------------------------------------------
+    // Geometry helpers
+    // ---------------------------------------------------------------------
+
+    function addMesh(geometry, material, parent, name) {
+      const object = new THREE.Mesh(geometry, material);
+      object.name = name;
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function box(name, size, position, material, parent, rotation = [0, 0, 0]) {
+      return addMesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material,
+        parent,
+        name
+      );
+    }
+
+    function cylinder(
+      name,
+      radius,
+      height,
+      position,
+      material,
+      parent,
+      rotation = [0, 0, 0],
+      segments = 12
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(radius, radius, height, segments),
+        material,
+        parent,
+        name
+      );
+    }
+
+    function makeRoundedRectangle(
+      name,
+      size,
+      position,
+      material,
+      radius = 0.025,
+      parent,
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material,
+        parent,
+        name
+      );
+    }
+
+    function makeCylinderBetween(name, start, end, radius, material, parent, segments = 8) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      if (length < 0.00001) return null;
+
+      const object = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, segments),
+        material
+      );
+
+      object.name = name;
+      object.position.copy(start).add(end).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    // ---------------------------------------------------------------------
+    // Stylized low-poly human character
+    // ---------------------------------------------------------------------
+
+    const FWH = 1.0;
+
+    makeRoundedRectangle(
+      "Torso",
+      [FWH, 0.82, 0.92],
+      [0, 2.5, 0],
+      materials.leather,
+      0.065
+    );
+
+    // Leather torso panel.
+    makeRoundedRectangle(
+      "Lower_Leather_Panel",
+      [FWH, 0.58, 0.72],
+      [0, 1.95, 0],
+      materials.leatherDark,
+      0.045
+    );
+
+    // Leather belt and buckle.
+    makeRoundedRectangle(
+      "Belt",
+      [FWH, 0.34, 0.18],
+      [0, 2.37, 0],
+      materials.belt,
+      0.05
+    );
+
+    makeCylinder(
+      "Belt_Buckle",
+      0.12,
+      0.18,
+      [0, 2.36, 0.51],
+      materials.beltDark,
+      character,
+      Math.PI / 2,
+      12
+    );
+
+    // Belt pouch.
+    makeRoundedRectangle(
+      "Belt_Back_Pouch",
+      [FWH - 0.23, 0.16, 0.34],
+      [0, 2.35, -0.39],
+      materials.leather,
+      0.035
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Belt_Pouch_Flap",
+      [FWH - 0.16, 0.22, 0.14],
+      [0, 2.35, -0.49],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Belt_Pouch_Flap_Upper",
+      [FWH - 0.16, 0.22, 0.14],
+      [0, 2.35, -0.56],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Belt pouch flap.
+    makeRoundedRectangle(
+      "Leather_Belt_Pouch_Upper",
+      [FWH - 0.16, 0.22, 0.14],
+      [0, 2.35, -0.69],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather belt loop and buckle.
+    cylinder(
+      "Belt_Leather_Loop",
+      FWH - 0.16,
+      FWH - 0.16,
+      [0, 2.37, 0.58],
+      materials.beltDark,
+      character,
+      Math.PI / 2,
+      10
+    );
+
+    // Leather belt loop.
+    cylinder(
+      "Belt_Leather_Loop_Band",
+      FWH - 0.16,
+      FWH - 0.16,
+      [0, 2.37, 0.58],
+      materials.leatherLight,
+      character,
+      Math.PI / 2,
+      10
+    );
+
+    // Belt pouch flap.
+    makeRoundedRectangle(
+      "Leather_Belt_Pouch_Flap",
+      [FWH - 0.16, 0.22, 0.14],
+      [0, 2.35, -0.49],
+      materials.leatherDark,
+      0.035
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Belt_Pouch_Flap_Upper",
+      [FWH - 0.16, 0.22, 0.14],
+      [0, 2.35, -0.69],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather backpack.
+    makeRoundedRectangle(
+      "Leather_Backpack",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leather,
+      0.075
+    );
+
+    // Leather backpack flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Flap",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather band on the backpack flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Strap",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.beltDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Upper",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Right",
+      [FWH - 0.18, 0.88, 0.46],
+      [FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Right",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather backpack flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Flap",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leather,
+      0.075
+    );
+
+    // Leather backpack flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Flap_Upper",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather backpack flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Flap_Lower",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap",
+      [FWH + 0.18, 0.88, 0.46],
+      [0, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH - 0.18, 0.88, 0.46],
+      [FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [FWH, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Top",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Bottom",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.04
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Right",
+      [FWH + 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherLight,
+      0.025
+    );
+
+    // Leather pouch flap.
+    makeRoundedRectangle(
+      "Leather_Backpack_Leather_Pouch_Flap_Left",
+      [FWH - 0.18, 0.88, 0.46],
+      [-FWH + 0.02, 1.8, -0.02],
+      materials.leatherDark,
+      0

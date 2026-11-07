@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval-10 · Viable WebGPU Three.js Scene Matrix &amp; Live Grid</title>
+  <style>
+    @layer base, layout, components, utilities;
+
+    @layer base {
+      :root {
+        color-scheme: dark light;
+        --bg-page: light-dark(#f8fafc, #0b101b);
+        --bg-surface: light-dark(#ffffff, #131b2e);
+        --bg-elevated: light-dark(#f1f5f9, #1b2640);
+        --border-ui: light-dark(#cbd5e1, #2a395c);
+        --text-main: light-dark(#0f172a, #e2e8f0);
+        --text-muted: light-dark(#475569, #94a3b8);
+        --accent: light-dark(#2563eb, #60a5fa);
+        --accent-glow: rgba(96, 165, 250, 0.25);
+        --pass-bg: light-dark(#dcfce7, #0f3628);
+        --pass-fg: light-dark(#166534, #6ee7b7);
+        --heal-bg: light-dark(#fef3c7, #3b2d12);
+        --heal-fg: light-dark(#92400e, #fcd34d);
+        --fail-bg: light-dark(#fee2e2, #3f161e);
+        --fail-fg: light-dark(#991b1b, #fca5a5);
+        --info-bg: light-dark(#e0f2fe, #102a45);
+        --info-fg: light-dark(#0369a1, #7dd3fc);
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: var(--bg-page);
+        color: var(--text-main);
+        line-height: 1.45;
+      }
+    }
+
+    @layer layout {
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding-block: 0.85rem;
+        padding-inline: 1.25rem;
+        background-color: var(--bg-surface);
+        border-block-end: 1px solid var(--border-ui);
+        position: sticky;
+        top: 0;
+        z-index: 40;
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .topbar-meta {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .nav-link {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+      }
+
+      .nav-link:hover {
+        text-decoration: underline;
+      }
+
+      main {
+        max-inline-size: 1720px;
+        margin-inline: auto;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .card {
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+      }
+
+      .card-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-block-end: 1rem;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+
+      .card-subtitle {
+        margin: 0.2rem 0 0;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+    }
+
+    @layer components {
+      /* Leaderboard Table */
+      .table-wrapper {
+        overflow-x: auto;
+        border: 1px solid var(--border-ui);
+        border-radius: 0.55rem;
+      }
+
+      table {
+        inline-size: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.83rem;
+      }
+
+      thead th {
+        background-color: var(--bg-elevated);
+        border-block-end: 1px solid var(--border-ui);
+        padding: 0.6rem 0.75rem;
+        text-align: start;
+        white-space: nowrap;
+        font-weight: 650;
+      }
+
+      tbody th {
+        background-color: var(--bg-surface);
+        border-block-end: 1px solid var(--border-ui);
+        border-inline-end: 1px solid var(--border-ui);
+        padding: 0.55rem 0.75rem;
+        text-align: start;
+        white-space: nowrap;
+      }
+
+      tbody td {
+        border-block-end: 1px solid var(--border-ui);
+        padding: 0.5rem 0.75rem;
+        vertical-align: middle;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 9999px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .pill.pass {
+        background-color: var(--pass-bg);
+        color: var(--pass-fg);
+      }
+
+      .pill.heal {
+        background-color: var(--heal-bg);
+        color: var(--heal-fg);
+      }
+
+      .pill.fail {
+        background-color: var(--fail-bg);
+        color: var(--fail-fg);
+      }
+
+      .pill.info {
+        background-color: var(--info-bg);
+        color: var(--info-fg);
+      }
+
+      /* 1. ARENA: Side-by-Side Live 3D Viewport Row */
+      .arena-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background-color: var(--bg-elevated);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.65rem;
+        margin-block-end: 1rem;
+      }
+
+      .prompt-pills-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .prompt-pill-btn {
+        padding: 0.35rem 0.65rem;
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-main);
+        transition: all 0.15s ease;
+      }
+
+      .prompt-pill-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .prompt-pill-btn.active {
+        background-color: var(--accent);
+        color: #ffffff;
+        border-color: var(--accent);
+        box-shadow: 0 2px 8px var(--accent-glow);
+      }
+
+      .arena-stepper {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .arena-btn {
+        padding: 0.4rem 0.8rem;
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.4rem;
+        font-size: 0.82rem;
+        font-weight: 650;
+        cursor: pointer;
+        color: var(--text-main);
+      }
+
+      .arena-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .arena-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+      }
+
+      @media (max-width: 1080px) {
+        .arena-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .arena-cell {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-ui);
+        border-radius: 0.75rem;
+        background-color: var(--bg-surface);
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      }
+
+      .arena-cell-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.65rem 0.85rem;
+        background-color: var(--bg-elevated);
+        border-block-end: 1px solid var(--border-ui);
+      }
+
+      .arena-model-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .arena-model-spec {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      .arena-viewport {
+        position: relative;
+        inline-size: 100%;
+        aspect-ratio: 4 / 3;
+        background-color: #0b0f19;
+      }
+
+      .arena-iframe {
+        position: absolute;
+        inset: 0;
+        inline-size: 100%;
+        block-size: 100%;
+        border: none;
+      }
+
+      .arena-cell-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.5rem 0.85rem;
+        background-color: var(--bg-elevated);
+        border-block-start: 1px solid var(--border-ui);
+        font-size: 0.78rem;
+      }
+
+      /* 2. MATRIX: Side-by-Side Prompt Rows */
+      .matrix-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .matrix-header-sticky {
+        position: sticky;
+        top: 57px;
+        z-index: 25;
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.65rem;
+        padding: 0.75rem 1rem;
+        display: grid;
+        grid-template-columns: 280px repeat(3, minmax(320px, 1fr));
+        gap: 1.25rem;
+        align-items: center;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        overflow-x: auto;
+      }
+
+      .matrix-header-label {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+      }
+
+      .model-col-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+
+      .model-col-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .model-col-meta {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+      }
+
+      .matrix-prompt-row {
+        display: grid;
+        grid-template-columns: 280px repeat(3, minmax(320px, 1fr));
+        gap: 1.25rem;
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        align-items: stretch;
+        overflow-x: auto;
+      }
+
+      .prompt-info-col {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 0.85rem;
+        padding-inline-end: 0.75rem;
+        border-inline-end: 1px solid var(--border-ui);
+      }
+
+      .prompt-info-top {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .prompt-tag {
+        align-self: flex-start;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.3rem;
+        background-color: var(--bg-elevated);
+        border: 1px solid var(--border-ui);
+        color: var(--accent);
+      }
+
+      .prompt-title-text {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.3;
+      }
+
+      .prompt-desc-text {
+        margin: 0;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+
+      .row-action-btn {
+        padding: 0.45rem 0.75rem;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-weight: 650;
+        font-size: 0.8rem;
+        border: none;
+        border-radius: 0.4rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .row-action-btn:hover {
+        opacity: 0.92;
+      }
+
+      /* Scene Viewport inside Matrix */
+      .matrix-scene-card {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-ui);
+        border-radius: 0.65rem;
+        background-color: var(--bg-elevated);
+        overflow: hidden;
+        position: relative;
+        min-block-size: 320px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .matrix-scene-card:hover, .matrix-scene-card.loaded {
+        border-color: var(--accent);
+        box-shadow: 0 4px 18px var(--accent-glow);
+      }
+
+      .matrix-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background-color: var(--bg-surface);
+        border-block-end: 1px solid var(--border-ui);
+      }
+
+      .matrix-model-badge {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .matrix-viewport {
+        position: relative;
+        inline-size: 100%;
+        aspect-ratio: 4 / 3;
+        background-color: #0b0f19;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .matrix-iframe {
+        position: absolute;
+        inset: 0;
+        inline-size: 100%;
+        block-size: 100%;
+        border: none;
+        background-color: transparent;
+      }
+
+      .matrix-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        padding: 1.5rem;
+        text-align: center;
+        color: var(--text-muted);
+      }
+
+      .launch-live-btn {
+        padding: 0.5rem 1rem;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-size: 0.82rem;
+        font-weight: 650;
+        border: none;
+        border-radius: 9999px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: transform 0.15s ease;
+      }
+
+      .launch-live-btn:hover {
+        transform: scale(1.04);
+      }
+
+      .matrix-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.45rem 0.75rem;
+        background-color: var(--bg-surface);
+        border-block-start: 1px solid var(--border-ui);
+        font-size: 0.78rem;
+      }
+
+      .popout-link {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 650;
+      }
+
+      .popout-link:hover {
+        text-decoration: underline;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>ThreeCoder Eval-10 · Viable WebGPU Scene Suite</h1>
+      <div id="topbar-meta" class="topbar-meta">Side-by-Side Model Comparison (Zero Broken Thumbnails · 100% Live 3D WebGL Viewports)</div>
+    </div>
+    <nav class="nav-links">
+      <a href="http://127.0.0.1:8765/" class="nav-link">← Back to Playground</a>
+      <a href="./SUMMARY.md" class="nav-link" target="_blank" rel="noopener">Summary MD</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- SECTION 1: LIVE 3-MODEL ARENA (TOP FOCUS VIEW) -->
+    <section class="card" aria-labelledby="arena-heading">
+      <div class="card-header">
+        <div>
+          <h2 id="arena-heading" class="card-title">Live 3D Side-by-Side Arena (3 Models Running Simultaneously)</h2>
+          <p class="card-subtitle">Zero static thumbnails · Inspect all 3 WebGPU models executing live in the browser side by side for any prompt.</p>
+        </div>
+        <div id="arena-current-label" class="pill info">Current: P01 · Default Studio Cube</div>
+      </div>
+
+      <!-- PROMPT SELECTOR BAR -->
+      <div class="arena-controls">
+        <div id="prompt-pills-bar" class="prompt-pills-bar"></div>
+        <div class="arena-stepper">
+          <button type="button" id="arena-prev-btn" class="arena-btn">← Prev</button>
+          <button type="button" id="arena-next-btn" class="arena-btn">Next →</button>
+        </div>
+      </div>
+
+      <!-- 3 LIVE VIEWPORTS SIDE BY SIDE -->
+      <div id="arena-grid" class="arena-grid"></div>
+    </section>
+
+    <!-- SECTION 2: VIABLE WEBGPU SCENE LEADERBOARD -->
+    <section class="card" aria-labelledby="leaderboard-heading">
+      <div class="card-header">
+        <div>
+          <h2 id="leaderboard-heading" class="card-title">Viable WebGPU Three.js Scene Coders</h2>
+          <p class="card-subtitle">Zero GLB clutter · Pure Three.js standalone HTML scene generation tested on Apple Silicon WebGPU &amp; Metal</p>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="viable-table">
+          <thead>
+            <tr>
+              <th scope="col">Model Checkpoint</th>
+              <th scope="col">VRAM / Model Size</th>
+              <th scope="col">Valid Scenes</th>
+              <th scope="col">Batch Speed</th>
+              <th scope="col">10-Scene Time</th>
+              <th scope="col">Average Code Size</th>
+              <th scope="col">Primary Strength</th>
+            </tr>
+          </thead>
+          <tbody id="viable-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION 3: FULL 10-ROW PROMPT MATRIX -->
+    <section class="card" aria-labelledby="matrix-heading">
+      <div class="card-header">
+        <div>
+          <h2 id="matrix-heading" class="card-title">Complete 10-Prompt Matrix (Rows = Prompts · Columns = Models)</h2>
+          <p class="card-subtitle">Side-by-side prompt rows with on-demand WebGL embedding. Click any card to launch its live 3D scene.</p>
+        </div>
+      </div>
+
+      <div id="matrix-container" class="matrix-container">
+        <!-- STICKY COLUMN HEADER -->
+        <div id="matrix-sticky-header" class="matrix-header-sticky"></div>
+
+        <!-- MATRIX ROWS -->
+        <div id="matrix-rows-body" class="matrix-rows-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    // Viable WebGPU models to feature in side-by-side columns
+    const VIABLE_MODELS = [
+      {
+        key: "lfm3_1.7b_3d_bf16",
+        label: "LFM3 1.7B Scene (BF16)",
+        size: "1.03 GB WebGPU",
+        strength: "Fastest (~98 tok/s WebGPU) · 10/10 valid scenes · 5.0 GB RAM",
+      },
+      {
+        key: "lfm3_omni_2b_3d_bf16",
+        label: "LFM3-Omni 2B Scene (BF16)",
+        size: "1.32 GB WebGPU",
+        strength: "Omni Multimodal Architecture · 10/10 valid scenes · 6.1 GB RAM",
+      },
+      {
+        key: "qwen35_4b_3d_bf16",
+        label: "Qwen3.5 4B Scene (BF16)",
+        size: "2.81 GB WebGPU",
+        strength: "Highest precision zero-shot syntax (9/10 raw) · 18.1 GB RAM",
+      },
+    ];
+
+    // DOM Elements
+    const promptPillsBar = document.getElementById("prompt-pills-bar");
+    const arenaGrid = document.getElementById("arena-grid");
+    const arenaPrevBtn = document.getElementById("arena-prev-btn");
+    const arenaNextBtn = document.getElementById("arena-next-btn");
+    const arenaCurrentLabel = document.getElementById("arena-current-label");
+    const viableTbody = document.getElementById("viable-tbody");
+    const matrixStickyHeader = document.getElementById("matrix-sticky-header");
+    const matrixRowsBody = document.getElementById("matrix-rows-body");
+
+    // State
+    let evalData = null;
+    let currentPromptIdx = 0;
+
+    async function init() {
+      try {
+        const res = await fetch(`./results.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        evalData = await res.json();
+
+        renderLeaderboard();
+        buildPromptPills();
+        loadArenaPrompt(currentPromptIdx);
+        renderMatrixRows();
+      } catch (e) {
+        console.error("Failed to load results.json:", e);
+      }
+    }
+
+    function renderLeaderboard() {
+      viableTbody.replaceChildren();
+      if (!evalData) return;
+
+      VIABLE_MODELS.forEach((vm) => {
+        const m = evalData.models.find((x) => x.key === vm.key);
+        if (!m) return;
+
+        const tr = document.createElement("tr");
+
+        const th = document.createElement("th");
+        th.scope = "row";
+        th.innerHTML = `<b>${vm.label}</b>`;
+        tr.appendChild(th);
+
+        const tdSize = document.createElement("td");
+        tdSize.innerHTML = `<span class="pill info">${vm.size}</span>`;
+        tr.appendChild(tdSize);
+
+        const tdValid = document.createElement("td");
+        const passClass = m.healed_valid_js_count >= 8 ? "pass" : "heal";
+        tdValid.innerHTML = `<span class="pill ${passClass}"><b>${m.healed_valid_js_count}/10 valid (${m.raw_valid_js_count} zero-shot)</b></span>`;
+        tr.appendChild(tdValid);
+
+        const tdSpeed = document.createElement("td");
+        tdSpeed.textContent = `${m.aggregate_batch_tps?.toFixed(1) || "-"} tok/s`;
+        tr.appendChild(tdSpeed);
+
+        const tdTime = document.createElement("td");
+        tdTime.textContent = `${m.wall_seconds?.toFixed(1) || "-"}s`;
+        tr.appendChild(tdTime);
+
+        const avgLines = Math.round(m.items.reduce((acc, it) => acc + (it.html_lines || 0), 0) / m.items.length);
+        const tdLines = document.createElement("td");
+        tdLines.textContent = `~${avgLines} lines / scene`;
+        tr.appendChild(tdLines);
+
+        const tdStrength = document.createElement("td");
+        tdStrength.textContent = vm.strength;
+        tr.appendChild(tdStrength);
+
+        viableTbody.appendChild(tr);
+      });
+    }
+
+    // 1. ARENA FUNCTIONS
+    function buildPromptPills() {
+      promptPillsBar.replaceChildren();
+      evalData.prompts.forEach((p, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `prompt-pill-btn ${idx === currentPromptIdx ? "active" : ""}`;
+        btn.textContent = `P${String(p.level).padStart(2, "0")} · ${p.title}`;
+        btn.addEventListener("click", () => {
+          loadArenaPrompt(idx);
+        });
+        promptPillsBar.appendChild(btn);
+      });
+    }
+
+    function loadArenaPrompt(idx) {
+      currentPromptIdx = idx;
+      const prompt = evalData.prompts[idx];
+      arenaCurrentLabel.textContent = `P${String(prompt.level).padStart(2, "0")} · ${prompt.title}`;
+
+      // Update pill active class
+      const pills = promptPillsBar.querySelectorAll(".prompt-pill-btn");
+      pills.forEach((p, i) => {
+        p.classList.toggle("active", i === idx);
+      });
+
+      // Populate 3 Live Viewports Side by Side
+      arenaGrid.replaceChildren();
+
+      VIABLE_MODELS.forEach((vm) => {
+        const m = evalData.models.find((x) => x.key === vm.key);
+        const item = m ? m.items[idx] : null;
+
+        const cell = document.createElement("div");
+        cell.className = "arena-cell";
+
+        const header = document.createElement("div");
+        header.className = "arena-cell-header";
+        header.innerHTML = `
+          <div>
+            <div class="arena-model-title">${vm.label}</div>
+            <div class="arena-model-spec">${vm.size}</div>
+          </div>
+          <span class="pill ${item?.healed_js_ok ? "pass" : "heal"}">${item?.healed_js_ok ? "VALID 3D" : "RAW SYNTAX"}</span>
+        `;
+        cell.appendChild(header);
+
+        const viewport = document.createElement("div");
+        viewport.className = "arena-viewport";
+
+        const iframe = document.createElement("iframe");
+        iframe.className = "arena-iframe";
+        iframe.src = `./outputs/${vm.key}/${prompt.id}.html`;
+        iframe.sandbox = "allow-scripts allow-same-origin";
+
+        // Auto-frame camera to fit 3D geometry seamlessly
+        iframe.addEventListener("load", () => {
+          autoFrameIframe(iframe);
+        });
+
+        viewport.appendChild(iframe);
+        cell.appendChild(viewport);
+
+        const footer = document.createElement("div");
+        footer.className = "arena-cell-footer";
+        footer.innerHTML = `
+          <span style="color: var(--text-muted);">${item?.html_lines || 0} lines</span>
+          <button type="button" class="arena-btn" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;">Center 3D View</button>
+          <a href="./outputs/${vm.key}/${prompt.id}.html" target="_blank" rel="noopener" class="popout-link">Pop Out ↗</a>
+        `;
+
+        footer.querySelector("button").addEventListener("click", () => {
+          autoFrameIframe(iframe);
+        });
+
+        cell.appendChild(footer);
+        arenaGrid.appendChild(cell);
+      });
+    }
+
+    arenaPrevBtn.addEventListener("click", () => {
+      const prevIdx = (currentPromptIdx - 1 + evalData.prompts.length) % evalData.prompts.length;
+      loadArenaPrompt(prevIdx);
+    });
+
+    arenaNextBtn.addEventListener("click", () => {
+      const nextIdx = (currentPromptIdx + 1) % evalData.prompts.length;
+      loadArenaPrompt(nextIdx);
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+      if (e.key === "ArrowLeft") {
+        arenaPrevBtn.click();
+      } else if (e.key === "ArrowRight") {
+        arenaNextBtn.click();
+      }
+    });
+
+    // 2. COMPLETE MATRIX ROWS
+    function renderMatrixRows() {
+      // Sticky header
+      matrixStickyHeader.replaceChildren();
+
+      const promptH = document.createElement("div");
+      promptH.className = "matrix-header-label";
+      promptH.textContent = "Prompt / Specification";
+      matrixStickyHeader.appendChild(promptH);
+
+      VIABLE_MODELS.forEach((vm) => {
+        const colH = document.createElement("div");
+        colH.className = "model-col-header";
+        colH.innerHTML = `
+          <div class="model-col-title">${vm.label}</div>
+          <div class="model-col-meta">${vm.size}</div>
+        `;
+        matrixStickyHeader.appendChild(colH);
+      });
+
+      // Rows
+      matrixRowsBody.replaceChildren();
+
+      evalData.prompts.forEach((p, pIdx) => {
+        const row = document.createElement("div");
+        row.className = "matrix-prompt-row";
+
+        // Prompt Column
+        const promptCol = document.createElement("div");
+        promptCol.className = "prompt-info-col";
+
+        const topBlock = document.createElement("div");
+        topBlock.className = "prompt-info-top";
+
+        const tag = document.createElement("span");
+        tag.className = "prompt-tag";
+        tag.textContent = `P${String(p.level).padStart(2, "0")} · Level ${p.level}`;
+
+        const title = document.createElement("h3");
+        title.className = "prompt-title-text";
+        title.textContent = p.title;
+
+        const desc = document.createElement("p");
+        desc.className = "prompt-desc-text";
+        desc.textContent = p.prompt;
+
+        topBlock.appendChild(tag);
+        topBlock.appendChild(title);
+        topBlock.appendChild(desc);
+
+        const bottomBlock = document.createElement("div");
+        bottomBlock.style.display = "flex";
+        bottomBlock.style.flexDirection = "column";
+        bottomBlock.style.gap = "0.4rem";
+
+        const openInArenaBtn = document.createElement("button");
+        openInArenaBtn.type = "button";
+        openInArenaBtn.className = "row-action-btn";
+        openInArenaBtn.innerHTML = `⚡ View in 3-Model Arena`;
+        openInArenaBtn.addEventListener("click", () => {
+          loadArenaPrompt(pIdx);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+
+        bottomBlock.appendChild(openInArenaBtn);
+        promptCol.appendChild(topBlock);
+        promptCol.appendChild(bottomBlock);
+        row.appendChild(promptCol);
+
+        // 3 Model Cells Side by Side
+        VIABLE_MODELS.forEach((vm) => {
+          const m = evalData.models.find((x) => x.key === vm.key);
+          const item = m ? m.items[pIdx] : null;
+
+          const card = document.createElement("div");
+          card.className = "matrix-scene-card";
+
+          const cardHeader = document.createElement("div");
+          cardHeader.className = "matrix-card-header";
+          cardHeader.innerHTML = `
+            <span class="matrix-model-badge">${vm.label.split(" (")[0]}</span>
+            <span class="pill ${item?.healed_js_ok ? "pass" : "heal"}">${item?.healed_js_ok ? "VALID 3D" : "RAW"}</span>
+          `;
+          card.appendChild(cardHeader);
+
+          const viewport = document.createElement("div");
+          viewport.className = "matrix-viewport";
+
+          // Placeholder with Launch Button (Zero broken static thumbnails!)
+          const placeholder = document.createElement("div");
+          placeholder.className = "matrix-placeholder";
+          placeholder.innerHTML = `
+            <button type="button" class="launch-live-btn">▶ Launch Live 3D Scene</button>
+            <span style="font-size: 0.74rem;">Click to embed full interactive WebGL</span>
+          `;
+
+          placeholder.querySelector("button").addEventListener("click", () => {
+            placeholder.remove();
+            card.classList.add("loaded");
+            const iframe = document.createElement("iframe");
+            iframe.className = "matrix-iframe";
+            iframe.src = `./outputs/${vm.key}/${p.id}.html`;
+            iframe.sandbox = "allow-scripts allow-same-origin";
+            iframe.addEventListener("load", () => autoFrameIframe(iframe));
+            viewport.appendChild(iframe);
+          });
+
+          viewport.appendChild(placeholder);
+          card.appendChild(viewport);
+
+          const cardFooter = document.createElement("div");
+          cardFooter.className = "matrix-card-footer";
+          cardFooter.innerHTML = `
+            <span style="color: var(--text-muted);">${item?.html_lines || 0}L</span>
+            <a href="./outputs/${vm.key}/${p.id}.html" target="_blank" rel="noopener" class="popout-link">Pop Out ↗</a>
+          `;
+          card.appendChild(cardFooter);
+
+          row.appendChild(card);
+        });
+
+        matrixRowsBody.appendChild(row);
+      });
+    }
+
+    function autoFrameIframe(iframe) {
+      setTimeout(() => {
+        try {
+          const win = iframe.contentWindow;
+          if (win && win.THREE && win.scene && win.camera) {
+            const box = new win.THREE.Box3().setFromObject(win.scene);
+            if (!box.isEmpty()) {
+              const size = box.getSize(new win.THREE.Vector3());
+              const center = box.getCenter(new win.THREE.Vector3());
+              const maxDim = Math.max(size.x, size.y, size.z);
+              if (maxDim > 0.05 && maxDim < 1000) {
+                const fov = (win.camera.fov || 50) * (Math.PI / 180);
+                const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.35;
+                win.camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.9);
+                win.camera.lookAt(center);
+                if (win.controls && win.controls.target) {
+                  win.controls.target.copy(center);
+                  win.controls.update();
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }, 400);
+    }
+
+    init();
+  </script>
+</body>
+</html>

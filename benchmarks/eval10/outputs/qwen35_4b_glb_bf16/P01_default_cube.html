@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beveled Grey-Orange Cube</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #d9dcd8;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #viewport {
+      width: 100%;
+      height: 100%;
+    }
+
+    #header {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      pointer-events: none;
+      color: #272a27;
+    }
+
+    #header h1 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    #header p {
+      margin: 0;
+      color: #626761;
+      font-size: 12px;
+    }
+
+    #controls {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 10;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid #343934;
+      border-radius: 7px;
+      padding: 10px 15px;
+      background: #ffffff;
+      color: #272a27;
+      font: 600 13px Arial, Helvetica, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16);
+      transition: background 120ms ease, transform 120ms ease;
+    }
+
+    button:hover {
+      background: #f1f1eb;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    #status {
+      min-width: 90px;
+      color: #525750;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    @media (max-width: 600px) {
+      #header {
+        top: 12px;
+        left: 12px;
+      }
+
+      #controls {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <div id="header">
+    <h1>Grey-Orange Cube</h1>
+    <p>Beveled low-poly product asset · drag to orbit · scroll to zoom</p>
+  </div>
+
+  <div id="controls">
+    <span id="status">Ready</span>
+    <button id="exportButton" type="button">Export GLB</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    viewport.appendChild(renderer.domElement);
+
+    // Scene and camera
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xd9dcd8);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.3, 3.2, 5.2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0.95, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3.1;
+    controls.maxDistance = 10;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // Asset root: only this object is included in the GLB export.
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "GreyOrangeCube";
+    scene.add(assetRoot);
+
+    // Single clean beveled cube.
+    const cubeGeometry = new RoundedBoxGeometry(
+      2.4,
+      2.4,
+      2.4,
+      2,
+      0.11
+    );
+
+    const cubeMaterial = new THREE.MeshStandardMaterial({
+      name: "Warm_Grey_Powdercoat",
+      color: 0x85897f,
+      roughness: 0.68,
+      metalness: 0.04
+    });
+
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    cube.name = "Cube_Body";
+    cube.position.y = 0.95;
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+    assetRoot.add(cube);
+
+    // Three-point studio lighting
+    const keyLight = new THREE.DirectionalLight(0xfff3df, 4.2);
+    keyLight.position.set(4.5, 7, 4.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 4;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 18;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xc7dcff, 1.6);
+    fillLight.position.set(-5, 3, 2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd5a0, 2.4);
+    rimLight.position.set(-2, 5, -5);
+    scene.add(rimLight);
+
+    // Neutral studio ground for the preview only.
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({
+        color: 0xd5d8d3,
+        roughness: 0.96,
+        metalness: 0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Soft contact shadow beneath the product.
+    const contactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.65, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x252a25,
+        transparent: true,
+        opacity: 0.14,
+        depthWrite: false
+      })
+    );
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.y = 0.006;
+    contactShadow.scale.set(1.05, 0.78, 1);
+    scene.add(contactShadow);
+
+    // Export the asset root as a binary GLB.
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Exporting…";
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        assetRoot,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "beveled-grey-orange-cube.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB saved";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          truncateDrawRange: true
+        }
+      );
+    });
+
+    // Resize handling
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // Render loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

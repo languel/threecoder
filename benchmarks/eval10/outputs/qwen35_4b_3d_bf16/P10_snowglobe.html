@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cozy Winter Cabin Snowglobe</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 38%, #6b8ca3 0%, #354f68 38%, #17263a 78%, #0d1928 100%);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 24%),
+        radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.35) 100%);
+      z-index: 2;
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #scene:active {
+      cursor: grabbing;
+    }
+
+    .title-card {
+      position: fixed;
+      top: clamp(20px, 4vw, 48px);
+      left: clamp(20px, 4vw, 52px);
+      z-index: 3;
+      max-width: min(360px, calc(100vw - 40px));
+      pointer-events: none;
+      color: #f7f1df;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.55);
+    }
+
+    .eyebrow {
+      margin-bottom: 9px;
+      color: #d7b66f;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.7rem, 4vw, 3.2rem);
+      font-weight: 500;
+      line-height: 0.98;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: rgba(247, 241, 223, 0.72);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .hint {
+      position: fixed;
+      right: clamp(16px, 3vw, 36px);
+      bottom: clamp(16px, 3vw, 30px);
+      z-index: 3;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      color: rgba(255, 255, 255, 0.62);
+      background: rgba(13, 22, 35, 0.48);
+      backdrop-filter: blur(10px);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 43%, transparent 45%, rgba(3, 8, 16, 0.42) 100%);
+    }
+
+    @media (max-width: 600px) {
+      .subtitle {
+        max-width: 240px;
+      }
+
+      .hint {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="scene" aria-label="Interactive winter cabin snowglobe"></canvas>
+
+  <header class="title-card">
+    <div class="eyebrow">A winter’s dream</div>
+    <h1>The Cabin<br />Snowglobe</h1>
+    <div class="subtitle">
+      Warm windows, evergreen trees, a tiny snowman, and snowfall inside a hand-carved wooden world.
+    </div>
+  </header>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+  <div class="vignette"></div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const canvas = document.querySelector("#scene");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.fog = new THREE.FogExp2(0x263b50, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const clock = new THREE.Clock();
+
+    // Lightweight orbit controls implemented directly with pointer events.
+    const controls = {
+      target: new THREE.Vector3(0, 3.1, 0),
+      radius: 14.8,
+      theta: Math.PI * 0.22,
+      phi: Math.PI * 0.39,
+      dragging: false,
+      lastX: 0,
+      lastY: 0,
+      minRadius: 10,
+      maxRadius: 22,
+      minPhi: 0.25,
+      maxPhi: 1.48
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(controls.phi);
+      camera.position.set(
+        controls.target.x + controls.radius * sinPhi * Math.sin(controls.theta),
+        controls.target.y + controls.radius * Math.cos(controls.phi),
+        controls.target.z + controls.radius * sinPhi * Math.cos(controls.theta)
+      );
+      camera.lookAt(controls.target);
+    }
+
+    updateCamera();
+
+    canvas.addEventListener("pointerdown", (event) => {
+      controls.dragging = true;
+      controls.lastX = event.clientX;
+      controls.lastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!controls.dragging) return;
+
+      const dx = event.clientX - controls.lastX;
+      const dy = event.clientY - controls.lastY;
+      controls.lastX = event.clientX;
+      controls.lastY = event.clientY;
+
+      controls.theta -= dx * 0.006;
+      controls.phi = THREE.MathUtils.clamp(
+        controls.phi - dy * 0.005,
+        controls.minPhi,
+        controls.maxPhi
+      );
+
+      updateCamera();
+    });
+
+    function endDrag(event) {
+      controls.dragging = false;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        controls.radius = THREE.MathUtils.clamp(
+          controls.radius + event.deltaY * 0.008,
+          controls.minRadius,
+          controls.maxRadius
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    // Lighting: cool dusk outside and warm light inside the globe.
+    scene.add(new THREE.HemisphereLight(0x8ba9c7, 0x1b1620, 1.35));
+
+    const duskSky = new THREE.Mesh(
+      new THREE.SphereGeometry(70, 32, 20),
+      new THREE.MeshBasicMaterial({
+        color: 0x263b50,
+        side: THREE.BackSide,
+        fog: false
+      })
+    );
+    scene.add(duskSky);
+
+    const moon = new THREE.Mesh(
+      new THREE.SphereGeometry(1.3, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfff3cf, fog: false })
+    );
+    moon.position.set(-18, 17, -24);
+    scene.add(moon);
+
+    const moonGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(4.5, 24, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0x9eb9d2,
+        transparent: true,
+        opacity: 0.07,
+        depthWrite: false,
+        fog: false
+      })
+    );
+    moonGlow.position.copy(moon.position);
+    scene.add(moonGlow);
+
+    const interiorLight = new THREE.PointLight(0xffb45e, 38, 18, 2);
+    interiorLight.position.set(0, 2.6, 0);
+    scene.add(interiorLight);
+
+    const rimLight = new THREE.PointLight(0x8eb9ff, 22, 14, 2);
+    rimLight.position.set(-5, 5, 4);
+    scene.add(rimLight);
+
+    // Procedural wood texture.
+    function makeWoodTexture() {
+      const c = document.createElement("canvas");
+      c.width = 1024;
+      c.height = 256;
+      const ctx = c.getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, "#6f3f24");
+      gradient.addColorStop(0.5, "#4b2819");
+      gradient.addColorStop(1, "#7a4529");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      for (let i = 0; i < 95; i++) {
+        const y = Math.random() * 256;
+        const amplitude = 2 + Math.random() * 12;
+        const frequency = 0.008 + Math.random() * 0.018;
+        const phase = Math.random() * Math.PI * 2;
+
+        ctx.beginPath();
+        for (let x = 0; x <= c.width; x += 8) {
+          const wave = Math.sin(x * frequency + phase) * amplitude;
+          if (x === 0) ctx.moveTo(x, y + wave);
+          else ctx.lineTo(x, y + wave);
+        }
+
+        ctx.strokeStyle = `rgba(25, 12, 7, ${0.08 + Math.random() * 0.2})`;
+        ctx.lineWidth = 0.5 + Math.random() * 2.5;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(c);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return texture;
+    }
+
+    const woodTexture = makeWoodTexture();
+
+    // Carved wooden base.
+    const baseGroup = new THREE.Group();
+    scene.add(baseGroup);
+
+    function woodMaterial(color = 0xffffff) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        map: woodTexture,
+        roughness: 0.72,
+        metalness: 0.02
+      });
+    }
+
+    const darkWood = woodMaterial(0x8b5332);
+    const lightWood = woodMaterial(0xb4784a);
+    const goldWood = woodMaterial(0xc18b50);
+
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(5.3, 5.6, 0.38, 96),
+      darkWood
+    );
+    plinth.position.y = 0.19;
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    baseGroup.add(plinth);
+
+    const lowerBand = new THREE.Mesh(
+      new THREE.TorusGeometry(5.32, 0.14, 12, 96),
+      goldWood
+    );
+    lowerBand.rotation.x = Math.PI / 2;
+    lowerBand.position.y = 0.39;
+    lowerBand.castShadow = true;
+    baseGroup.add(lowerBand);
+
+    const topBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(4.85, 5.12, 0.34, 96),
+      lightWood
+    );
+    topBase.position.y = 0.6;
+    topBase.castShadow = true;
+    topBase.receiveShadow = true;
+    baseGroup.add(topBase);
+
+    const upperBand = new THREE.Mesh(
+      new THREE.TorusGeometry(4.87, 0.095, 12, 96),
+      goldWood
+    );
+    upperBand.rotation.x = Math.PI / 2;
+    upperBand.position.y = 0.78;
+    baseGroup.add(upperBand);
+
+    // Carved spiral and repeated notches around the plinth.
+    for (let i = 0; i < 36; i++) {
+      const angle = (i / 36) * Math.PI * 2;
+      const cut = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.18, 0.28),
+        goldWood
+      );
+      cut.position.set(
+        Math.cos(angle) * 5.29,
+        0.39,
+        Math.sin(angle) * 5.29
+      );
+      cut.rotation.y = -angle + Math.PI / 2;
+      cut.castShadow = true;
+      baseGroup.add(cut);
+    }
+
+    const spiral = new THREE.Mesh(
+      new THREE.TorusGeometry(0.65, 0.035, 8, 72),
+      goldWood
+    );
+    spiral.rotation.x = Math.PI / 2;
+    spiral.position.y = 0.39;
+    baseGroup.add(spiral);
+
+    // Glass skirt and transparent dome.
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xb8e4ef,
+      transparent: true,
+      opacity: 0.22,
+      roughness: 0.06,
+      metalness: 0,
+      transmission: 0.72,
+      thickness: 0.12,
+      ior: 1.45,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    const skirt = new THREE.Mesh(
+      new THREE.CylinderGeometry(4.18, 4.18, 1.18, 96, 1, true),
+      glassMaterial
+    );
+    skirt.position.y = 1.22;
+    skirt.renderOrder = 3;
+    scene.add(skirt);
+
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(
+        4.18,
+        96,
+        48,
+        0,
+        Math.PI * 2,
+        0,
+        Math.PI * 0.485
+      ),
+      glassMaterial
+    );
+    dome.position.y = 3.48;
+    dome.renderOrder = 4;
+    scene.add(dome);
+
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(4.18, 0.085, 12, 96),
+      new THREE.MeshStandardMaterial({
+        color: 0xd7edf1,
+        metalness: 0.65,
+        roughness: 0.2
+      })
+    );
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 1.43;
+    rim.castShadow = true;
+    scene.add(rim);
+
+    // Tiny snow-covered cabin.
+    const cabin = new THREE.Group();
+    cabin.position.y = 0.86;
+    scene.add(cabin);
+
+    const cabinMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8c4f32,
+      roughness: 0.9
+    });
+
+    const roofMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe7f1f1,
+      roughness: 0.95
+    });
+
+    const cabinBody = new THREE.Mesh(
+      new THREE.BoxGeometry(3.05, 2.05, 3.05),
+      cabinMaterial
+    );
+    cabinBody.position.y = 1.02;
+    cabinBody.castShadow = true;
+    cabinBody.receiveShadow = true;
+    cabin.add(cabinBody);
+
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(2.34, 1.55, 4),
+      roofMaterial
+    );
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 2.55;
+    roof.scale.z = 0.92;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    cabin.add(roof);
+
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 1.62, 0.08),
+      new THREE.MeshStandardMaterial({
+        color: 0x34251d,
+        roughness: 0.8
+      })
+    );
+    door.position.set(0.78, 0.81, 1.55);
+    door.castShadow = true;
+    cabin.add(door);
+
+    const windowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffc26b,
+      emissive: 0xff8a32,
+      emissiveIntensity: 3.2,
+      roughness: 0.25
+    });
+
+    function addWindow(x, y, z, width = 0.72, height = 1.0) {
+      const group = new THREE.Group();
+      group.position.set(x, y, z);
+
+      const pane = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, 0.08),
+        windowMaterial
+      );
+      pane.castShadow = false;
+      group.add(pane);
+
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(width + 0.16, height + 0.16, 0.12),
+        new THREE.MeshStandardMaterial({
+          color: 0x33261f,
+          roughness: 0.8
+        })
+      );
+      frame.position.z = 0.01;
+      frame.castShadow = true;
+      group.add(frame);
+
+      const cross = new THREE.Mesh(
+        new THREE.BoxGeometry(0.055, height, 0.09),
+        new THREE.MeshStandardMaterial({ color: 0xe3c69b })
+      );
+      cross.position.z = 0.075;
+      group.add(cross);
+
+      const sill = new THREE.Mesh(
+        new THREE.BoxGeometry(width + 0.25, 0.1, 0.2),
+        new THREE.MeshStandardMaterial({ color: 0x8c6044 })
+      );
+      sill.position.z = 0.1;
+      sill.castShadow = true;
+      group.add(sill);
+
+      return group;
+    }
+
+    cabin.add(addWindow(-0.72, 1.55, 0));
+    cabin.add(addWindow(0.72, 1.55, 0));
+    cabin.add(addWindow(0, 1.55, -0.72));
+    cabin.add(addWindow(0, 1.55, 0.72));
+
+    const chimney = new THREE.Mesh(
+      new THREE.BoxGeometry(0.48, 1.15, 0.48),
+      new THREE.MeshStandardMaterial({ color: 0x343b3d, roughness: 1 })
+    );
+    chimney.position.set(-0.95, 3.15, -0.2);
+    chimney.castShadow = true;
+    cabin.add(chimney);
+
+    const chimneyCap = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.13, 0.62),
+      new THREE.MeshStandardMaterial({ color: 0x252b2d, roughness: 1 })
+    );
+    chimneyCap.position.set(-0.95, 3.75, -0.2);
+    chimneyCap.castShadow = true;
+    cabin.add(chimneyCap);
+
+    // Pine tree helper.
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4b3024,
+      roughness: 1
+    });
+
+    const foliageMaterials = [
+      new THREE.MeshStandardMaterial({ color: 0x173c38, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0x24574b, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0x316653, roughness: 1 })
+    ];
+
+    function createPine(x, z, scale = 1, height = 1) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0.78, z);
+      tree.scale.setScalar(scale);
+
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.22, 2.5, 8),
+        trunkMaterial
+      );
+      trunk.position.y = 1.25;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const layers = [
+        { y: 1.65, radius: 1.05, height: 1.25 },
+        { y: 2.35, radius: 0.88, height: 1.35 },
+        { y: 3.05, radius: 0.64, height: 1.3 },
+        { y: 3.7, radius: 0.39, height: 1.2 }
+      ];
+
+      layers.forEach((layer, index) => {
+        const foliage = new THREE.Mesh(
+          new THREE.ConeGeometry(layer.radius, layer.height, 9),
+          foliageMaterials[index % foliageMaterials.length]
+        );
+        foliage.position.y = layer.y;
+        foliage.castShadow = true;
+        foliage.receiveShadow = true;
+        tree.add(foliage);
+      });
+
+      // A dusting of snow on the upper branches.
+      const snowCap = new THREE.Mesh(
+        new THREE.ConeGeometry(0.46, 0.55, 9),
+        roofMaterial
+      );
+      snowCap.position.y = 4.16;
+      snowCap.castShadow = true;
+      tree.add(snowCap);
+
+      return tree;
+    }
+
+    const treePositions = [
+      [-5.0, -3.1, 1.12],
+      [-4.2, 3.7, 0.94],
+      [4.8, -3.4, 1.08],
+      [4.6, 3.5, 0.92],
+      [-6.4, 0.2, 0.78],
+      [6.5, 0.4, 0.82],
+      [0.1, -5.6, 0.88]
+    ];
+
+    treePositions.forEach((args) => createPine(...args));
+
+    // Tiny snowman.
+    const snowman = new THREE.Group();
+    snowman.position.set(1.65, 0.87, -1.9);
+    scene.add(snowman);
+
+    const snowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf4f7f4,
+      roughness: 0.95
+    });
+
+    function sphere(radius, y, scale = 1) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 20, 14),
+        snowMaterial
+      );
+      mesh.position.y = y;
+      mesh.scale.setScalar(scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    snowman.add(sphere(0.38, 0));
+    snowman.add(sphere(0.31, 0.47, 0.95));
+
+    const scarf = new THREE.Mesh(
+      new THREE.TorusGeometry(0.285, 0.045, 8, 24),
+      new THREE.MeshStandardMaterial({
+        color: 0xc65b45,
+        roughness: 0.9
+      })
+    );
+    scarf.rotation.x = Math.PI / 2;
+    scarf.position.y = 0.13;
+    snowman.add(scarf);
+
+    const hat = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.22, 0.16, 16),
+      new THREE.MeshStandardMaterial({ color: 0x263b50, roughness: 1 })
+    );
+    hat.position.y = 0.79;
+    snowman.add(hat);
+
+    const hatBrim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.28, 0.035, 16),
+      new THREE.MeshStandardMaterial({ color: 0x263b50, roughness: 1 })
+    );
+    hatBrim.position.y = 0.7;
+    snowman.add(hatBrim);
+
+    const buttonMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc65b45,
+      roughness: 0.55
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const button = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 10, 8),
+        buttonMaterial
+      );
+      button.position.set(0, 0.49 + i * 0.08, 0.31);
+      snowman.add(button);
+    }
+
+    const coal = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 12, 8),
+      new THREE.MeshStandardMaterial({ color: 0x171a1c, roughness: 0.6 })
+    );
+    coal.position.set(0, 0.96, 0);
+    snowman.add(coal);
+
+    // Warm window glow spills onto the snow.
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffa84d,
+      transparent: true,
+      opacity: 0.11,
+      depthWrite: false
+    });
+
+    const leftGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.8),
+      glowMaterial
+    );
+    leftGlow.rotation.y = -Math.PI / 2;
+    leftGlow.position.set(-0.7, 1.5, 1.62);
+    scene.add(leftGlow);
+
+    const rightGlow = leftGlow.clone();
+    rightGlow.position.x = 0.7;
+    scene.add(rightGlow);
+
+    // Soft ground snow and footprints.
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(12, 96),
+      new THREE.MeshStandardMaterial({
+        color: 0x9eb5b5,
+        roughness: 1,
+        transparent: true,
+        opacity: 0.72
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0.02;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const footprintMaterial = new THREE.MeshBasicMaterial({
+      color: 0x6f898c,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false
+    });
+
+    for (let i = 0; i < 12; i++) {
+      const footprint = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 8, 6),
+        footprintMaterial
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 5.8 + Math.random() * 4.2;
+      footprint.scale.set(1.7, 0.35, 0.6);
+      footprint.position.set(
+        Math.cos(angle) * radius,
+        0.06,
+        Math.sin(angle) * radius
+      );
+      footprint.rotation.y = -angle + Math.PI / 2;
+      scene.add(footprint);
+    }
+
+    // Drifting snowflakes.
+    const snowflakeMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.74,
+      depthWrite: false
+    });
+
+    const snowflakes = [];
+    const flakeGeometry = new THREE.BufferGeometry();
+    flakeGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(new Float32Array(3), 3)
+    );
+
+    for (let i = 0; i < 170; i++) {
+      const positions = flakeGeometry.attributes.position;
+      const size = 0.025 + Math.random() * 0.065;
+
+      positions.setXYZ(
+        i,
+        (Math.random() - 0.5) * 18,
+        Math.random() * 12 - 1,
+        (Math.random() - 0.5) * 18
+      );
+
+      const flake = new THREE.Mesh(flakeGeometry, snowflakeMaterial);
+      flake.scale.setScalar(size);
+      flake.userData = {
+        speed: 0.22 + Math.random() * 0.45,
+        phase: Math.random() * Math.PI * 2,
+        size
+      };
+      scene.add(flake);
+      snowflakes.push(flake);
+    }
+
+    function updateSnowflakes(time) {
+      const positions = flakeGeometry.attributes.position;
+
+      snowflakes.forEach((flake, i) => {
+        let y = positions.getY(i) - flake.userData.speed * 0.016;
+        let x = positions.getX(i) + Math.sin(time * 0.45 + flake.userData.phase) * 0.0018;
+        let z = positions.getZ(i) + Math.cos(time * 0.33 + flake.userData.phase) * 0.0015;
+
+        if (y < 0.78) {
+          y = 8.2 + Math.random() * 1.2;
+          x = (Math.random() - 0.5) * 18;
+          z = (Math.random() - 0.5) * 18;
+        }
+
+        positions.setY(i, y);
+        positions.setX(i, x);
+        positions.setZ(i, z);
+      });
+
+      flakeGeometry.attributes.position.needsUpdate = true;
+    }
+
+    // Subtle warm light pulse and drifting snow inside the globe.
+    const interiorSnow = [];
+    const interiorPositions = new THREE.Float32BufferAttribute(
+      new Float32Array(45 * 3),
+      3
+    );
+
+    for (let i = 0; i < 45; i++) {
+      const x = (Math.random() - 0.5) * 7.5;
+      const y = 1.2 + Math.random() * 4.8;
+      const z = (Math.random() - 0.5) * 7.5;
+      interiorPositions.setXYZ(i, x, y, z);
+
+      const flake = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025 + Math.random() * 0.035, 6, 5),
+        snowflakeMaterial
+      );
+      flake.userData.speed = 0.25 + Math.random() * 0.4;
+      flake.userData.phase = Math.random() * Math.PI * 2;
+      scene.add(flake);
+      interiorSnow.push(flake);
+    }
+
+    const insideGeometry = new THREE.BufferGeometry();
+    insideGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(interiorPositions.array, 3)
+    );
+
+    function updateInteriorSnow(time) {
+      const positions = insideGeometry.attributes.position;
+
+      interiorSnow.forEach((flake, i) => {
+        let y = positions.getY(i) - flake.userData.speed * 0.012;
+        let x = positions.getX(i) + Math.sin(time * 0.7 + flake.userData.phase) * 0.003;
+        let z = positions.getZ(i) + Math.cos(time * 0.58 + flake.userData.phase) * 0.002;
+
+        if (y < 1.45) {
+          y = 6.6 + Math.random() * 0.5;
+          x = (Math.random() - 0.5) * 7.5;
+          z = (Math.random() - 0.5) * 7.5;
+        }
+
+        positions.setY(i, y);
+        positions.setX(i, x);
+        positions.setZ(i, z);
+      });
+
+      insideGeometry.attributes.position.needsUpdate = true;
+    }
+
+    // A few small decorative icicles and ornaments on the dome.
+    const ornamentMaterials = [
+      new THREE.MeshStandardMaterial({ color: 0xe7c46a, metalness: 0.55, roughness: 0.28 }),
+      new THREE.MeshStandardMaterial({ color: 0x6fb3c6, metalness: 0.45, roughness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: 0xf0eee1, roughness: 0.55 })
+    ];
+
+    function ornament(x, y, z, material, scale = 1) {
+      const group = new THREE.Group();
+      group.position.set(x, y, z);
+      group.scale.setScalar(scale);
+
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 18, 12),
+        material
+      );
+      ball.castShadow = true;
+      group.add(ball);
+
+      const cap = new THREE.Mesh(
+        new THREE.ConeGeometry(0.19, 0.22, 12),
+        material
+      );
+      cap.position.y = 0.19;
+      cap.castShadow = true;
+      group.add(cap);
+
+      return group;
+    }
+
+    ornament(-1.45, 5.85, 0.45, ornamentMaterials[0], 1);
+    ornament(1.35, 6.05, -0.35, ornamentMaterials[1], 0.9);
+    ornament(0, 7.2, 0, ornamentMaterials[2], 0.8);
+
+    const topOrnament = ornament(0, 8.55, 0, ornamentMaterials[1], 1.05);
+    scene.add(topOrnament);
+
+    // Tiny warm lights around the base.
+    const bulbMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffd68a,
+      emissive: 0xff9e43,
+      emissiveIntensity: 2.5,
+      roughness: 0.3
+    });
+
+    for (let i = 0; i < 7; i++) {
+      const angle = (i / 7) * Math.PI * 2;
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 12, 8),
+        bulbMaterial
+      );
+      bulb.position.set(
+        Math.cos(angle) * 4.95,
+        0.58,
+        Math.sin(angle) * 4.95
+      );
+      scene.add(bulb);
+    }
+
+    // Responsive resizing.
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation loop.
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+      const time = elapsed * 0.001;
+
+      updateSnowflakes(time);
+      updateInteriorSnow(time);
+
+      interiorLight.intensity = 36 + Math.sin(time * 1.7) * 1.5;
+      windowMaterial.emissiveIntensity = 3.0 + Math.sin(time * 2.1) * 0.18;
+
+      topOrnament.rotation.y = time * 0.12;
+      topOrnament.rotation.z = Math.sin(time * 0.45) * 0.08;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

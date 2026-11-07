@@ -7,6 +7,16 @@ venv/
 adapters/
 checkpoints/
 datasets/
+data/
 models/
 *.gguf
 *.safetensors
+*.onnx
+*.onnx_data*
+*.bin
+*.tar.gz
+*.zip
+.env
+node_modules/
+*.glb
+snapshots/

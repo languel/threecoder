@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Adventurer Character</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dbe7e8;
+      color: #263a3b;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 22px;
+      left: 24px;
+      z-index: 10;
+      padding: 15px 17px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 12px;
+      background: rgba(40, 35, 28, 0.72);
+      box-shadow: 0 12px 35px rgba(31, 24, 18, 0.2);
+      backdrop-filter: blur(14px);
+      pointer-events: none;
+    }
+
+    .hint {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 10;
+      color: rgba(64, 49, 42, 0.68);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    #export-button {
+      position: fixed;
+      top: 22px;
+      right: 24px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 176px;
+      padding: 13px 19px;
+      border: 0;
+      border-radius: 10px;
+      background: #d8c5a7;
+      color: #fff;
+      box-shadow: 0 5px 18px rgba(232, 211, 166, 0.22);
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      transition:
+        transform 120ms ease,
+        background 120ms ease,
+        box-shadow 120ms ease;
+    }
+
+    #export-button:hover {
+      transform: translateY(-2px);
+      background: #e6b87f;
+      box-shadow: 0 7px 24px rgba(232, 211, 166, 0.28);
+    }
+
+    #export-button:active {
+      transform: translateY(0);
+    }
+
+    #export-button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #export-button svg {
+      width: 17px;
+      height: 17px;
+      fill: currentColor;
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 560px) {
+      .panel {
+        top: 14px;
+        left: 14px;
+      }
+
+      #export-button {
+        top: auto;
+        right: 14px;
+        bottom: 56px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Stylized Adventurer</h1>
+    <p>Low-poly character · Tunic, leather gear · Subtle idle breathing pose</p>
+    <button id="export-button" type="button">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3v10.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6-3.6 6-6 6-6-6-1.4 1.4V3h2.2V3zm-2.2 20h14a2 2 0 0 1 5 5 2-2 2-2-2 0 1 1 2-2 2 2-2-2 0 1-1-2V5h-2v-2h2zm-6 6h14a2 2 0 0 1 5-5 2-2 2 2-2-2 0 1-1-2V5h-2v-2h2zm2-2h14a2 2 0 0 1 5 5 2-2 2 2-2 2 0 1-1-2V3h2.2V3"/>
+      </svg>
+      Export GLB
+    </button>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("export-button");
+
+    // ------------------------------------------------------------
+    // Renderer and camera
+    // ------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xdbe7e8);
+    scene.fog = new THREE.Fog(0xdbe7e8, 15, 28);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.6, 3.25, 5.7);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.65, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 3.4;
+    controls.maxDistance = 10;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemisphere = new THREE.HemisphereLight(0xf5f7ff, 0x7c6b58, 2.15);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff4df, 3.1);
+    keyLight.position.set(4.5, 7.5, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -2;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xfff7e6, 2.25);
+    rimLight.position.set(-5, 3, -4);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+
+    const materials = {
+      leather: new THREE.MeshStandardMaterial({
+        color: 0x68431d,
+        roughness: 0.78,
+        metalness: 0.02,
+        flatShading: true
+      }),
+      leatherDark: new THREE.MeshStandardMaterial({
+        color: 0x3f2c19,
+        roughness: 0.82,
+        metalness: 0.03,
+        flatShading: true
+      }),
+      leatherLight: new THREE.MeshStandardMaterial({
+        color: 0x8a5b3d,
+        roughness: 0.76,
+        metalness: 0.04,
+        flatShading: true
+      }),
+
+      leatherBoot: new THREE.MeshStandardMaterial({
+        color: 0x5e392f,
+        roughness: 0.9,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      rubber: new THREE.MeshStandardMaterial({
+        color: 0x15191c,
+        roughness: 0.95,
+        metalness: 0.0,
+        flatShading: true
+      }),
+
+      leatherPatch: new THREE.MeshStandardMaterial({
+        color: 0x704019,
+        roughness: 0.85,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      leatherBand: new THREE.MeshStandardMaterial({
+        color: 0xa88d40,
+        roughness: 0.62,
+        metalness: 0.12,
+        flatShading: true
+      }),
+
+      leatherStrap: new THREE.MeshStandardMaterial({
+        color: 0x3c2d18,
+        roughness: 0.88,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      leatherStrapBand: new THREE.MeshStandardMaterial({
+        color: 0xb88a34,
+        roughness: 0.64,
+        metalness: 0.12,
+        flatShading: true
+      }),
+
+      leatherBuckle: new THREE.MeshStandardMaterial({
+        color: 0x5e392f,
+        roughness: 0.85,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      leatherStrapLace: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.92,
+        metalness: 0.01,
+        flatShading: true
+      }),
+
+      leatherBackpack: new THREE.MeshStandardMaterial({
+        color: 0x4d2d22,
+        roughness: 0.98,
+        metalness: 0.05,
+        flatShading: true
+      }),
+
+      leatherBackpackBand: new THREE.MeshStandardMaterial({
+        color: 0xa88d40,
+        roughness: 0.9,
+        metalness: 0.08,
+        flatShading: true
+      }),
+
+      leatherBackpackLace: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.96,
+        metalness: 0.01,
+        flatShading: true
+      }),
+
+      leatherBackpackStrap: new THREE.MeshStandardMaterial({
+        color: 0x3c2d18,
+        roughness: 0.86,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      leatherBackpackPatch: new THREE.MeshStandardMaterial({
+        color: 0x704019,
+        roughness: 0.95,
+        metalness: 0.01,
+        flatShading: true
+      }),
+
+      leatherBand: new THREE.MeshStandardMaterial({
+        color: 0xb88a34,
+        roughness: 0.62,
+        metalness: 0.12,
+        flatShading: true
+      }),
+
+      leatherBackpackBandStrap: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.92,
+        metalness: 0.01,
+        flatShading: true
+      })
+    };
+
+    // ------------------------------------------------------------
+    // Character hierarchy
+    // ------------------------------------------------------------
+
+    const model = new THREE.Group();
+    model.name = "Stylized_Adventurer";
+    scene.add(model);
+
+    const body = new THREE.Group();
+    body.name = "Body";
+    model.add(body);
+
+    const head = new THREE.Group();
+    head.name = "Head";
+    model.add(head);
+
+    const arms = new THREE.Group();
+    arms.name = "Arms";
+    model.add(arms);
+
+    const legs = new THREE.Group();
+    legs.name = "Legs";
+    model.add(legs);
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    function addMesh(
+      parent,
+      geometry,
+      material,
+      name,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0],
+      scale = [1, 1, 1]
+    ) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      mesh.scale.set(...scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function cylinderBetween(
+      parent,
+      start,
+      end,
+      radius,
+      material,
+      name,
+      radialSegments = 6
+    ) {
+      const a = new THREE.Vector3(...start);
+      const b = new THREE.Vector3(...end);
+      const direction = b.clone().sub(a);
+      const length = direction.length();
+
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, radialSegments),
+        material
+      );
+      mesh.name = name;
+      mesh.position.copy(a).add(b).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addBone(parent, points, radius, material, name) {
+      const shape = new THREE.Shape();
+      shape.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) {
+        shape.lineTo(points[i][0], points[i][1]);
+      }
+      shape.closePath();
+
+      return addMesh(
+        parent,
+        new THREE.BoxGeometry(radius, radius * 2, radius * 2),
+        material,
+        name
+      );
+    }
+
+    function addTorus(parent, radius, tube, material, name, radialSegments = 5) {
+      return addMesh(
+        parent,
+        new THREE.TorusGeometry(radius, tube, radialSegments, 7),
+        material,
+        name
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Boots and lower legs
+    // ------------------------------------------------------------
+
+    const leftShoulder = [-0.48, 0.98, 0];
+    const rightShoulder = [0.47, 1.04, 0];
+
+    for (const side of [-1, 1]) {
+      addBone(legs, [
+        [side * 0.42, 0.84, 0],
+        [side * 0.16, 0.58, 0.22],
+        [side * 0.07, 0.30, 0.54]
+      ], 0.17, materials.leatherDark, side < 0 ? "Left_Shin" : "Right_Shin");
+
+      const ankle = new THREE.Group();
+      ankle.name = side < 0 ? "Left_Ankle" : "Right_Ankle";
+      legs.add(ankle);
+
+      addBone(ankles, [
+        [side * 0.16, 0.58, 0.22],
+        [side * 0.07, 0.30, 0.54]
+      ], 0.12, materials.leatherPatch, side < 0 ? "Left_Ankle_Patch" : "Right_Ankle_Patch");
+
+      addBone(ankles, [
+        [side * 0.07, 0.30, 0.54],
+        [side * 0.16, 0.58, 0.22]
+      ], 0.12, materials.leatherPatch, side < 0 ? "Left_Ankle_Patch" : "Right_Ankle_Patch");
+
+      addTorus(ankle, 0.16, 0.035, materials.leatherBoot, side < 0 ? "Left_Leather_Boot" : "Right_Leather_Boot", 5);
+    }
+
+    // ------------------------------------------------------------
+    // Torso and back
+    // ------------------------------------------------------------
+
+    addBone(body, [
+      [-0.48, 1.04, 0],
+      [-0.16, 0.63, 0.22],
+      [0.00, 1.25, 0.54],
+      [0.16, 0.63, 0.22],
+      [0.48, 1.04, 0]
+    ], 0.18, materials.leather, "Torso");
+    addBone(body, [
+      [-0.08, 1.28, 0.58],
+      [0, 1.28, 0.58],
+      [0.08, 1.28, 0.58]
+    ], 0.035, materials.leatherStrapBand, "Belt_Band");
+
+    addBone(body, [
+      [-0.48, 0.96, 0],
+      [-0.08, 1.15, 0.52],
+      [0, 1.25, 0.55],
+      [0.08, 1.15, 0.52],
+      [0.48, 0.96, 0]
+    ], 0.16, materials.leather, "Back");
+    addBone(body, [
+      [-0.16, 0.63, 0.22],
+      [0, 0.78, 0.38],
+      [0.16, 0.63, 0.22],
+      [-0.08, 1.15, 0.52],
+      [0, 1.25, 0.55]
+    ], 0.12, materials.leather, "Side");
+
+    // ------------------------------------------------------------
+    // Arms
+    // ------------------------------------------------------------
+
+    for (const side of [-1, 1]) {
+      addBone(arms, [
+        [side * 0.42, 1.04, 0],
+        [side * 0.16, 0.63, 0.22],
+        [side * 0.08, 0.31, 0.53]
+      ], 0.17, materials.leatherDark, side < 0 ? "Left_Upper_Arm" : "Right_Upper_Arm");
+
+      const elbow = new THREE.Group();
+      elbow.name = side < 0 ? "Left_Elbow" : "Right_Elbow";
+      arms.add(elbow);
+
+      addBone(elbow, [
+        [side * 0.16, 0.63, 0.22],
+        [side * 0.08, 0.31, 0.53]
+      ], 0.12, materials.leatherPatch, side < 0 ? "Left_Elbow_Patch" : "Right_Elbow_Patch");
+
+      addBone(elbow, [
+        [side * 0.08, 0.31, 0.53],
+        [side * 0.16, 0.63, 0.22]
+      ], 0.12, materials.leatherPatch, side < 0 ? "Left_Elbow_Patch" : "Right_Elbow_Patch");
+
+      addTorus(elbow, 0.155, 0.035, materials.leatherBoot, side < 0 ? "Left_Leather_Boot" : "Right_Leather_Boot", 5);
+    }
+
+    // ------------------------------------------------------------
+    // Legs
+    // ------------------------------------------------------------
+
+    addBone(legs, [
+      [-0.16, 0.58, 0.22],
+      [0.08, 0.31, 0.53]
+    ], 0.12, materials.leatherPatch, "Left_Shin_Patch");
+    addBone(legs, [
+      [0.16, 0.58, 0.22],
+      [-0.08, 0.31, 0.53]
+    ], 0.12, materials.leatherPatch, "Right_Shin_Patch");
+
+    // ------------------------------------------------------------
+    // Head
+    // ------------------------------------------------------------
+
+    addBone(head, [
+      [0, 1.25, 0.55],
+      [0, 1.19, 0.82],
+      [-0.08, 1.13, 0.9],
+      [0.08, 1.13, 0.9],
+      [0, 1.19, 0.82]
+    ], 0.16, materials.leather, "Neck");
+    addBone(head, [
+      [-0.08, 1.09, 0.86],
+      [0, 1.20, 0.82],
+      [-0.08, 1.13, 0.9]
+    ], 0.16, materials.leather, "Neck_Head");
+
+    addBone(head, [
+      [-0.08, 1.20, 0.82],
+      [0, 1.20, 0.82],
+      [0.08, 1.13, 0.9],
+      [-0.08, 1.13, 0.86]
+    ], 0.16, materials.leather, "Head");
+    addBone(head, [
+      [0.08, 1.20, 0.82],
+      [-0.08, 1.20, 0.82],
+      [-0.08, 1.13, 0.86]
+    ], 0.16, materials.leather, "Head_Left");
+    addBone(head, [
+      [-0.08, 1.13, 0.86],
+      [0, 1.20, 0.82],
+      [0.08, 1.20, 0.82]
+    ], 0.16, materials.leather, "Head_Right");
+
+    // ------------------------------------------------------------
+    // Arms
+    // ------------------------------------------------------------
+
+    addBone(arms, [
+      [-0.08, 1.20, 0.82],
+      [0, 1.20, 0.82],
+      [-0.08, 1.13, 0.86]
+    ], 0.16, materials.leather, "Left_Upper_Arm");
+    addBone(arms, [
+      [0.08, 1.20, 0.82],
+      [-0.08, 1.20, 0.82],
+      [-0.08, 1.13, 0.86]
+    ], 0.16, materials.leather, "Right_Upper_Arm");
+
+    // ------------------------------------------------------------
+    // Torso
+    // ------------------------------------------------------------
+
+    addBone(body, [
+      [-0.48, 1.04, 0],
+      [-0.16, 0.63, 0.22],
+      [0.00, 1.25, 0.54],
+      [0.16, 0.63, 0.22],
+      [-0.08, 1.13, 0.86]
+    ], 0.18, materials.leather, "Torso");
+    addBone(body, [
+      [-0.08, 1.28, 0.58],
+      [0, 1.28, 0.58],
+      [0.08, 1.28, 0.58]
+    ], 0.035, materials.leatherStrapBand, "Belt_Band");
+
+    // ------------------------------------------------------------
+    // Leather backpack
+    // ------------------------------------------------------------
+
+    const backpack = new THREE.Group();
+    backpack.name = "Leather_Backpack";
+    model.add(backpack);
+
+    addBone(backpack, [
+      [-0.48, 1.04, 0],
+      [-0.08, 0.63, 0.22],
+      [0.00, 1.25, 0.54],
+      [0.16, 0.63, 0.22],
+      [-0.08, 1.13, 0.86]
+    ], 0.18, materials.leather, "Backpack");
+    addBone(backpack, [
+      [-0.08, 1.28, 0.58],
+      [0, 1.28, 0.58],
+      [0.08, 1.28, 0.58]
+    ], 0.035, materials.leatherStrapBand, "Backpack_Band");
+
+    // ------------------------------------------------------------
+    // Leather backpack straps and straps
+    // ------------------------------------------------------------
+
+    addMesh(
+      backpack,
+      new THREE.TorusGeometry(0.16, 0.035, 5, 7),
+      materials.leatherBuckle,
+      "Backpack_Buckle",
+      [0, 1.25, 0.55],
+      [0, 0, 0]
+    );
+
+    addTorus(
+      backpack,
+      0.17,
+      0.035,
+      materials.leatherStrap,
+      "Backpack_Straps"
+    );
+
+    addMesh(
+      backpack,
+      new THREE.TorusGeometry(0.13, 0.035, 5, 7),
+      materials.leatherStrapLace,
+      "Backpack_Strap_Lace",
+      [0, 1.19, 0.84]
+    );
+
+    addMesh(
+      backpack,
+      new THREE.TorusGeometry(0.13, 0.035, 5, 7),
+      materials.leatherStrapLace,
+      "Backpack_Strap_Lace",
+      [0, 1.19, 0.84]
+    );
+
+    // ------------------------------------------------------------
+    // Leather pouch
+    // ------------------------------------------------------------
+
+    const pouch = new THREE.Group();
+    pouch.name = "Leather_Pouch";
+    model.add(pouch);
+
+    addBone(pouch, [
+      [-0.08, 1.28, 0.58],
+      [0, 1.28, 0.58],
+      [0.08, 1.28, 0.58]
+    ], 0.035, materials.leatherStrapBand, "Pouch_Band");
+
+    addBone(pouch, [
+      [-0.16, 1.04, 0],
+      [-0.02, 0.63, 0.22],
+      [0, 1.25, 0.54],
+      [0.02, 0.63, 0.22],
+      [-0.08, 1.13, 0.86]
+    ], 0.16, materials.leather, "Pouch");
+    addBone(pouch, [
+      [-0.16, 0.56, 0.18],
+      [-0.02, 0.28, 0.40],
+      [0, 1.12, 0.61],
+      [0.02, 0.28, 0.40],
+      [-0.08, 1.13, 0.86]
+    ], 0.11, materials.leatherPatch, "Pouch_Patch");
+
+    // ------------------------------------------------------------
+    // Leather backpack straps and straps
+    // ------------------------------------------------------------
+
+    addMesh(
+      pouch,
+      new THREE.TorusGeometry(0.16, 0.035, 5, 7),
+      materials.leatherBuckle,
+      "Pouch_Buckle",
+      [0, 1.28, 0.58],
+      [0, 0, 0]
+    );
+
+    addMesh(
+      pouch,
+      new THREE.TorusGeometry(0.17, 0.035, 5, 7),
+      materials.leatherStrap,
+      "Pouch_Straps"
+    );
+
+    addMesh(
+      pouch,
+      new THREE.TorusGeometry(0.14, 0.035, 5, 7),
+      materials.leatherStrapLace,
+      "Pouch_Strap_Lace",
+      [0, 1

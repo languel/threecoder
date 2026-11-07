@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brushed Gold — Relic of the Stone Circle</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17313f;
+      --muted: #6b7d8a;
+      --gold: #e7c17a;
+      --stone: #aeb9aa;
+      --shadow: rgba(22, 28, 30, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #15171a;
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .title-card {
+      position: fixed;
+      top: clamp(22px, 5vw, 48px);
+      left: clamp(22px, 5vw, 52px);
+      z-index: 2;
+      pointer-events: none;
+      color: var(--ink);
+      text-shadow: 0 2px 18px rgba(0, 0, 0, 0.55);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 34px;
+      height: 1px;
+      content: "";
+      background: #e7c17a;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5.4vw, 66px);
+      font-weight: 380;
+      letter-spacing: -0.055em;
+      line-height: 0.95;
+    }
+
+    .subtitle {
+      max-width: 320px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .controls {
+      position: fixed;
+      right: clamp(18px, 4vw, 38px);
+      bottom: clamp(18px, 4vw, 34px);
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      pointer-events: none;
+    }
+
+    .hint {
+      padding: 10px 13px;
+      border: 1px solid rgba(224, 196, 175, 0.14);
+      border-radius: 999px;
+      background: rgba(20, 28, 30, 0.58);
+      color: #b8c3ca;
+      font-size: 11px;
+      letter-spacing: 0.025em;
+      backdrop-filter: blur(10px);
+    }
+
+    button {
+      border: 1px solid rgba(224, 196, 175, 0.22);
+      border-radius: 999px;
+      padding: 10px 15px;
+      background: rgba(224, 196, 175, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition:
+        transform 160ms ease,
+        background 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(224, 196, 175, 0.16);
+    }
+
+    @media (max-width: 700px) {
+      .subtitle {
+        max-width: 260px;
+        font-size: 12px;
+      }
+
+      .controls {
+        left: 18px;
+        right: 18px;
+        justify-content: space-between;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <header class="title-card">
+    <div class="eyebrow">Circle of the World · No. 04</div>
+    <h1>Brushed<br />Gold</h1>
+    <p class="subtitle">
+      A softly illuminated sphere resting on a dark circular stone pedestal.
+    </p>
+  </header>
+
+  <div class="controls">
+    <div class="hint">Drag to orbit · Scroll or pinch to zoom · R to reset</div>
+    <button id="reset" type="button">Reset view</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, scene and camera
+    // -------------------------------------------------------------------------
+
+    const viewport = document.querySelector("#viewport");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene with a brushed-gold sphere and stone pedestal"
+    );
+
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x15171a);
+    scene.fog = new THREE.Fog(0x15171a, 17, 34);
+
+    const camera = new THREE.PerspectiveCamera(
+      36,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+    window.camera = camera;
+
+    const cameraTarget = new THREE.Vector3(0, 1.15, 0);
+    let cameraRotation = {
+      yaw: 0.72,
+      pitch: 0.34,
+      radius: 10.8
+    };
+
+    function updateCamera() {
+      const horizontal = Math.sin(cameraRotation.pitch) * cameraRotation.radius;
+
+      camera.position.set(
+        cameraTarget.x + horizontal * Math.sin(cameraRotation.yaw),
+        cameraTarget.y + Math.cos(cameraRotation.pitch) * cameraRotation.radius,
+        cameraTarget.z + horizontal * Math.cos(cameraRotation.yaw)
+      );
+
+      camera.lookAt(cameraTarget);
+    }
+
+    updateCamera();
+
+    // -------------------------------------------------------------------------
+    // Procedural studio environment
+    // -------------------------------------------------------------------------
+
+    function createEnvironmentTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      // Soft ambient fill.
+      ctx.fillStyle = "#aeb8bb";
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Warm key light.
+      ctx.fillStyle = "#f3e7d6";
+      ctx.shadowBlur = "12px";
+      ctx.fillRect(35, 45, 170, 260);
+      ctx.fillRect(290, 100, 170, 250);
+
+      // Soft direct sun.
+      const sun = ctx.createRadialGradient(
+        380,
+        270,
+        15,
+        380,
+        270,
+        225
+      );
+
+      sun.addColorStop(0, "rgba(255, 245, 210, 0.95)");
+      sun.addColorStop(0.42, "rgba(255, 245, 210, 0.72)");
+      sun.addColorStop(1, "rgba(255, 245, 210, 0)");
+
+      ctx.fillStyle = sun;
+      ctx.fillRect(300, 130, 180, 190);
+
+      // Longer soft catchlight.
+      const catchlight = ctx.createRadialGradient(
+        420,
+        380,
+        45,
+        420,
+        380,
+        230
+      );
+
+      catchlight.addColorStop(0, "rgba(255, 245, 210, 0.95)");
+      catchlight.addColorStop(1, "rgba(255, 245, 210, 0)");
+
+      ctx.fillStyle = catchlight;
+      ctx.fillRect(310, 340, 130, 190);
+
+      // Fine ambient rim.
+      const rim = ctx.createRadialGradient(
+        360,
+        360,
+        25,
+        360,
+        360,
+        300
+      );
+
+      rim.addColorStop(0, "rgba(255, 240, 180, 0.18)");
+      rim.addColorStop(1, "rgba(255, 240, 180, 0)");
+
+      ctx.fillStyle = rim;
+      ctx.fillRect(220, 30, 150, 310);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.5, 2.5);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    const environmentTexture = createEnvironmentTexture();
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environmentTarget = pmrem.fromEquirectangular(environmentTexture);
+
+    scene.environment = environmentTarget.texture;
+    pmrem.dispose();
+    environmentTexture.dispose();
+
+    // -------------------------------------------------------------------------
+    // Materials and geometry helpers
+    // -------------------------------------------------------------------------
+
+    function makeStoneTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        20,
+        256,
+        256,
+        230
+      );
+
+      gradient.addColorStop(0, "#b8c1aa");
+      gradient.addColorStop(0.42, "#aeb9aa");
+      gradient.addColorStop(1, "#92939b");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3.2, 3.2);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      map: makeStoneTexture(),
+      color: 0xffffff,
+      roughness: 0.93,
+      metalness: 0
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      map: makeStoneTexture(),
+      color: 0xffffff,
+      roughness: 1
+    });
+
+    const brushedMetalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe5c17a,
+      metalness: 0.78,
+      roughness: 0.34
+    });
+
+    const contactMaterial = new THREE.MeshStandardMaterial({
+      color: 0x202b25,
+      metalness: 0.12,
+      roughness: 0.75
+    });
+
+    const darkMetalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x263239,
+      metalness: 0.4,
+      roughness: 0.43
+    });
+
+    const goldMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xe7c17a,
+      metalness: 0.72,
+      roughness: 0.24,
+      clearcoat: 0.34,
+      clearcoatRoughness: 0.2,
+      transmission: 0.12,
+      thickness: 0.08,
+      ior: 1.32
+    });
+
+    const contactAccentMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe1c17a,
+      emissive: 0x8a5d35,
+      emissiveIntensity: 0.16,
+      metalness: 0.42,
+      roughness: 0.3
+    });
+
+    // -------------------------------------------------------------------------
+    // Stone pedestal
+    // -------------------------------------------------------------------------
+
+    const pedestal = new THREE.Group();
+    pedestal.position.set(0, 1.15, -0.35);
+    pedestal.scale.set(6.2, 5.8, 4.7);
+    pedestal.castShadow = true;
+    pedestal.receiveShadow = true;
+
+    const stonePedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.65, 3.95, 1.25, 96),
+      stoneMaterial
+    );
+
+    stonePedestal.position.y = 0.72;
+    stonePedestal.receiveShadow = true;
+
+    const darkPedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.55, 3.55, 1.25, 96),
+      darkStoneMaterial
+    );
+
+    darkPedestal.position.y = 0.72;
+    darkPedestal.receiveShadow = true;
+
+    pedestal.add(stonePedestal, darkPedestal);
+
+    // -------------------------------------------------------------------------
+    // Brushed-gold sphere
+    // -------------------------------------------------------------------------
+
+    const sphere = new THREE.Group();
+    sphere.position.set(0, 2.35, 0);
+    scene.add(sphere);
+
+    const sphereRadius = 1.05;
+    const sphereHeight = 0.72;
+    const radiusHalf = sphereRadius / 2;
+
+    const sphereGeometry = new THREE.SphereGeometry(
+      sphereRadius,
+      96,
+      32,
+      0,
+      Math.PI * 2,
+      sphereHeight
+    );
+
+    const brushedSphere = new THREE.Mesh(sphereGeometry, brushedMetalMaterial);
+    brushedSphere.castShadow = true;
+    brushedSphere.receiveShadow = true;
+
+    sphere.add(brushedSphere);
+
+    // A subtle contact shadow beneath the top of the sphere.
+    const contactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.82, 64),
+      contactAccentMaterial
+    );
+
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.y = sphereHeight + 0.006;
+    sphere.add(contactShadow);
+
+    // -------------------------------------------------------------------------
+    // Soft animated sphere light
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(
+      0xb8d9d8,
+      0x6b4c35,
+      2.1
+    );
+
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffead7, 3.25);
+    keyLight.position.set(4.5, 8.5, 6.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.shadow.normalBias = 0.025;
+    keyLight.target.position.set(0, 2.35, 0);
+    scene.add(keyLight, keyLight.target);
+
+    const fillLight = new THREE.DirectionalLight(0x8fb5ca, 1.25);
+    fillLight.position.set(-5, 4, 3);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffb86a, 1.15);
+    rimLight.position.set(2, 3, -6);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Custom orbit camera controls
+    // -------------------------------------------------------------------------
+
+    const pointers = new Map();
+    let pinchDistance = 0;
+    let dragMode = "orbit";
+    let dragging = false;
+
+    function pointerDistance() {
+      const points = [...pointers.values()];
+      if (points.length < 2) return 0;
+
+      return Math.hypot(
+        points[0].x - points[1].x,
+        points[0].y - points[1].y
+      );
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      renderer.domElement.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (pointers.size === 2) {
+        dragMode = "pinch";
+        dragMode === "orbit" ? pinchDistance = pointerDistance() : pinchDistance = 0;
+      } else if (pointers.size === 1) {
+        dragging = true;
+        dragMode = "orbit";
+        updateCamera();
+      }
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!pointers.has(event.pointerId)) return;
+
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+      if (pointers.size === 1) {
+        const previous = pointers.get(event.pointerId);
+        const deltaX = event.clientX - previous.x;
+        const deltaY = event.clientY - previous.y;
+
+        cameraRotation.yaw -= deltaX * 0.0055;
+        cameraRotation.x += deltaY * 0.0048;
+      } else if (pointers.size === 2) {
+        const distance = pointerDistance();
+
+        if (pinchDistance > 0 && distance > 0) {
+          cameraRadius *= pinchDistance / distance;
+          cameraRadius = THREE.MathUtils.clamp(
+            cameraRadius,
+            5.8,
+            17
+          );
+        }
+
+        pinchDistance = distance;
+      }
+    });
+
+    function endPointer(event) {
+      pointers.delete(event.pointerId);
+
+      if (pointers.size === 0) {
+        dragging = false;
+        dragMode = "orbit";
+        pinchDistance = 0;
+      } else if (pointers.size === 1) {
+        const remaining = [...pointers.values()][0];
+        dragging = true;
+        dragMode = "orbit";
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endPointer);
+    renderer.domElement.addEventListener("pointercancel", endPointer);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        cameraRadius *= Math.exp(event.deltaY * 0.001);
+        cameraRadius = THREE.MathUtils.clamp(
+          cameraRadius,
+          5.8,
+          17
+        );
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", () => {
+      cameraRotation.set(0.72, 0.34, 10.8);
+    });
+
+    document.querySelector("#reset").addEventListener("click", () => {
+      cameraRotation.set(0.72, 0.34, 10.8);
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and animation
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.fov = Math.min(36, height < 700 ? 44 : 36);
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+
+      updateCamera();
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      if (dragMode === "pinch") {
+        cameraRadius *= Math.exp(delta * 0.0014);
+        cameraRadius = THREE.MathUtils.clamp(
+          cameraRadius,
+          5.8,
+          17
+        );
+      } else if (dragMode === "orbit") {
+        cameraRotation.yaw -= delta * 0.008;
+      }
+
+      updateCamera();
+
+      sphere.scale.setScalar(1 + Math.sin(delta * 3.2) * 0.012);
+      contactShadow.scale.setScalar(1 + Math.sin(delta * 4.1) * 0.006);
+
+      renderer.render(scene, camera);
+    }
+
+    renderer.setAnimationLoop(animate);
+  </script>
+</body>
+</html>

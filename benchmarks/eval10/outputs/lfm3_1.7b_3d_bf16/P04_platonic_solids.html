@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platonic Solids — Orbital Study</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17232d;
+      --paper: rgba(244, 247, 246, 0.86);
+      --muted: #52647a;
+      --accent: #8b6d2c;
+      --glass: rgba(238, 243, 242, 0.88);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #e8eeee;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .title-card {
+      position: fixed;
+      top: 28px;
+      left: 30px;
+      z-index: 2;
+      width: min(360px, calc(100vw - 60px));
+      padding: 20px 22px 19px;
+      border: 1px solid var(--glass);
+      border-radius: 18px;
+      background: var(--glass);
+      box-shadow: 0 12px 40px rgba(244, 247, 248, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4vw, 42px);
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 15px;
+      border: 1px solid var(--glass);
+      border-radius: 999px;
+      background: var(--glass);
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+
+    .controls .hint {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .controls button {
+      padding: 10px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: 999px;
+      background: rgba(244, 247, 248, 0.78);
+      color: var(--ink);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
+    }
+
+    .controls button:hover {
+      border-color: rgba(255, 255, 255, 1.05);
+      background: #fffaf0;
+      transform: translateY(-1px);
+    }
+
+    .controls button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .hint-label {
+      position: fixed;
+      left: 50%;
+      bottom: 31px;
+      z-index: 2;
+      transform: translateX(-50%);
+      padding: 7px 13px;
+      border: 1px solid var(--glass);
+      border-radius: 999px;
+      background: rgba(244, 247, 248, 0.88);
+      color: #52647a;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .hint-label::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 4px;
+      width: 1px;
+      height: 24px;
+      background: var(--ink);
+      animation: label-enter 0.6s ease-in-out infinite alternate;
+    }
+
+    .hint-label.visible {
+      opacity: 1;
+    }
+
+    @keyframes label-enter {
+      from {
+        transform: translate(-50%, -50%);
+        opacity: 0;
+      }
+      to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 14px;
+        left: 14px;
+        width: calc(100vw - 28px);
+        padding: 15px 17px;
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .controls {
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        justify-content: space-between;
+      }
+
+      .hint-label {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title-card">
+    <div class="eyebrow">Geometry · Study 04</div>
+    <h1>Platonic<br><span>Solids</span></h1>
+    <p class="subtitle">
+      Five regular polyhedra arranged in a circular orbital display,
+      each supported on its own metal pedestal.
+    </p>
+  </div>
+
+  <div class="controls">
+    <div class="hint">Drag to orbit · Scroll or pinch to zoom · Arrow keys rotate</div>
+    <button id="reset" type="button">Reset view</button>
+  </div>
+
+  <div class="hint-label" id="label-1" class="visible">Tetrahedron</div>
+  <div class="hint-label" id="label-2" class="visible">Cube</div>
+  <div class="hint-label" id="label-3" class="visible">Octahedron</div>
+  <div class="hint-label" id="label-4" class="visible">Dodecahedron</div>
+  <div class="hint-label" id="label-5" class="visible">Icosahedron</div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional study of the five Platonic solids"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xe8eeee);
+    scene.fog = new THREE.Fog(0xe8eeee, 18, 38);
+
+    const camera = new THREE.PerspectiveCamera(
+      34,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural studio environment
+    // -------------------------------------------------------------------------
+
+    function createStudioEnvironment() {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 512;
+      const context = canvas.getContext("2d");
+
+      context.fillStyle = "#e8eeee";
+      context.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 110; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const radius = 2 + Math.random() * 18;
+
+        context.fillStyle = `rgba(255,255,255,${0.025 + Math.random() * 0.08})`;
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const environmentScene = new THREE.Scene();
+      environmentScene.background = new THREE.Color(0xffffff);
+
+      const pmremTexture = pmrem.fromEquirectangular(texture);
+      environmentScene.environment = pmremTexture.texture;
+      environmentScene.fog = null;
+
+      const hemisphere = new THREE.HemisphereLight(0xe8eeee, 0x59666b, 1.45);
+      environmentScene.add(hemisphere);
+
+      return { pmrem, environment: pmrem.scene };
+    }
+
+    createStudioEnvironment();
+
+    // -------------------------------------------------------------------------
+    // Solid geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addCube(parent, w, h, d, x, y, z, material) {
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        material
+      );
+
+      cube.position.set(x, y, z);
+      cube.castShadow = true;
+      cube.receiveShadow = true;
+      parent.add(cube);
+
+      return cube;
+    }
+
+    function addSphere(parent, radius, x, y, z, material) {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 32, 20),
+        material
+      );
+
+      sphere.position.set(x, y, z);
+      sphere.castShadow = true;
+      parent.add(sphere);
+
+      return sphere;
+    }
+
+    function addCylinder(parent, radius, height, x, y, z, material) {
+      const cylinder = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, height, 10),
+        material
+      );
+
+      cylinder.position.set(x, y, z);
+      cylinder.castShadow = true;
+      parent.add(cylinder);
+
+      return cylinder;
+    }
+
+    function addCone(parent, radius, height, x, y, z, material) {
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, 4),
+        material
+      );
+
+      cone.position.set(x, y, z);
+      cone.castShadow = true;
+      parent.add(cone);
+
+      return cone;
+    }
+
+    function addTorus(parent, radius, tube, x, y, z, material) {
+      const torus = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 8, 30),
+        material
+      );
+
+      torus.rotation.x = Math.PI / 2;
+      torus.position.set(x, y, z);
+      parent.add(torus);
+
+      return torus;
+    }
+
+    function addBeam(parent, start, end, radius, material) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, 8),
+        material
+      );
+
+      beam.position.copy(start).add(end).multiplyScalar(0.5);
+      beam.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      beam.castShadow = true;
+      parent.add(beam);
+
+      return beam;
+    }
+
+    function addArrow(parent, start, end, color, material) {
+      const a = new THREE.Vector3(...start);
+      const b = new THREE.Vector3(...end);
+      const direction = b.clone().sub(a);
+      const length = direction.length();
+
+      const arrow = new THREE.Mesh(
+        new THREE.ConeGeometry(0.055, length, 2),
+        material
+      );
+
+      arrow.position.copy(a).add(b).multiplyScalar(0.5);
+      arrow.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      arrow.castShadow = true;
+      parent.add(arrow);
+
+      return arrow;
+    }
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphereLight = new THREE.HemisphereLight(0xf6fbff, 0x68766d, 2.15);
+    scene.add(hemisphereLight);
+
+    const keyLight = new THREE.DirectionalLight(0xe8f0ff, 3.4);
+    keyLight.position.set(-4.5, 9.5, 7.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 8;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 22;
+    keyLight.shadow.normalBias = 0.025;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.target.position.set(0, 0, 0);
+    scene.add(keyLight, keyLight.target);
+
+    const fillLight = new THREE.DirectionalLight(0xb8d5ff, 1.25);
+    fillLight.position.set(5, 4, -6);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    rimLight.position.set(-3, -2, -5);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Lighting direction for the floor
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0xf8fbff, 0x65766d, 1.35);
+    scene.add(hemisphere);
+
+    const floorLight = new THREE.DirectionalLight(0xe8eeee, 1.15);
+    floorLight.position.set(0, 2.5, -6);
+    floorLight.castShadow = true;
+    floorLight.shadow.mapSize.set(1024, 1024);
+    floorLight.shadow.camera.left = -7;
+    floorLight.shadow.camera.right = 7;
+    floorLight.shadow.camera.top = 7;
+    floorLight.shadow.camera.bottom = -3;
+    floorLight.shadow.camera.near = 0.5;
+    floorLight.shadow.camera.far = 24;
+    floorLight.shadow.bias = -0.00035;
+    scene.add(floorLight);
+
+    // -------------------------------------------------------------------------
+    // Material definitions
+    // -------------------------------------------------------------------------
+
+    const materials = {
+      red: new THREE.MeshStandardMaterial({
+        color: 0xb8422f,
+        metalness: 0.72,
+        roughness: 0.32
+      }),
+
+      orange: new THREE.MeshStandardMaterial({
+        color: 0xe66c2d,
+        metalness: 0.7,
+        roughness: 0.3
+      }),
+
+      yellow: new THREE.MeshStandardMaterial({
+        color: 0xf1a65e,
+        metalness: 0.62,
+        roughness: 0.27
+      }),
+
+      teal: new THREE.MeshStandardMaterial({
+        color: 0x35b8ff,
+        metalness: 0.68,
+        roughness: 0.28
+      }),
+
+      blue: new THREE.MeshStandardMaterial({
+        color: 0x3f9aff,
+        metalness: 0.66,
+        roughness: 0.25
+      }),
+
+      violet: new THREE.MeshStandardMaterial({
+        color: 0xb8d2ff,
+        metalness: 0.65,
+        roughness: 0.28
+      }),
+      white: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.25,
+        roughness: 0.24
+      }),
+      darkMetal: new THREE.MeshStandardMaterial({
+        color: 0x252b2a,
+        metalness: 0.9,
+        roughness: 0.32
+      }),
+      bronze: new THREE.MeshStandardMaterial({
+        color: 0xb99a3d,
+        metalness: 0.84,
+        roughness: 0.34
+      }),
+      glass: new THREE.MeshPhysicalMaterial({
+        color: 0x9fc8ff,
+        metalness: 0.12,
+        roughness: 0.16,
+        transmission: 0.18,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false
+      })
+    };
+
+    // -------------------------------------------------------------------------
+    // Platform and pedestals
+    // -------------------------------------------------------------------------
+
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(9, 9, 0.18, 96),
+      new THREE.MeshStandardMaterial({
+        color: 0xdce8e9,
+        metalness: 0.12,
+        roughness: 0.28
+      })
+    );
+
+    platform.position.y = -1.05;
+    platform.receiveShadow = true;
+    scene.add(platform);
+
+    const pedestalX = [-2.55, -0.4, 0.4, 2.35];
+    const pedestalZ = [2.35, 3.15, 3.65, 4.05];
+
+    function createPedestal(x, z) {
+      const pedestal = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.34, 1.48, 0.36, 96),
+        materials.red
+      );
+
+      pedestal.position.set(x, -0.68, z);
+      pedestal.castShadow = true;
+      pedestal.receiveShadow = true;
+      scene.add(pedestal);
+
+      // A narrow, raised support plate under the pedestal.
+      const plate = new THREE.Mesh(
+        new THREE.BoxGeometry(1.24, 0.16, 0.12),
+        materials.bronze
+      );
+
+      plate.position.set(x, -0.54, z + 0.12);
+      plate.castShadow = true;
+      scene.add(plate);
+
+      // A small dark base under the pedestal.
+      const base = new THREE.Mesh(
+        new THREE.CircleGeometry(1.18, 96),
+        materials.darkMetal
+      );
+
+      base.position.set(x, -0.43, z + 0.24);
+      base.scale.y = 0.72;
+      base.receiveShadow = true;
+      scene.add(base);
+    }
+
+    for (let i = 0; i < pedestalX.length; i++) { const x = pedestalX[i], z = pedestalZ[i];
+      createPedestal(x, z);
+    }
+
+    // -------------------------------------------------------------------------
+    // Solid geometry
+    // -------------------------------------------------------------------------
+
+    const solids = [
+      {
+        name: "Tetrahedron",
+        x: -1.2,
+        z: 3.8,
+        material: materials.red,
+        height: 0.32
+      },
+      {
+        name: "Cube",
+        x: 0.4,
+        z: 3.6,
+        material: materials.blue,
+        height: 0.2
+      },
+      {
+        name: "Octahedron",
+        x: -0.1,
+        z: 3.35,
+        material: materials.violet,
+        height: 0.22
+      },
+      {
+        name: "Dodecahedron",
+        x: 1.25,
+        z: 4.0,
+        material: materials.orange,
+        height: 0.28
+      },
+      {
+        name: "Icosahedron",
+        x: -0.75,
+        z: 4.55,
+        material: materials.white,
+        height: 0.25
+      }
+    ];
+
+    solids.forEach(({ name, x, z, material, height }) => {
+      const solid = new THREE.Group();
+      solid.x = x;
+      solid.name = name;
+
+      let geometry;
+      if (name === "Tetrahedron") geometry = new THREE.TetrahedronGeometry(0.7);
+      else if (name === "Cube") geometry = new THREE.BoxGeometry(0.85, 0.85, 0.85);
+      else if (name === "Octahedron") geometry = new THREE.OctahedronGeometry(0.7);
+      else if (name === "Dodecahedron") geometry = new THREE.DodecahedronGeometry(0.65);
+      else geometry = new THREE.IcosahedronGeometry(0.65);
+
+      geometry.computeVertexNormals();
+
+      const body = new THREE.Mesh(geometry, material);
+      body.castShadow = true;
+      body.receiveShadow = true;
+
+      solid.add(body);
+      solid.position.set(x, height + 0.45, z);
+      scene.add(solid);
+
+      // Small rounded top rim.
+      const rim = new THREE.Mesh(
+        new THREE.TorusGeometry(1.15, 0.075, 12, 48),
+        materials.darkMetal
+      );
+
+      rim.position.set(x, height + 0.18, z);
+      rim.scale.y = 0.72;
+      rim.castShadow = true;
+      scene.add(rim);
+
+      // Fine dark edge lines.
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const point = new THREE.Vector3(
+          x + Math.cos(angle) * 0.16,
+          height + 0.18,
+          z + Math.sin(angle) * 0.16
+        );
+
+        addArrow(scene, [x, height - 0.08, z], [point.x, height + 0.08, point.z], materials.darkMetal);
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Custom camera controls — no external addons
+    // -------------------------------------------------------------------------
+
+    const orbit = {
+      target: new THREE.Vector3(0, 1.25, 0),
+      theta: 0.52,
+      phi: 1.08,
+      radius: 13.2,
+      desiredTheta: 0.52,
+      desiredPhi: 1.08,
+      desiredRadius: 13.2
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(orbit.phi);
+      camera.position.set(
+        orbit.target.x + orbit.radius * sinPhi * Math.sin(orbit.theta),
+        orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+        orbit.target.z + orbit.radius * sinPhi * Math.cos(orbit.theta)
+      );
+      camera.lookAt(orbit.target);
+    }
+
+    function resetView() {
+      orbit.desiredTheta = 0.52;
+      orbit.desiredPhi = 1.08;
+      orbit.desiredRadius = 13.2;
+      updateCamera();
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      orbit.desiredTheta -= event.deltaX * 0.006;
+      orbit.desiredPhi = THREE.MathUtils.clamp(orbit.desiredPhi + event.deltaY * 0.005, 0.28, 1.38);
+      updateCamera();
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      const dx = event.deltaX;
+      const dy = event.deltaY;
+
+      orbit.desiredTheta -= dx * 0.006;
+      orbit.desiredPhi = THREE.MathUtils.clamp(
+        orbit.desiredPhi + dy * 0.005,
+        0.28,
+        1.38
+      );
+
+      updateCamera();
+    });
+
+    function endDrag(event) {
+      const pointerX = event.clientX;
+      const pointerY = event.clientY;
+
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        orbit.desiredRadius = THREE.MathUtils.clamp(
+          orbit.desiredRadius + event.deltaY * 0.008,
+          9.5,
+          19
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetView);
+    renderer.domElement.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") orbit.desiredTheta += 0.08;
+      if (event.key === "ArrowRight") orbit.desiredTheta -= 0.08;
+      if (event.key === "ArrowUp") {
+        orbit.desiredPhi = Math.max(0.28, orbit.desiredPhi - 0.06);
+      }
+      if (event.key === "ArrowDown") {
+        orbit.desiredPhi = Math.min(1.38, orbit.desiredPhi + 0.06);
+      }
+      if (event.key === "+" || event.key === "=") {
+        orbit.desiredRadius = Math.max(9.5, orbit.desiredRadius - 0.6);
+      }
+      if (event.key === "-") {
+        orbit.desiredRadius = Math.min(19, orbit.desiredRadius + 0.6);
+      }
+      if (event.key.toLowerCase() === "r") resetView();
+    });
+
+    document.getElementById("reset").addEventListener("click", resetView);
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.fov = width < 700 ? 48 : 34;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+
+      if (!camera.position.x) {
+        camera.position.set(0, 1.25, 0);
+      }
+    }
+
+    window.addEventListener("resize", resize);
+
+    let previousTime = performance.now();
+
+    function animate(time) {
+      const delta = Math.min((time - previousTime) / 1000, 0.05);
+
+      if (orbit.desiredRadius < orbit.radius) {
+        orbit.radius += delta * 0.09;
+      } else if (orbit.desiredRadius > orbit.radius) {
+        orbit.radius -= delta * 0.09;
+      }
+      orbit.radius = THREE.MathUtils.clamp(
+        orbit.radius,
+        9.5,
+        19
+      );
+
+      updateCamera();
+
+// animated solids
+
+      renderer.render(scene, camera);
+      previousTime = time;
+    }
+
+    renderer.setAnimationLoop(animate);
+  </script>
+</body>
+</html>

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matte Crimson Cube · Glossy Cobalt Sphere · Emerald Tetrahedron</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --text: #eaf3f7;
+      --muted: #b9c8cc;
+      --accent: #d65a48;
+      --panel: rgba(4, 12, 18, 0.72);
+      --line: rgba(220, 180, 108, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 30%, #07111d 0%, #05080f 48%, #020a20 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .hud {
+      position: fixed;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .title-card {
+      top: 28px;
+      left: 30px;
+      width: min(390px, calc(100vw - 60px));
+      padding: 20px 22px 18px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background:
+        linear-gradient(135deg, rgba(8, 19, 25, 0.7), rgba(3, 9, 13, 0.56));
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      margin-bottom: 8px;
+      color: var(--accent);
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(30px, 4vw, 48px);
+      font-weight: 400;
+      line-height: 0.98;
+      letter-spacing: -0.035em;
+    }
+
+    .controls {
+      top: 28px;
+      right: 30px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(220, 180, 108, 0.32);
+      border-radius: 999px;
+      padding: 9px 13px;
+      color: var(--text);
+      background: rgba(5, 16, 22, 0.78);
+      font: inherit;
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        background 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(8, 19, 25, 0.95);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .hint {
+      right: 30px;
+      bottom: 27px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 18px;
+        left: 18px;
+        width: calc(100vw - 36px);
+      }
+
+      .controls {
+        top: auto;
+        right: 18px;
+        flex-direction: column;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <section class="title-card" aria-label="Scene introduction">
+      <div class="eyebrow">Material Study · No. 03</div>
+      <h1>Matte crimson<br />glossy cobalt<br />emerald tetrahedron</h1>
+    </section>
+
+    <nav class="controls" aria-label="Scene controls" aria-label="A: Auto orbit · B: Reset camera" aria-pressed="true">
+      <button id="auto-orbit" type="button">Auto orbit</button>
+      <button id="reset-camera" type="button">Reset view</button>
+      <button id="orbit-toggle" type="button">Pause orbit</button>
+    </nav>
+
+    <div class="hint">Drag to orbit · Scroll to zoom · Double-click to reset</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera and lighting
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene with a matte crimson cube, glossy sphere, and emerald tetrahedron"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x07111d);
+    scene.fog = new THREE.FogExp2(0x07111d, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const hemisphere = new THREE.HemisphereLight(0xc8e4ef, 0x17202b, 2.05);
+    scene.add(hemisphere);
+
+    var keyLight = new THREE.DirectionalLight(0xffedcf, 3.2);
+    keyLight.position.set(-5.5, 10, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 9;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.shadow.normalBias = 0.025;
+    scene.add(keyLight);
+
+    var fillLight = new THREE.DirectionalLight(0x91a7bd, 1.15);
+    fillLight.position.set(6, 4, -5);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.DirectionalLight(0xffd49c, 1.25);
+    rimLight.position.set(-5, 3, -6);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Procedural studio environment texture
+    // -------------------------------------------------------------------------
+
+    var createEnvironmentTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+      gradient.addColorStop(0, "#8eaa89");
+      gradient.addColorStop(0.45, "#9ee5d0");
+      gradient.addColorStop(1, "#ffffff");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    var environmentTarget = pmrem.fromEquirectangular(createEnvironmentTexture());
+    scene.environment = environmentTarget.texture;
+
+    // -------------------------------------------------------------------------
+    // Deterministic procedural textures
+    // -------------------------------------------------------------------------
+
+    function createMatteTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 512, 0);
+      gradient.addColorStop(0, "#b8a87f");
+      gradient.addColorStop(0.42, "#8c2e20");
+      gradient.addColorStop(1, "#3d120d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 1.5);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    var createEnvironmentTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        256
+      );
+
+      gradient.addColorStop(0, "#8bc4d7");
+      gradient.addColorStop(0.45, "#c9e1ea");
+      gradient.addColorStop(1, "#ffffff");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function createBloomTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        64,
+        64,
+        0,
+        64,
+        64,
+        64
+      );
+
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,.72)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 128, 128);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
+    const matteTexture = createMatteTexture();
+    const environmentTexture = createEnvironmentTexture();
+    const bloomTexture = createBloomTexture();
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const materials = {
+      surface: new THREE.MeshStandardMaterial({
+        map: matteTexture,
+        roughness: 0.88,
+        metalness: 0
+      }),
+      warm: new THREE.MeshStandardMaterial({
+        color: 0xd64b2e,
+        roughness: 0.78,
+        metalness: 0.04
+      }),
+      cool: new THREE.MeshStandardMaterial({
+        color: 0x2b171c,
+        roughness: 0.76,
+        metalness: 0.02
+      }),
+      dark: new THREE.MeshStandardMaterial({
+        color: 0x08080d,
+        roughness: 0.48,
+        metalness: 0.12
+      }),
+      glossy: new THREE.MeshPhysicalMaterial({
+        color: 0xe7f2ff,
+        roughness: 0.24,
+        metalness: 0.1,
+        clearcoat: 0.58,
+        clearcoatRoughness: 0.2,
+        sheen: 1,
+        sheenColor: new THREE.Color(0x4f7ff5),
+        sheenRoughness: 0.26,
+        emissive: 0x000000,
+        emissiveIntensity: 0
+      }),
+      emerald: new THREE.MeshPhysicalMaterial({
+        color: 0x29b89c,
+        roughness: 0.34,
+        metalness: 0.12,
+        clearcoat: 0.35,
+        clearcoatRoughness: 0.2,
+        sheen: 0.9,
+        sheenColor: new THREE.Color(0x1d7c8f),
+        sheenRoughness: 0.25
+      })
+    };
+
+    const sphereMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x3a6e84,
+      roughness: 0.32,
+      metalness: 0.08,
+      clearcoat: 0.42,
+      clearcoatRoughness: 0.22,
+      sheen: 1,
+      sheenColor: new THREE.Color(0x2ac4d2),
+      sheenRoughness: 0.25
+    });
+
+    const tetrahedronMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x3f6b49,
+      roughness: 0.34,
+      metalness: 0.1,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.22,
+      sheen: 1,
+      sheenColor: new THREE.Color(0x2a7c79),
+      sheenRoughness: 0.25
+    });
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addBox(
+      width,
+      height,
+      depth,
+      material,
+      position,
+      castShadow = true,
+      receiveShadow = true
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, depth),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = receiveShadow;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(
+      radius,
+      height,
+      material,
+      position,
+      radialSegments = 64,
+      tubeRadius = 0.05
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, height, radialSegments),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.x = Math.PI / 2;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addSphere(
+      radius,
+      material,
+      position,
+      scale = [1, 1, 1],
+      castShadow = true,
+      receiveShadow = true
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(radius, 1),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = receiveShadow;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addCone(
+      radius,
+      height,
+      material,
+      position,
+      radialSegments = 16,
+      tubeRadius = 0.05
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, radialSegments),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.z = Math.PI / 2;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addTorus(
+      radius,
+      tube,
+      material,
+      position,
+      radialSegments = 32
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 10, radialSegments),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.x = Math.PI / 2;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addArrow(
+      start,
+      end,
+      radius,
+      material,
+      parent = scene
+    ) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, 8),
+        material
+      );
+
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Lighting and reflection
+    // -------------------------------------------------------------------------
+
+    const hemisphereLight = new THREE.HemisphereLight(0xc8e4ef, 0x17111d, 2.05);
+    scene.add(hemisphereLight);
+
+    var keyLight = new THREE.DirectionalLight(0xffedcf, 3.2);
+    keyLight.position.set(-5.5, 10, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 9;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.shadow.normalBias = 0.025;
+    scene.add(keyLight);
+
+    var fillLight = new THREE.DirectionalLight(0x91a7bd, 1.15);
+    fillLight.position.set(6, 4, -5);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.DirectionalLight(0xffd49c, 1.25);
+    rimLight.position.set(-5, 3, -6);
+    scene.add(rimLight);
+
+    var environmentTarget = pmrem.fromEquirectangular(createEnvironmentTexture());
+    scene.environment = environmentTarget.texture;
+
+    // -------------------------------------------------------------------------
+    // Plinth and scattered dust
+    // -------------------------------------------------------------------------
+
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.1, 3.35, 0.72, 96, 1, true),
+      materials.surface
+    );
+
+    plinth.position.y = -0.36;
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    scene.add(plinth);
+
+    const dustMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 1
+    });
+
+    const dust = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.035, 8, 6),
+      dustMaterial,
+      300
+    );
+
+    const dustPosition = new Float32Array(300 * 3);
+    const dustColor = new Float32Array(300 * 3);
+
+    for (let i = 0; i < 300; i++) {
+      const radius = 0.18 + Math.random() * 0.22;
+      const theta = Math.random() * Math.PI * 2;
+
+      dustPosition[i * 3] = radius * Math.cos(theta);
+      dustPosition[i * 3 + 1] = Math.random() * 0.65 - 0.325;
+      dustPosition[i * 3 + 2] = radius * Math.sin(theta);
+
+      dustColor[i * 3] = 0.18 + Math.random() * 0.08;
+      dustColor[i * 3 + 1] = 0.12 + Math.random() * 0.1;
+      dustColor[i * 3 + 2] = 0.18 + Math.random() * 0.08;
+
+      const m = new THREE.Matrix4().setPosition(dustPosition[i * 3], dustPosition[i * 3 + 1], dustPosition[i * 3 + 2]);
+      dust.setMatrixAt(i, m);
+      dust.setColorAt(i, new THREE.Color(dustColor[i * 3], dustColor[i * 3 + 1], dustColor[i * 3 + 2]));
+    }
+
+    dust.instanceMatrix.needsUpdate = true;
+    if (dust.instanceColor) {
+      dust.instanceColor.needsUpdate = true;
+    }
+    scene.add(dust);
+
+    // -------------------------------------------------------------------------
+    // Matte crimson cube
+    // -------------------------------------------------------------------------
+
+    const cube = new THREE.Group();
+    cube.position.set(0, 1.35, -0.45);
+    scene.add(cube);
+
+    addBox(
+      2.9,
+      3.0,
+      2.9,
+      materials.surface,
+      [0, 1.5, 0]
+    );
+
+    addBox(
+      2.72,
+      2.48,
+      2.48,
+      materials.warm,
+      [0, 1.98, 0]
+    );
+
+    addBox(
+      2.86,
+      0.38,
+      2.86,
+      materials.cool,
+      [0, 3.18, 0]
+    );
+
+    // A subtle dark edge around the outer surface.
+    addBox(
+      2.82,
+      0.055,
+      0.055,
+      materials.dark,
+      [0, 1.385, 0.92],
+      false,
+      true
+    );
+
+    addBox(
+      2.82,
+      0.055,
+      0.055,
+      materials.dark,
+      [0, 3.18, 0.92],
+      false,
+      true
+    );
+
+    addBox(
+      0.055,
+      0.055,
+      2.82,
+      materials.dark,
+      [1.37, 1.98, 0],
+      false,
+      true
+    );
+
+    // -------------------------------------------------------------------------
+    // Glossy cobalt sphere
+    // -------------------------------------------------------------------------
+
+    const cobalt = new THREE.Group();
+    cobalt.position.set(0, 2.75, -1.95);
+    scene.add(cobalt);
+
+    addSphere(
+      1.48,
+      sphereMaterial,
+      [0, 0, 0],
+      [1, 1, 1],
+      false,
+      true
+    );
+
+    // A soft reflective halo lets the glossy surface catch subtle light.
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(1.42, 96, 48),
+      new THREE.MeshBasicMaterial({
+        map: bloomTexture,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false
+      })
+    );
+
+    halo.position.set(0, 0, 0);
+    scene.add(halo);
+
+    // -------------------------------------------------------------------------
+    // Emerald tetrahedron
+    // -------------------------------------------------------------------------
+
+    const tetrahedron = new THREE.Group();
+    tetrahedron.position.set(-0.45, 2.75, -0.72);
+    scene.add(tetrahedron);
+
+    const tetra = new THREE.Group();
+    tetra.position.z = 0;
+    tetra.rotation.y = Math.PI / 3;
+    tetra.scale.set(1, 1, 1);
+    tetra.castShadow = true;
+    tetra.receiveShadow = true;
+    scene.add(tetra);
+
+    addTorus(
+      0.34,
+      0.14,
+      materials.emerald,
+      [0, 0, 0],
+      24
+    );
+
+    addTorus(
+      0.29,
+      0.11,
+      materials.emerald,
+      [0, 0.23, -0.02],
+      24
+    );
+
+    addTorus(
+      0.29,
+      0.11,
+      materials.emerald,
+      [0, 0.23, 0.02],
+      24
+    );
+
+    // A three-dimensional golden point emphasizes the tetrahedron's geometry.
+    const goldenPoint = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 12, 8),
+      materials.warm
+    );
+
+    goldenPoint.position.set(0, 0.27, 0);
+    goldenPoint.scale.set(1, 1, 1);
+    goldenPoint.castShadow = true;
+    scene.add(goldenPoint);
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls: orbit and reset
+    // -------------------------------------------------------------------------
+
+    const cameraState = {
+      target: new THREE.Vector3(0, 2.45, 0.12),
+      yaw: 0.72,
+      pitch: 0.68,
+      radius: 8.5,
+      autoOrbit: true,
+      resetButton: false
+    };
+
+    let autoOrbit = cameraState.autoOrbit;
+    let pointerDown = false;
+    let dragMode = "orbit";
+    let dragX = 0;
+    let dragY = 0;
+
+    function updateCamera() {
+      const horizontal = Math.cos(cameraState.pitch) * cameraState.radius;
+
+      camera.position.set(
+        cameraState.target.x + horizontal * Math.sin(cameraState.yaw),
+        cameraState.target.y + Math.sin(cameraState.pitch) * cameraState.radius,
+        cameraState.target.z + horizontal * Math.cos(cameraState.yaw)
+      );
+
+      camera.lookAt(cameraState.target);
+    }
+
+    function resetCamera() {
+      cameraState.target.set(0, 2.45, 0.12);
+      cameraState.yaw = 0.72;
+      cameraState.pitch = 0.68;
+      cameraState.radius = 8.5;
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      pointerDown = true;
+      dragMode = event.button === 2 || event.shiftKey ? "orbit" : "reset";
+      dragX = event.clientX;
+      dragY = event.clientY;
+      renderer.domElement.classList.add("dragging");
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!pointerDown) return;
+
+      const dx = event.clientX - dragX;
+      const dy = event.clientY - dragY;
+
+      cameraState.yaw -= dx * 0.006;
+      cameraState.pitch = THREE.MathUtils.clamp(
+        cameraState.pitch + dy * 0.005,
+        0.16,
+        1.18
+      );
+
+      dragX = event.clientX;
+      dragY = event.clientY;
+    });
+
+    function endDrag(event) {
+      pointerDown = false;
+
+      if (renderer.domElement.classList.contains("dragging")) {
+        renderer.domElement.classList.remove("dragging");
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+
+        cameraState.radius = THREE.MathUtils.clamp(
+          cameraState.radius * Math.exp(event.deltaY * 0.001),
+          5.2,
+          13
+        );
+
+        dragMode =
+          event.button === 2 || event.shiftKey ? "orbit" : "reset";
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetCamera);
+
+    renderer.domElement.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
+    renderer.domElement.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key.toLowerCase() === "r") {
+          resetCamera();
+        }
+
+        if (event.key === "ArrowLeft") cameraState.yaw += 0.08;
+        if (event.key === "ArrowRight") cameraState.yaw -= 0.08;
+        if (event.key === "ArrowUp") {
+          cameraState.pitch = THREE.MathUtils.clamp(
+            cameraState.pitch - 0.06,
+            0.16,
+            1.18
+          );
+        }
+        if (event.key === "ArrowDown") {
+          cameraState.pitch = THREE.MathUtils.clamp(
+            cameraState.pitch + 0.06,
+            0.16,
+            1.18
+          );
+        }
+
+        if (event.key.toLowerCase() === "+" || event.code === "Home") {
+          cameraState.radius = Math.max(5.2, cameraState.radius - 0.4);
+        }
+        if (event.key.toLowerCase() === "-") {
+          cameraState.radius = Math.min(13, cameraState.radius + 0.4);
+        }
+      },
+      { passive: false }
+    );
+
+    // -------------------------------------------------------------------------
+    // UI controls
+    // -------------------------------------------------------------------------
+
+    const autoButton = document.getElementById("auto-orbit");
+    const resetButton = document.getElementById("reset-camera");
+    const orbitToggle = document.getElementById("orbit-toggle");
+
+    autoButton.addEventListener("click", () => {
+      cameraState.autoOrbit = !cameraState.autoOrbit;
+      autoButton.textContent = cameraState.autoOrbit
+        ? "Auto orbit"
+        : "Auto orbit off";
+    });
+
+    resetButton.addEventListener("click", resetCamera);
+
+    orbitToggle.addEventListener("click", () => {
+      cameraState.autoOrbit = !cameraState.autoOrbit;
+      orbitToggle.textContent = cameraState.autoOrbit
+        ? "Pause orbit"
+        : "Auto orbit";
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "KeyR") {
+        resetCamera();
+      }
+
+      if (event.code === "Space" && event.target === document.body) {
+        cameraState.autoOrbit = !cameraState.autoOrbit;
+        autoButton.textContent = cameraState.autoOrbit
+          ? "Auto orbit"
+          : "Auto orbit off";
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    updateCamera();
+
+    // -------------------------------------------------------------------------
+    // Render loop
+    // -------------------------------------------------------------------------
+
+    renderer.setAnimationLoop(() => {
+      autoButton.classList.toggle("active", !cameraState.autoOrbit);
+
+      if (autoButton.classList.contains("active")) {
+        cameraState.yaw += 0.08;
+        cameraState.pitch += 0.06;
+        cameraState.radius += 0.025;
+
+        const damping = 1 - Math.exp(-10 * 0.075);
+        cameraState.target.lerp(cameraState.target, damping);
+      }
+
+      updateCamera();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

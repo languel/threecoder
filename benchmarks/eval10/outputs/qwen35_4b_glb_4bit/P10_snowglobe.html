@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cozy Winter Cabin — GLB Asset</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #07131f;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: min(330px, calc(100vw - 40px));
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 16px;
+      color: #f5fbff;
+      background: rgba(7, 19, 31, 0.76);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(14px);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    p {
+      margin: 0 0 15px;
+      color: #b9cbd5;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px 16px;
+      border: 0;
+      border-radius: 10px;
+      color: #07131f;
+      background: linear-gradient(135deg, #f5fbff, #a9dded);
+      box-shadow: 0 6px 20px rgba(130, 211, 235, 0.22);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 150ms ease, filter 150ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .hint {
+      margin-top: 11px;
+      color: #8298a8;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    #status {
+      min-height: 17px;
+      margin-top: 9px;
+      color: #9ed8b0;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    @media (max-width: 560px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 14px 16px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Cozy Winter Cabin</h1>
+    <p>
+      A low-poly snow-covered lodge cabin with a glowing glass dome,
+      carved timber pedestal, pine grooves, and a tiny snowman.
+    </p>
+    <button id="exportButton">Export GLB</button>
+    <div id="status" aria-live="polite"></div>
+    <div class="hint">Drag to orbit · Scroll to zoom · Animated snowflakes included</div>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x07131f);
+    scene.fog = new THREE.FogExp2(0x07131f, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(8.2, 6.3, 9.2);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.65, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 5.5;
+    controls.maxDistance = 20;
+    controls.maxPolarAngle = Math.PI * 0.48;
+
+    scene.add(new THREE.HemisphereLight(0xbcecff, 0x27333c, 1.65));
+
+    const keyLight = new THREE.DirectionalLight(0xffe6bf, 2.25);
+    keyLight.position.set(5, 9, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -7;
+    keyLight.shadow.bias = -0.00035;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x77bfff, 1.4);
+    rimLight.position.set(-6, 5, -7);
+    scene.add(rimLight);
+
+    const warmLight = new THREE.PointLight(0xff9e45, 2.3, 7, 2);
+    warmLight.position.set(0, 2.65, 0);
+    scene.add(warmLight);
+
+    // Everything intended for export lives under this root.
+    const exportRoot = new THREE.Group();
+    exportRoot.name = "CozyWinterCabin";
+    scene.add(exportRoot);
+
+    const materials = {
+      darkWood: new THREE.MeshStandardMaterial({
+        color: 0x38251d,
+        roughness: 0.93,
+        flatShading: true
+      }),
+      wood: new THREE.MeshStandardMaterial({
+        color: 0x67432f,
+        roughness: 0.9,
+        flatShading: true
+      }),
+      lightWood: new THREE.MeshStandardMaterial({
+        color: 0x94623d,
+        roughness: 0.88,
+        flatShading: true
+      }),
+      snow: new THREE.MeshStandardMaterial({
+        color: 0xe9f5f7,
+        roughness: 0.96,
+        flatShading: true
+      }),
+      snowShade: new THREE.MeshStandardMaterial({
+        color: 0xc6dfe5,
+        roughness: 0.98,
+        flatShading: true
+      }),
+      glass: new THREE.MeshPhysicalMaterial({
+        color: 0xffc56d,
+        emissive: 0xff7a25,
+        emissiveIntensity: 1.25,
+        roughness: 0.22,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.58,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      }),
+      pine: new THREE.MeshStandardMaterial({
+        color: 0x195a4d,
+        roughness: 0.95,
+        flatShading: true
+      }),
+      pineLight: new THREE.MeshStandardMaterial({
+        color: 0x2e7661,
+        roughness: 0.95,
+        flatShading: true
+      }),
+      red: new THREE.MeshStandardMaterial({
+        color: 0xb83e35,
+        roughness: 0.72,
+        flatShading: true
+      }),
+      black: new THREE.MeshStandardMaterial({
+        color: 0x171a1c,
+        roughness: 0.72,
+        flatShading: true
+      }),
+      yellow: new THREE.MeshStandardMaterial({
+        color: 0xf2b83b,
+        roughness: 0.65,
+        flatShading: true
+      }),
+      orange: new THREE.MeshStandardMaterial({
+        color: 0xe9782c,
+        roughness: 0.68,
+        flatShading: true
+      }),
+      ice: new THREE.MeshPhysicalMaterial({
+        color: 0xbfe9f1,
+        emissive: 0x2e7786,
+        emissiveIntensity: 0.28,
+        roughness: 0.25,
+        transparent: true,
+        opacity: 0.82,
+        flatShading: true
+      })
+    };
+
+    function mesh(geometry, material, name, castShadow = true) {
+      const object = new THREE.Mesh(geometry, material);
+      object.name = name;
+      object.castShadow = castShadow;
+      object.receiveShadow = true;
+      return object;
+    }
+
+    function box(w, h, d, material, name) {
+      return mesh(new THREE.BoxGeometry(w, h, d), material, name);
+    }
+
+    function cylinder(radiusTop, radiusBottom, height, segments, material, name) {
+      return mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+        material,
+        name
+      );
+    }
+
+    function ico(radius, detail, material, name) {
+      return mesh(new THREE.IcosahedronGeometry(radius, detail), material, name);
+    }
+
+    // ------------------------------------------------------------
+    // Carved wooden pedestal
+    // ------------------------------------------------------------
+
+    const pedestal = new THREE.Group();
+    pedestal.name = "CarvedWoodenPedestal";
+    exportRoot.add(pedestal);
+
+    const plinth = cylinder(4.25, 4.55, 0.48, 14, materials.darkWood, "Plinth_Lower");
+    plinth.position.y = 0.24;
+    pedestal.add(plinth);
+
+    const upperRing = cylinder(3.85, 4.15, 0.38, 14, materials.wood, "Plinth_Upper");
+    upperRing.position.y = 0.69;
+    pedestal.add(upperRing);
+
+    const snowDeck = cylinder(4.05, 4.05, 0.16, 14, materials.snow, "Snow_On_Plinth");
+    snowDeck.position.y = 0.94;
+    pedestal.add(snowDeck);
+
+    // Radial carved plank seams.
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const seam = box(
+        0.13,
+        0.045,
+        3.6,
+        materials.snowShade,
+        `Snow_Plank_Seam_${i}`
+      );
+      seam.rotation.y = angle;
+      seam.position.set(
+        Math.sin(angle) * 0.65,
+        1.04,
+        Math.cos(angle) * 0.65
+      );
+      pedestal.add(seam);
+    }
+
+    // Raised carved ring around the center.
+    const runeRing = cylinder(
+      2.7,
+      2.7,
+      0.095,
+      16,
+      materials.lightWood,
+      "Carved_Rune_Ring"
+    );
+    runeRing.position.y = 1.08;
+    pedestal.add(runeRing);
+
+    const innerRing = cylinder(
+      2.42,
+      2.42,
+      0.075,
+      16,
+      materials.darkWood,
+      "Carved_Inner_Ring"
+    );
+    innerRing.position.y = 1.14;
+    pedestal.add(innerRing);
+
+    // Small faceted stones around the base.
+    const stoneGeometry = new THREE.DodecahedronGeometry(0.2, 0);
+    for (let i = 0; i < 13; i++) {
+      const angle = (i / 13) * Math.PI * 2 + 0.25;
+      const radius = 3.65 + (i % 3) * 0.18;
+      const stone = mesh(stoneGeometry, materials.snowShade, `Base_Stone_${i}`);
+      stone.position.set(
+        Math.cos(angle) * radius,
+        1.12,
+        Math.sin(angle) * radius
+      );
+      stone.rotation.set(i * 0.31, i * 0.67, i * 0.19);
+      stone.scale.set(1.2, 0.7, 1);
+      pedestal.add(stone);
+    }
+
+    // ------------------------------------------------------------
+    // Central wooden cabin
+    // ------------------------------------------------------------
+
+    const cabin = new THREE.Group();
+    cabin.name = "Wooden_Cabin";
+    cabin.position.y = 1.16;
+    exportRoot.add(cabin);
+
+    const floor = box(3.35, 0.18, 2.55, materials.darkWood, "Cabin_Floor");
+    floor.position.y = 0.1;
+    cabin.add(floor);
+
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x754832,
+      roughness: 0.94,
+      flatShading: true
+    });
+
+    const leftWall = box(0.16, 1.85, 2.35, wallMaterial, "Cabin_Left_Wall");
+    leftWall.position.set(-1.5, 1.03, 0);
+    cabin.add(leftWall);
+
+    const rightWall = box(0.16, 1.85, 2.35, wallMaterial, "Cabin_Right_Wall");
+    rightWall.position.set(1.5, 1.03, 0);
+    cabin.add(rightWall);
+
+    const backWall = box(3.0, 1.85, 0.16, wallMaterial, "Cabin_Back_Wall");
+    backWall.position.set(0, 1.03, -1.08);
+    cabin.add(backWall);
+
+    // Front wall with a central opening for the glowing windows.
+    const frontWall = box(3.0, 1.85, 0.16, wallMaterial, "Cabin_Front_Wall");
+    frontWall.position.set(0, 1.03, 1.08);
+    cabin.add(frontWall);
+
+    // Dark timber structural frame.
+    const postMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3d281e,
+      roughness: 0.95,
+      flatShading: true
+    });
+
+    const postPositions = [
+      [-1.45, 1.04, -1.03],
+      [1.45, 1.04, -1.03],
+      [-1.45, 1.04, 1.03],
+      [1.45, 1.04, 1.03]
+    ];
+
+    postPositions.forEach((p, i) => {
+      const post = box(0.2, 1.95, 0.2, postMaterial, `Cabin_Post_${i}`);
+      post.position.set(...p);
+      cabin.add(post);
+    });
+
+    const topBeam = box(3.35, 0.22, 0.22, postMaterial, "Cabin_Top_Beam");
+    topBeam.position.set(0, 1.95, 1.04);
+    cabin.add(topBeam);
+
+    const sideBeamLeft = box(0.22, 0.22, 2.35, postMaterial, "Cabin_Left_Header");
+    sideBeamLeft.position.set(-1.47, 1.95, 0);
+    cabin.add(sideBeamLeft);
+
+    const sideBeamRight = box(0.22, 0.22, 2.35, postMaterial, "Cabin_Right_Header");
+    rightWall.position.x = 1.5;
+    cabin.add(sideBeamRight);
+
+    // Warm, emissive windows.
+    const windowGlassMaterial = materials.glass.clone();
+    windowGlassMaterial.emissiveIntensity = 1.7;
+
+    const frontWindow = box(0.92, 0.78, 0.055, windowGlassMaterial, "Front_Glowing_Window");
+    frontWindow.position.set(-0.72, 1.17, 1.18);
+    cabin.add(frontWindow);
+
+    const frontWindowFrame = box(1.03, 0.9, 0.08, postMaterial, "Front_Window_Frame");
+    frontWindowFrame.position.set(-0.72, 1.17, 1.14);
+    cabin.add(frontWindowFrame);
+    cabin.add(frontWindow);
+
+    const sideWindow = box(0.055, 0.78, 0.92, windowGlassMaterial, "Side_Glowing_Window");
+    sideWindow.position.set(1.6, 1.17, 0.15);
+    cabin.add(sideWindow);
+
+    const sideWindowFrame = box(0.08, 0.9, 1.03, postMaterial, "Side_Window_Frame");
+    sideWindowFrame.position.set(1.56, 1.17, 0.15);
+    cabin.add(sideWindowFrame);
+
+    // Gable infill above the front windows.
+    const gable = box(2.85, 0.55, 0.13, wallMaterial, "Cabin_Gable");
+    gable.position.set(0, 1.74, 1.15);
+    cabin.add(gable);
+
+    const gableTrim = box(3.0, 0.12, 0.18, postMaterial, "Gable_Trim");
+    gableTrim.position.set(0, 1.99, 1.16);
+    cabin.add(gableTrim);
+
+    // Snowy peaked roof.
+    const roof = mesh(
+      new THREE.ConeGeometry(2.15, 1.15, 4, 1, false),
+      materials.snow,
+      "Snow_Covered_Roof"
+    );
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(0, 2.73, 0);
+    cabin.add(roof);
+
+    const roofUnderside = mesh(
+      new THREE.ConeGeometry(2.18, 1.03, 4, 1, false),
+      materials.pine,
+      "Roof_Underside"
+    );
+    roofUnderside.rotation.y = Math.PI / 4;
+    roofUnderside.position.set(0, 2.69, 0);
+    cabin.add(roofUnderside);
+
+    // A small snow lip around the roof base.
+    const roofLip = cylinder(2.15, 2.15, 0.12, 4, materials.snowShade, "Roof_Snow_Lip");
+    roofLip.rotation.y = Math.PI / 4;
+    roofLip.position.set(0, 2.2, 0);
+    cabin.add(roofLip);
+
+    // ------------------------------------------------------------
+    // Glowing glass dome
+    // ------------------------------------------------------------
+
+    const dome = new THREE.Group();
+    dome.name = "Glass_Dome";
+    dome.position.set(0, 3.32, 0);
+    exportRoot.add(dome);
+
+    const domeMesh = mesh(
+      new THREE.SphereGeometry(1.55, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+      materials.glass,
+      "Faceted_Glass_Dome",
+      false
+    );
+    domeMesh.scale.y = 0.9;
+    dome.add(domeMesh);
+
+    // Wooden dome frame.
+    const domeRim = cylinder(1.58, 1.65, 0.16, 12, materials.darkWood, "Dome_Rim");
+    domeRim.position.y = -1.52;
+    domeRim.scale.z = 0.9;
+    dome.add(domeRim);
+
+    // Vertical frame members.
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const member = box(
+        0.1,
+        3.05,
+        0.1,
+        materials.darkWood,
+        `Dome_Frame_${i}`
+      );
+      member.position.set(
+        Math.cos(angle) * 1.55,
+        0.02,
+        Math.sin(angle) * 1.17
+      );
+      dome.add(member);
+    }
+
+    // Horizontal hoops.
+    const upperHoop = cylinder(
+      0.78,
+      1.15,
+      0.09,
+      12,
+      materials.darkWood,
+      "Dome_Upper_Hoop"
+    );
+    upperHoop.position.y = 0.75;
+    upperHoop.scale.z = 0.9;
+    dome.add(upperHoop);
+
+    const lowerHoop = cylinder(
+      1.32,
+      1.38,
+      0.09,
+      12,
+      materials.darkWood,
+      "Dome_Lower_Hoop"
+    );
+    lowerHoop.position.y = -0.55;
+    lowerHoop.scale.z = 0.9;
+    dome.add(lowerHoop);
+
+    // Snow cap on the dome's upper rim.
+    const domeSnow = mesh(
+      new THREE.SphereGeometry(1.6, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+      materials.snow,
+      "Dome_Snow_Cap",
+      false
+    );
+    domeSnow.scale.set(1.02, 0.58, 0.94);
+    domeSnow.position.y = -1.48;
+    dome.add(domeSnow);
+
+    // ------------------------------------------------------------
+    // Snow-covered pine trees
+    // ------------------------------------------------------------
+
+    function createPine(x, z, scale, rotation) {
+      const tree = new THREE.Group();
+      tree.name = `Pine_Tree_${x.toFixed(2)}_${z.toFixed(2)}`;
+      tree.position.set(x, 1.08, z);
+      tree.scale.setScalar(scale);
+      tree.rotation.y = rotation;
+      exportRoot.add(tree);
+
+      const tiers = [
+        { y: 0.52, r: 0.78, h: 1.35, mat: materials.pine },
+        { y: 1.15, r: 0.61, h: 1.18, mat: materials.pineLight },
+        { y: 1.76, r: 0.42, h: 1.0, mat: materials.pine }
+      ];
+
+      tiers.forEach((tier, i) => {
+        const foliage = cylinder(
+          tier.r * 0.82,
+          tier.r,
+          tier.h,
+          7,
+          tier.mat,
+          `Pine_Foliage_${i}`
+        );
+        foliage.position.y = tier.y;
+        foliage.rotation.y = i * 0.31;
+        tree.add(foliage);
+
+        const snowCap = cylinder(
+          tier.r * 0.57,
+          tier.r * 0.68,
+          tier.h * 0.28,
+          7,
+          materials.snow,
+          `Pine_Snow_${i}`
+        );
+        snowCap.position.y = tier.y + tier.h * 0.39;
+        snowCap.rotation.y = i * 0.31;
+        tree.add(snowCap);
+      });
+
+      const top = cylinder(
+        0.05,
+        0.12,
+        0.55,
+        6,
+        materials.snow,
+        "Pine_Tip"
+      );
+      top.position.y = 2.35;
+      tree.add(top);
+    }
+
+    createPine(-2.85, -1.45, 0.95, 0.3);
+    createPine(-3.55, -0.65, 0.67, 1.1);
+    createPine(2.9, -1.55, 0.83, 2.1);
+    createPine(3.65, -0.65, 0.59, 0.7);
+    createPine(-1.95, 2.95, 0.56, 1.8);
+    createPine(2.0, 3.05, 0.62, 2.7);
+
+    // ------------------------------------------------------------
+    // Tiny snowman
+    // ------------------------------------------------------------
+
+    const snowman = new THREE.Group();
+    snowman.name = "Tiny_Snowman";
+    snowman.position.set(1.15, 1.08, 2.2);
+    snowman.rotation.y = -0.25;
+    exportRoot.add(snowman);
+
+    const snowmanBody = cylinder(
+      0.31,
+      0.39,
+      0.68,
+      8,
+      materials.snow,
+      "Snowman_Body"
+    );
+    snowmanBody.position.y = 0.36;
+    snowman.add(snowmanBody);
+
+    const snowmanHead = ico(0.29, 1, materials.snow, "Snowman_Head");
+    snowmanHead.position.set(0, 0.88, 0);
+    snowman.add(snowmanHead);
+
+    const carrot = mesh(
+      new THREE.ConeGeometry(0.075, 0.32, 6),
+      materials.orange,
+      "Snowman_Carrot"
+    );
+    carrot.rotation.z = Math.PI / 2;
+    carrot.position.set(0, 0.86, 0.29);
+    snowman.add(carrot);
+
+    const blackButtonMaterial = materials.black;
+    [-0.1, 0.1].forEach((x, i) => {
+      const button = mesh(
+        new THREE.SphereGeometry(0.035, 6, 4),
+        blackButtonMaterial,
+        `Snowman_Button_${i}`
+      );
+      button.position.set(x, 0.93, 0.255);
+      snowman.add(button);
+    });
+
+    const scarf = mesh(
+      new THREE.TorusGeometry(0.27, 0.065, 5, 10),
+      materials.red,
+      "Snowman_Scarf"
+    );
+    scarf.rotation.x = Math.PI / 2;
+    scarf.position.y = 0.72;
+    snowman.add(scarf);
+
+    const scarfTail = box(0.13, 0.35, 0.065, materials.red, "Snowman_Scarf_Tail");
+    scarfTail.position.set(0.16, 0.56, 0.27);
+    scarfTail.rotation.z = -0.2;
+    snowman.add(scarfTail);
+
+    // ------------------------------------------------------------
+    // Drifting snowflakes
+    // ------------------------------------------------------------
+
+    const snowflakeGroups = [];
+    const snowflakeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xeefaff,
+      emissive: 0x73bdc9,
+      emissiveIntensity: 0.22,
+      roughness: 0.75,
+      flatShading: true
+    });
+
+    function createSnowflake(index) {
+      const group = new THREE.Group();
+      group.name = `Snowflake_${index}`;
+
+      const style = index % 3;
+      const length = 0.58 + (index % 4) * 0.11;
+      const thickness = 0.035 + (index % 3) * 0.008;
+
+      const horizontal = box(
+        length,
+        thickness,
+        thickness,
+        snowflakeMaterial,
+        `Snowflake_${index}_Horizontal`
+      );
+
+      const vertical = box(
+        thickness,
+        length,
+        thickness,
+        snowflakeMaterial,
+        `Snowflake_${index}_Vertical`
+      );
+
+      const center = mesh(
+        new THREE.OctahedronGeometry(thickness * 1.7, 0),
+        snowflakeMaterial,
+        `Snowflake_${index}_Center`
+      );
+
+      group.add(horizontal, vertical, center);
+      group.userData.baseY = 2.35 + (index % 5) * 0.34;
+      group.userData.phase = index * 0.71;
+      exportRoot.add(group);
+      snowflakeGroups.push(group);
+    }
+
+    snowflakeGroups.forEach((_, i) => createSnowflake(i));
+
+    // ------------------------------------------------------------
+    // Small decorative lights and warm details
+    // ------------------------------------------------------------
+
+    const lanternMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffc25d,
+      emissive: 0xff7b20,
+      emissiveIntensity: 1.6,
+      roughness: 0.35
+    });
+
+    const lantern = mesh(
+      new THREE.OctahedronGeometry(0.13, 0),
+      lanternMaterial,
+      "Warm_Lantern"
+    );
+    lantern.position.set(-0.75, 2.28, 1.4);
+    exportRoot.add(lantern);
+
+    const lanternCap = mesh(
+      new THREE.ConeGeometry(0.16, 0.15, 6),
+      materials.darkWood,
+      "Lantern_Cap"
+    );
+    lanternCap.position.set(-0.75, 2.43, 1.4);
+    exportRoot.add(lanternCap);
+
+    // Warm wall lights beneath the front gable.
+    [-0.8, 0.8].forEach((x, i) => {
+      const light = mesh(
+        new THREE.SphereGeometry(0.075, 6, 4),
+        lanternMaterial,
+        `Gable_Light_${i}`
+      );
+      light.position.set(x, 1.58, 1.22);
+      exportRoot.add(light);
+    });
+
+    // ------------------------------------------------------------
+    // Environment-only ground; this is not exported.
+    // ------------------------------------------------------------
+
+    const ground = mesh(
+      new THREE.CircleGeometry(30, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0x0b1c29,
+        roughness: 1,
+        flatShading: true
+      }),
+      "Environment_Ground",
+      false
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    scene.add(ground);
+
+    // ------------------------------------------------------------
+    // Animation
+    // ------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+      const positions = snowflakeGroups.map((snowflake) => snowflake.userData.baseY);
+
+      for (let i = 0; i < snowflakeGroups.length; i++) {
+        const snowflake = snowflakeGroups[i];
+        snowflake.position.y =
+          snowflake.userData.baseY +
+          Math.sin(elapsed * 0.38 + snowflake.userData.phase) * 0.12;
+        snowflake.rotation.x += 0.0007;
+        snowflake.rotation.y += 0.0012;
+      }
+
+      // Subtle warm pulse inside the cabin.
+      warmLight.intensity = 2.15 + Math.sin(elapsed * 2.2) * 0.18;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // ------------------------------------------------------------
+    // GLB export
+    // ------------------------------------------------------------
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      try {
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(exportRoot, {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        });
+
+        const blob = new Blob([result], {
+          type: "model/gltf-binary"
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "cozy-winter-cabin.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        status.textContent = `Exported ${(blob.size / 1024).toFixed(1)} KB`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Export failed. See the browser console.";
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

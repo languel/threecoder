@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometric Study — GLB Asset Creator</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --accent: #e76f51;
+      --panel: rgba(16, 19, 27, 0.84);
+      --border: rgba(255, 255, 255, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #090b11;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 2;
+      top: 22px;
+      left: 22px;
+      width: min(360px, calc(100vw - 44px));
+      padding: 20px;
+      color: #f2f4f8;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .description {
+      margin: 0 0 18px;
+      color: #a6abb8;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 15px;
+      color: #fff;
+      background: linear-gradient(135deg, #f07858, #bd4936);
+      box-shadow: 0 7px 20px rgba(205, 78, 51, 0.25);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 150ms ease, filter 150ms ease, opacity 150ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .secondary {
+      color: #d8dbe4;
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+    }
+
+    #status {
+      min-height: 18px;
+      margin-top: 12px;
+      color: #7f8796;
+      font-size: 12px;
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 2;
+      right: 20px;
+      bottom: 18px;
+      color: rgba(225, 229, 238, 0.55);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 21px;
+      }
+
+      .description {
+        margin-bottom: 13px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <div class="eyebrow">Low-poly asset studio</div>
+    <h1>Geometric Study</h1>
+    <p class="description">
+      A matte crimson cube, glossy cobalt sphere, and emerald tetrahedron,
+      arranged side by side on a dark slate plinth.
+    </p>
+
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <button id="resetButton" class="secondary" type="button">Reset View</button>
+    </div>
+
+    <div id="status" aria-live="polite">Ready to export.</div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+    import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+    const viewport = document.querySelector("#viewport");
+    const exportButton = document.querySelector("#exportButton");
+    const resetButton = document.querySelector("#resetButton");
+    const status = document.querySelector("#status");
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x090b11);
+    scene.fog = new THREE.FogExp2(0x090b11, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const defaultCameraPosition = new THREE.Vector3(6.7, 4.8, 7.7);
+    const defaultTarget = new THREE.Vector3(0, 1.05, 0);
+    camera.position.copy(defaultCameraPosition);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(defaultTarget);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 4.5;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // Lighting is kept outside the exported asset.
+    scene.add(new THREE.HemisphereLight(0xb8d7ff, 0x25151a, 1.45));
+
+    const keyLight = new THREE.DirectionalLight(0xffe7dd, 4.2);
+    keyLight.position.set(4.5, 8, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -6;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.0003;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x4f9dff, 3.1);
+    rimLight.position.set(-5, 4.5, -5);
+    scene.add(rimLight);
+
+    const warmFill = new THREE.PointLight(0xff6b4a, 16, 12, 2);
+    warmFill.position.set(-3.5, 2.6, 3.2);
+    scene.add(warmFill);
+
+    // Ground is preview-only and is not exported.
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(30, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x11151d,
+        roughness: 0.92,
+        metalness: 0.05
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.025;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const groundGrid = new THREE.GridHelper(24, 48, 0x303644, 0x171b24);
+    groundGrid.position.y = -0.012;
+    groundGrid.material.transparent = true;
+    groundGrid.material.opacity = 0.22;
+    scene.add(groundGrid);
+
+    // Everything below this group is exported.
+    const exportRoot = new THREE.Group();
+    exportRoot.name = "Geometric_Study";
+    scene.add(exportRoot);
+
+    const plinthMaterial = new THREE.MeshStandardMaterial({
+      color: 0x20252e,
+      roughness: 0.58,
+      metalness: 0.22,
+      flatShading: true
+    });
+
+    const plinthEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x343a46,
+      roughness: 0.42,
+      metalness: 0.35,
+      flatShading: true
+    });
+
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.72, 2.86, 0.28, 8, 1, false),
+      plinthMaterial
+    );
+    plinth.name = "Octagonal_Slate_Plinth";
+    plinth.position.y = 0.14;
+    plinth.rotation.y = Math.PI / 8;
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    exportRoot.add(plinth);
+
+    const plinthInset = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.47, 2.56, 0.12, 8, 1, false),
+      plinthEdgeMaterial
+    );
+    plinthInset.name = "Plinth_Inset";
+    plinthInset.position.y = 0.34;
+    plinthInset.rotation.y = Math.PI / 8;
+    plinthInset.castShadow = true;
+    plinthInset.receiveShadow = true;
+    exportRoot.add(plinthInset);
+
+    // Matte crimson cube with a subtly beveled silhouette.
+    const cubeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8e1820,
+      roughness: 0.72,
+      metalness: 0.05,
+      flatShading: true
+    });
+
+    const cubeEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb5242a,
+      roughness: 0.58,
+      metalness: 0.08,
+      flatShading: true
+    });
+
+    const cube = new THREE.Mesh(
+      new RoundedBoxGeometry(2.28, 2.28, 2.28, 2, 0.075),
+      cubeMaterial
+    );
+    cube.name = "Matte_Crimson_Cube";
+    cube.position.set(-1.72, 1.49, 0);
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+    exportRoot.add(cube);
+
+    // Small inset panel details break up the cube without sacrificing its silhouette.
+    const panelGeometry = new THREE.BoxGeometry(0.72, 0.012, 0.48);
+
+    for (const side of [-1, 1]) {
+      const panel = new THREE.Mesh(panelGeometry, cubeEdgeMaterial);
+      panel.name = side < 0 ? "Cube_Left_Panel" : "Cube_Right_Panel";
+      panel.position.set(side * 1.72, 1.49, 0);
+      panel.rotation.y = side * Math.PI / 2;
+      panel.castShadow = true;
+      exportRoot.add(panel);
+    }
+
+    // Glossy cobalt sphere.
+    const cobaltMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x1769aa,
+      roughness: 0.16,
+      metalness: 0.58,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.12,
+      sheen: 0.35,
+      sheenColor: 0x6fc7ff,
+      sheenRoughness: 0.12,
+      flatShading: false
+    });
+
+    const sphereGeometry = new THREE.IcosahedronGeometry(0.78, 3);
+    const sphere = new THREE.Mesh(sphereGeometry, cobaltMaterial);
+    sphere.name = "Glossy_Cobalt_Sphere";
+    sphere.position.set(0, 1.49, 0);
+    sphere.castShadow = true;
+    sphere.receiveShadow = true;
+    exportRoot.add(sphere);
+
+    // A restrained metallic rim around the cobalt sphere.
+    const sphereRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.78, 0.025, 6, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0xb8c9d9,
+        roughness: 0.24,
+        metalness: 0.86
+      })
+    );
+    sphereRim.name = "Sphere_Metal_Rim";
+    sphereRim.position.set(0, 1.49, 0);
+    sphereRim.rotation.x = Math.PI / 2;
+    sphereRim.castShadow = true;
+    exportRoot.add(sphereRim);
+
+    // Emerald tetrahedron.
+    const emeraldMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x148a55,
+      roughness: 0.24,
+      metalness: 0.35,
+      clearcoat: 0.65,
+      clearcoatRoughness: 0.18,
+      sheen: 0.45,
+      sheenColor: 0x75ffbc,
+      sheenRoughness: 0.2,
+      flatShading: true
+    });
+
+    const tetraVertices = new Float32Array([
+      // Bottom square, clockwise as seen from above.
+      -0.48, 0, -0.42,
+       0.48, 0, -0.42,
+       0.48, 0,  0.42,
+      -0.48, 0,  0.42,
+
+      // Top vertex.
+       0.00, 0.92, 0.00
+    ]);
+
+    const tetraIndices = [
+      0, 1, 2, 0, 2, 3,
+      3, 2, 4,
+      0, 4, 1,
+      1, 4, 2,
+      2, 4, 3,
+      3, 4, 0
+    ];
+
+    const tetrahedronGeometry = new THREE.BufferGeometry();
+    tetrahedronGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(tetraVertices, 3)
+    );
+    tetrahedronGeometry.setIndex(tetraIndices);
+    tetrahedronGeometry.computeVertexNormals();
+
+    const tetrahedron = new THREE.Mesh(tetrahedronGeometry, emeraldMaterial);
+    tetrahedron.name = "Emerald_Tetrahedron";
+    tetrahedron.position.set(1.72, 1.49, 0);
+    tetrahedron.rotation.set(0.12, -0.32, 0.08);
+    tetrahedron.castShadow = true;
+    tetrahedron.receiveShadow = true;
+    exportRoot.add(tetrahedron);
+
+    // Small emerald accent beneath the tetrahedron.
+    const emeraldBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.36, 0.12, 6),
+      new THREE.MeshStandardMaterial({
+        color: 0x0d6343,
+        roughness: 0.45,
+        metalness: 0.25,
+        flatShading: true
+      })
+    );
+    emeraldBase.name = "Emerald_Base";
+    emeraldBase.position.set(1.72, 0.49, 0);
+    emeraldBase.castShadow = true;
+    emeraldBase.receiveShadow = true;
+    exportRoot.add(emeraldBase);
+
+    // Arrange the asset comfortably within the plinth.
+    exportRoot.position.y = 0.4;
+
+    // Export the exportRoot only; lights, camera, ground, and grid are excluded.
+    const exporter = new GLTFExporter();
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      status.textContent = "Building GLB…";
+
+      try {
+        const result = await exporter.parseAsync(exportRoot, {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        });
+
+        const blob = new Blob([result], { type: "model/gltf-binary" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "geometric-study.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        status.textContent = "GLB exported successfully.";
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Export failed. See the browser console for details.";
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+
+    resetButton.addEventListener("click", () => {
+      camera.position.copy(defaultCameraPosition);
+      controls.target.copy(defaultTarget);
+      controls.update();
+    });
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener("resize", resize);
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

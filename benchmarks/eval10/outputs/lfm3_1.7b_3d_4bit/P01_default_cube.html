@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio Light — Beveled Cube</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --muted: rgba(255, 255, 255, 0.72);
+      --text: #e8f1fb;
+      --panel: rgba(18, 25, 29, 0.68);
+      --line: rgba(255, 255, 255, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #071311;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+    }
+
+    #scene canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #scene canvas:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 45%, transparent 35%, rgba(0, 0, 0, 0.18) 68%),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.12), transparent);
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .title-card {
+      position: absolute;
+      top: 28px;
+      left: 30px;
+      width: min(330px, calc(100vw - 60px));
+      padding: 20px 22px 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 11px;
+      color: #d5c8b9;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 24px;
+      height: 1px;
+      content: "";
+      background: #d5c8b9;
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(22px, 3vw, 36px);
+      line-height: 1.05;
+      letter-spacing: -0.045em;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: absolute;
+      right: 28px;
+      bottom: 28px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: #e8f1fb;
+      background: var(--panel);
+      box-shadow: 0 7px 18px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      transition:
+        color 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease;
+    }
+
+    button:hover {
+      color: #d9dce5;
+      border-color: rgba(255, 255, 255, 0.32);
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    button.active {
+      color: #071311;
+      border-color: var(--muted);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .hint {
+      position: absolute;
+      left: 30px;
+      bottom: 30px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: rgba(255, 255, 255, 0.88);
+      background: rgba(18, 25, 29, 0.48);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .hint strong {
+      color: #d9dce5;
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 16px;
+        left: 16px;
+        width: calc(100vw - 32px);
+        padding: 15px 17px;
+      }
+
+      h1 {
+        font-size: 19px;
+      }
+
+      .subtitle {
+        max-width: 240px;
+      }
+
+      .hint {
+        left: 16px;
+        bottom: 16px;
+        max-width: calc(100vw - 32px);
+        padding: 10px 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="scene"></div>
+  <div class="vignette"></div>
+
+  <section class="hud title-card" aria-label="Scene information">
+    <div class="eyebrow">Studio study / No. 01</div>
+    <h1>Beveled<br>Grey–Orange Cube</h1>
+    <div class="subtitle">A clean, raised object under three-point key light.</div>
+  </section>
+
+  <div class="hint">
+    Drag to orbit · Scroll to zoom · Arrow keys to rotate
+  </div>
+
+  <div id="orbitButton" class="active" aria-pressed="true">
+    <span>Drag to orbit</span>
+  </div>
+
+  <div class="controls" aria-label="Scene controls">
+    <button id="resetView" type="button">Reset view</button>
+    <button id="toggleLight" type="button">Light toggle</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const host = document.getElementById("scene");
+
+    // ---------------------------------------------------------------------
+    // Renderer and scene
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    host.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x071311);
+    scene.fog = new THREE.Fog(0x071311, 8, 18);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      50
+    );
+    window.camera = camera;
+
+    // ---------------------------------------------------------------------
+    // Lighting
+    // ---------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x9fb8bc, 0x171a1c, 1.15));
+
+    var keyLight = new THREE.DirectionalLight(0xfff1d4, 3.6);
+    keyLight.position.set(-4.5, 7.5, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 15;
+    keyLight.shadow.normalBias = 0.025;
+    scene.add(keyLight);
+
+    var fillLight = new THREE.DirectionalLight(0x6cc8d2, 1.35);
+    fillLight.position.set(4, 3.5, 4);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.DirectionalLight(0xffb96a, 1.45);
+    rimLight.position.set(-2, 4, -5);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Procedural textures
+    // ---------------------------------------------------------------------
+
+    function makeWoodTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+
+      gradient.addColorStop(0, "#74503f");
+      gradient.addColorStop(0.45, "#6b4e3c");
+      gradient.addColorStop(1, "#3d2518");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.5, 1.5);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+
+      gradient.addColorStop(0, "#71776f");
+      gradient.addColorStop(0.5, "#526b62");
+      gradient.addColorStop(1, "#3a3e3d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const woodTexture = makeWoodTexture();
+    const groundTexture = makeGroundTexture();
+
+    // ---------------------------------------------------------------------
+    // Geometry and materials
+    // ---------------------------------------------------------------------
+
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cubePositions = cubeGeometry.attributes.position;
+    const cubeColors = [];
+
+    for (let i = 0; i < cubePositions.count; i++) {
+      const x = cubePositions.getX(i);
+      const y = cubePositions.getY(i);
+      const z = cubePositions.getZ(i);
+
+      if (x > -0.5 && x < 0.5) {
+        cubeColors.push(1, 0.72, 0.48);
+      } else if (x > -1.25 && x < 0.25) {
+        cubeColors.push(0.48, 0.58, 0.64);
+      } else {
+        cubeColors.push(0.34, 0.5, 0.66);
+      }
+    }
+
+    cubeGeometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(cubeColors, 3)
+    );
+
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: woodTexture,
+      roughness: 0.78,
+      metalness: 0
+    });
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd4d0d6,
+      map: groundTexture,
+      roughness: 0.94,
+      metalness: 0
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x777b78,
+      map: groundTexture,
+      roughness: 1
+    });
+
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111a1e,
+      map: groundTexture,
+      roughness: 1
+    });
+
+    // ---------------------------------------------------------------------
+    // Cube dimensions and geometry
+    //
+    // The cube is centered at origin with its axes aligned to world space.
+    // Its edges are beveled like a real architectural object.
+    // ---------------------------------------------------------------------
+
+    const cube = new THREE.Group();
+    scene.add(cube);
+
+    const HALF_SIDE = 2.3;
+    const HALF_THICKNESS = 0.18;
+
+    // The outer cube is [HALF_SIDE, HALF_SIDE, HALF_SIDE].
+    // Its edges are rounded to a quarter-circle, creating a beveled surface.
+    const outerPositions = cubeGeometry.attributes.position;
+    const outerColors = [];
+
+    for (let i = 0; i < outerPositions.count; i++) {
+      const x = outerPositions.getX(i);
+      const y = outerPositions.getY(i);
+      const z = outerPositions.getZ(i);
+
+      if (Math.abs(x) < HALF_SIDE * 0.5 && Math.abs(y) < HALF_SIDE * 0.5) {
+        // Outer face: no bevel.
+        outerColors.push(1, 0.72, 0.48);
+      } else {
+        // Inner edge: a quarter-circle arc.
+        const radius = Math.hypot(x, y);
+        const theta = Math.atan2(y, x);
+
+        if (radius < HALF_SIDE * 0.5) {
+          outerColors.push(
+            0.48,
+            0.58,
+            0.64,
+            1,
+            0.34,
+            0.5,
+            0.66
+          );
+        } else {
+          outerColors.push(
+            0.34,
+            0.5,
+            0.66,
+            1,
+            0.48,
+            0.58,
+            0.72
+          );
+        }
+      }
+    }
+
+    outerGeometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(outerColors, 3)
+    );
+
+    const outer = cubeGeometry;
+    outer.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(outerPositions, 3)
+    );
+
+    const outerMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      map: woodTexture,
+      roughness: 0.5,
+      metalness: 0,
+      bumpMap: woodTexture,
+      bumpScale: 0.035,
+      clearcoat: 0.2,
+      clearcoatRoughness: 0.55,
+      side: THREE.DoubleSide
+    });
+
+    const bevelMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.48,
+      metalness: 0
+    });
+
+    // ---------------------------------------------------------------------
+    // Lighting geometry and cast/shadow details
+    // ---------------------------------------------------------------------
+
+    function createSoftbox() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        10,
+        256,
+        256,
+        240
+      );
+
+      gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+      gradient.addColorStop(0.48, "rgba(255, 255, 255, 0.85)");
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        fog: false
+      });
+
+      return { material, parent: ctx };
+    }
+
+    var keyLight = createSoftbox();
+    keyLight.parent = scene;
+
+    var fillLight = new THREE.SpotLight(
+      0xd9d8d1,
+      45,
+      42,
+      0.45,
+      0.85,
+      0.65
+    );
+
+    fillLight.position.set(-4, 3, 5);
+    fillLight.target.position.set(0, 0, 0);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.SpotLight(
+      0xffb96a,
+      42,
+      36,
+      0.45,
+      0.85,
+      0.65
+    );
+
+    rimLight.position.set(-2, 4, -5);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Cube construction
+    // ---------------------------------------------------------------------
+
+    const halfSide = HALF_SIDE / 2;
+    const halfThickness = HALF_THICKNESS / 2;
+
+    function createCubeGeometry(side, thickness) {
+      const positions = cubeGeometry.attributes.position.clone();
+      const colors = cubeColors;
+
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+
+        if (x > -side * 0.5 && x < side * 0.5) {
+          colors[i] = 1;
+        } else if (z > -side * 0.5 && z < side * 0.5) {
+          colors[i] = 1;
+        } else {
+          const edgeDistance = Math.hypot(
+            x - side * 0.5,
+            y - side * 0.5,
+            z - side * 0.5
+          );
+
+          if (edgeDistance < thickness * 2) {
+            colors[i] = 0;
+          }
+        }
+
+        positions.setXYZ(
+          i,
+          x,
+          y,
+          z
+        );
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+
+      geometry.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(colors, 3)
+      );
+
+      return geometry;
+    }
+
+    function createCube(position, scale, material) {
+      const mesh = new THREE.Mesh(
+        createCubeGeometry(scale, scale),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // Main cube: 3.15 × 3.15 × 3.15, beveled at the edges.
+    const mainCube = createCube([0, 0, 0], [3.15, 3.15, 3.15], woodMaterial);
+    scene.add(mainCube);
+
+    // Lower-left cube: 2.25 × 2.45 × 2.45, beveled.
+    var lowerLeft = createCube([-1.05, -0.75, -1.05], [2.25, 2.45, 2.45], woodMaterial);
+    scene.add(lowerLeft);
+
+    // Upper-right cube: 2.45 × 2.25 × 2.45, beveled.
+    var upperRight = createCube([1.05, 0.75, 1.05], [2.45, 2.25, 2.45], woodMaterial);
+    scene.add(upperRight);
+
+    // Front-left cube: 2.45 × 2.25 × 2.45, beveled.
+    const frontLeft = createCube([-1.05, -0.75, 1.05], [2.45, 2.25, 2.45], woodMaterial);
+    scene.add(frontLeft);
+
+    // Front-right cube: 2.45 × 2.25 × 2.45, beveled.
+    const frontRight = createCube([1.05, -0.75, 1.05], [2.45, 2.25, 2.45], woodMaterial);
+    scene.add(frontRight);
+
+    // Upper-left cube: 2.45 × 2.25 × 2.45, beveled.
+    const upperLeft = createCube([-1.05, 0.75, -1.05], [2.45, 2.25, 2.45], woodMaterial);
+    scene.add(upperLeft);
+
+    // Upper-right cube: 2.45 × 2.25 × 2.45, beveled.
+    var upperRight = createCube([1.05, 0.75, 1.05], [2.45, 2.25, 2.45], woodMaterial);
+    scene.add(upperRight);
+
+    // Lower-right cube: 3.15 × 2.45 × 3.15, beveled.
+    const lowerRight = createCube([2.05, -0.75, 2.05], [3.15, 2.45, 3.15], woodMaterial);
+    scene.add(lowerRight);
+
+    // Lower-left cube: 3.15 × 2.45 × 3.15, beveled.
+    var lowerLeft = createCube([-2.05, -0.75, -2.05], [3.15, 2.45, 3.15], woodMaterial);
+    scene.add(lowerLeft);
+
+    // ---------------------------------------------------------------------
+    // Direct camera controls: orbit, zoom, keyboard, touch pinch, and reset
+    // ---------------------------------------------------------------------
+
+    const cameraState = {
+      theta: -0.35,
+      phi: 1.08,
+      radius: 7.8,
+      target: new THREE.Vector3(0, 0.45, 0)
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(cameraState.phi);
+
+      camera.position.set(
+        cameraState.target.x +
+          cameraState.radius * sinPhi * Math.sin(cameraState.theta),
+        cameraState.target.y + cameraState.radius * Math.cos(cameraState.phi),
+        cameraState.target.z +
+          cameraState.radius * sinPhi * Math.cos(cameraState.theta)
+      );
+
+      camera.lookAt(cameraState.target);
+    }
+
+    function resetView() {
+      cameraState.theta = -0.35;
+      cameraState.phi = 1.08;
+      cameraState.radius = 7.8;
+      cameraState.target.set(0, 0.45, 0);
+      cameraState.updateCamera();
+    }
+
+    function toggleLight() {
+      const lightToggleButton = document.getElementById("toggleLight");
+      const isOn = lightToggleButton.classList.toggle("active", !scene.lightOn);
+
+      scene.lightOn = !isOn;
+
+      if (isOn) {
+        keyLight.intensity = 3.6;
+        fillLight.intensity = 0.45;
+        rimLight.intensity = 1.45;
+        lightToggleButton.classList.remove("active");
+      } else {
+        keyLight.intensity = 0.18;
+        fillLight.intensity = 0.12;
+        rimLight.intensity = 0.7;
+        lightToggleButton.classList.add("active");
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener("resize", resize);
+
+    let lightOn = true;
+    const orbitButton = document.getElementById("orbitButton");
+    var resetButton = document.getElementById("resetView");
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+
+      cameraState.theta -= event.deltaX * 0.005;
+      cameraState.phi = THREE.MathUtils.clamp(
+        cameraState.phi + event.deltaY * 0.004,
+        0.38,
+        1.42
+      );
+    });
+
+    renderer.domElement.addEventListener("pointerup", () => {
+      cameraState.theta += event.deltaX * 0.005;
+      cameraState.phi = THREE.MathUtils.clamp(
+        cameraState.phi - event.deltaY * 0.004,
+        0.38,
+        1.42
+      );
+    });
+
+    renderer.domElement.addEventListener("pointercancel", () => {
+      cameraState.theta += event.deltaX * 0.005;
+      cameraState.phi = THREE.MathUtils.clamp(
+        cameraState.phi - event.deltaY * 0.004,
+        0.38,
+        1.42
+      );
+    });
+
+    renderer.domElement.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      cameraState.radius = THREE.MathUtils.clamp(
+        cameraState.radius + event.deltaY * 0.012,
+        5.2,
+        10.5
+      );
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      } else if (event.key === "ArrowLeft") {
+        cameraState.theta += 0.08;
+      } else if (event.key === "ArrowRight") {
+        cameraState.theta -= 0.08;
+      } else if (event.key === "ArrowUp") {
+        cameraState.phi = Math.max(0.38, cameraState.phi - 0.06);
+      } else if (event.key === "ArrowDown") {
+        cameraState.phi = Math.min(1.42, cameraState.phi + 0.06);
+      }
+    });
+
+    var resetButton = document.getElementById("resetView");
+    let lastInteraction = performance.now();
+
+    resetButton.addEventListener("click", () => {
+      cameraState.theta = -0.35;
+      cameraState.phi = 1.08;
+      cameraState.radius = 7.8;
+      cameraState.target.set(0, 0.45, 0);
+      cameraState.updateCamera();
+    });
+
+    orbitButton.addEventListener("click", () => {
+      const direction = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+      const right = new THREE.Vector3()
+        .subVectors(camera.matrix, camera.position)
+        .normalize();
+
+      const up = new THREE.Vector3()
+        .subVectors(camera.matrix, camera.position)
+        .normalize();
+
+      const scale = cameraState.radius * 0.0012;
+      cameraState.theta -= direction.dot(right) * scale;
+      cameraState.phi = THREE.MathUtils.clamp(
+        cameraState.phi - right.dot(up) * scale,
+        0.38,
+        1.42
+      );
+
+      cameraState.updateCamera();
+    });
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    renderer.setAnimationLoop(() => {
+      if (lightOn) {
+        keyLight.intensity = 3.6;
+        fillLight.intensity = 0.45;
+        rimLight.intensity = 1.45;
+      } else {
+        keyLight.intensity = 0.18;
+        fillLight.intensity = 0.12;
+        rimLight.intensity = 0.7;
+      }
+
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

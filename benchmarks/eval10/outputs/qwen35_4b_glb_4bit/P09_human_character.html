@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Adventurer — GLB Creator</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(20, 25, 27, 0.86);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f2eee2;
+      --muted: #b9b2a5;
+      --accent: #d7a85b;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #172024;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      width: min(340px, calc(100vw - 36px));
+      padding: 17px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      user-select: none;
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      letter-spacing: 0.01em;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px 14px;
+      color: #231b0e;
+      background: linear-gradient(#e8bd73, #c89043);
+      border: 0;
+      border-radius: 9px;
+      font-weight: 750;
+      font-size: 13px;
+      cursor: pointer;
+      transition: filter 150ms ease, transform 150ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.3);
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .hint {
+      position: fixed;
+      right: 18px;
+      bottom: 16px;
+      padding: 7px 10px;
+      color: rgba(255,255,255,0.62);
+      background: rgba(15,20,22,0.52);
+      border-radius: 7px;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 560px) {
+      #ui {
+        top: 10px;
+        left: 10px;
+        width: calc(100vw - 20px);
+      }
+
+      .hint { display: none; }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section id="ui">
+    <h1>Low-Poly Adventurer</h1>
+    <p>
+      A stylized forest ranger in a subtle idle breathing pose, with layered clothing,
+      leather gear, and an animated two-breath cycle.
+    </p>
+    <button id="exportButton" type="button">Export GLB</button>
+    <div id="status">Animation and character are ready to export.</div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    const viewport = document.getElementById('viewport');
+    const exportButton = document.getElementById('exportButton');
+    const status = document.getElementById('status');
+
+    // ------------------------------------------------------------
+    // Renderer, camera, and presentation
+    // ------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x172024);
+    scene.fog = new THREE.Fog(0x172024, 8, 17);
+
+    const camera = new THREE.PerspectiveCamera(
+      36,
+      window.innerWidth / window.innerHeight,
+      0.05,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.1, 2.75, -5.3);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.15, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.065;
+    controls.minDistance = 2.7;
+    controls.maxDistance = 9;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemi = new THREE.HemisphereLight(0xc9e3ed, 0x30251b, 2.0);
+    scene.add(hemi);
+
+    const key = new THREE.DirectionalLight(0xffe1b0, 3.4);
+    key.position.set(-3.5, 6, -4.5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -4;
+    key.shadow.camera.right = 4;
+    key.shadow.camera.top = 5;
+    key.shadow.camera.bottom = -2;
+    key.shadow.bias = -0.0004;
+    scene.add(key);
+
+    const rim = new THREE.DirectionalLight(0x78b9c8, 2.0);
+    rim.position.set(4, 3.5, 4);
+    scene.add(rim);
+
+    const fill = new THREE.PointLight(0xd59b62, 12, 8, 2);
+    fill.position.set(-2.5, 1.5, -2.5);
+    scene.add(fill);
+
+    // Presentation ground is intentionally outside the exported root.
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(5.5, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x263236,
+        roughness: 0.96,
+        metalness: 0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const groundRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.05, 2.07, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0x6f8b89,
+        transparent: true,
+        opacity: 0.32,
+        side: THREE.DoubleSide
+      })
+    );
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = 0.004;
+    scene.add(groundRing);
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+
+    function material(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: options.roughness ?? 0.86,
+        metalness: options.metalness ?? 0,
+        flatShading: true,
+        ...options
+      });
+    }
+
+    const M = {
+      skin: material(0xc98f67, { roughness: 0.9 }),
+      skinLight: material(0xd9a278, { roughness: 0.9 }),
+      hair: material(0x38251d, { roughness: 0.95 }),
+      beard: material(0x513226, { roughness: 0.95 }),
+
+      tunic: material(0x315c4b, { roughness: 0.94 }),
+      tunicDark: material(0x244538, { roughness: 0.95 }),
+      tunicLight: material(0x47715b, { roughness: 0.92 }),
+      scarf: material(0xb45a3f, { roughness: 0.95 }),
+      scarfDark: material(0x843c30, { roughness: 0.95 }),
+
+      leather: material(0x65402a, { roughness: 0.9 }),
+      leatherDark: material(0x3e2b22, { roughness: 0.96 }),
+      leatherLight: material(0x875a37, { roughness: 0.9 }),
+      canvas: material(0x9d8457, { roughness: 0.95 }),
+      metal: material(0x777, {
+        roughness: 0.5,
+        metalness: 0.55
+      }),
+
+      eye: material(0x221c19, { roughness: 0.75 }),
+      mouth: material(0x754337, { roughness: 0.95 })
+    };
+
+    // ------------------------------------------------------------
+    // Character hierarchy
+    // ------------------------------------------------------------
+
+    const root = new THREE.Group();
+    root.name = 'AdventurerRoot';
+    scene.add(root);
+
+    const character = new THREE.Group();
+    character.name = 'Character';
+    root.add(character);
+
+    function group(name, parent = character) {
+      const g = new THREE.Group();
+      g.name = name;
+      parent.add(g);
+      return g;
+    }
+
+    const body = group('Body');
+    var head = group('Head', body);
+    var leftArm = group('LeftArm', body);
+    var rightArm = group('RightArm', body);
+    const leftLeg = group('LeftLeg', body);
+    const rightLeg = group('RightLeg', body);
+    var torso = group('Torso', body);
+    const skirt = group('Skirt', body);
+    const accessories = group('Accessories', body);
+
+    // ------------------------------------------------------------
+    // Geometry helpers
+    // ------------------------------------------------------------
+
+    function mesh(geometry, mat, parent, name, position = [0, 0, 0], rotation = [0, 0, 0]) {
+      const m = new THREE.Mesh(geometry, mat);
+      m.name = name;
+      m.position.set(...position);
+      m.rotation.set(...rotation);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      parent.add(m);
+      return m;
+    }
+
+    function box(name, size, position, mat, parent, rotation = [0, 0, 0]) {
+      return mesh(
+        new THREE.BoxGeometry(...size),
+        mat,
+        parent,
+        name,
+        position,
+        rotation
+      );
+    }
+
+    function cylinder(name, radiusTop, radiusBottom, height, segments, position, mat, parent, rotation = [0, 0, 0]) {
+      return mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments),
+        mat,
+        parent,
+        name,
+        position,
+        rotation
+      );
+    }
+
+    function ico(name, radius, detail, position, mat, parent, scale = [1, 1, 1]) {
+      const m = mesh(
+        new THREE.IcosahedronGeometry(radius, detail),
+        mat,
+        parent,
+        name,
+        position
+      );
+      m.scale.set(...scale);
+      return m;
+    }
+
+    function cone(name, radius, height, segments, position, mat, parent, rotation = [0, 0, 0]) {
+      return mesh(
+        new THREE.ConeGeometry(radius, height, segments),
+        mat,
+        parent,
+        name,
+        position,
+        rotation
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Tunic body and silhouette
+    // ------------------------------------------------------------
+
+    // Pelvis and torso.
+    const pelvis = ico('Pelvis', 0.39, 1, [0, 0.89, 0], M.tunicDark, body, [1.05, 0.65, 0.72]);
+
+    var torso = group('Torso', body);
+    torso.position.set(0, 1.25, 0);
+
+    const chest = cylinder(
+      'Chest',
+      0.39,
+      0.31,
+      0.68,
+      8,
+      [0, 0.04, 0],
+      M.tunic,
+      torso
+    );
+    chest.rotation.y = Math.PI / 8;
+
+    const upperChest = cylinder(
+      'UpperChest',
+      0.36,
+      0.29,
+      0.24,
+      8,
+      [0, 0.43, 0],
+      M.tunicLight,
+      torso
+    );
+    upperChest.rotation.y = Math.PI / 8;
+
+    // Angular leather jerkin panels.
+    const leftPanel = box(
+      'LeftJerkinPanel',
+      [0.17, 0.55, 0.055],
+      [-0.23, 0.04, -0.325],
+      M.leather,
+      torso,
+      [0, 0, -0.12]
+    );
+    const rightPanel = box(
+      'RightJerkinPanel',
+      [0.17, 0.55, 0.055],
+      [0.23, 0.04, -0.325],
+      M.leather,
+      torso,
+      [0, 0, 0.12]
+    );
+
+    // Neck and scarf.
+    cylinder('Neck', 0.13, 0.15, 0.19, 8, [0, 0.44, 0], M.skin, torso);
+
+    const scarfRing = mesh(
+      new THREE.TorusGeometry(0.205, 0.075, 5, 12),
+      M.scarf,
+      torso,
+      'ScarfCollar',
+      [0, 0.38, 0],
+      [Math.PI / 2, 0, 0]
+    );
+    scarfRing.scale.z = 0.8;
+
+    const scarfTail = box(
+      'ScarfTail',
+      [0.18, 0.48, 0.07],
+      [0.13, 0.18, -0.27],
+      M.scarf,
+      torso,
+      [0.05, 0.1, -0.16]
+    );
+    scarfTail.geometry = boxGeometry(0.18, 0.48, 0.075, 1);
+
+    function boxGeometry(w, h, d, segments = 1) {
+      return new THREE.BoxGeometry(w, h, d, segments, segments, segments);
+    }
+
+    // Belt.
+    const belt = mesh(
+      new THREE.TorusGeometry(0.365, 0.052, 5, 12),
+      M.leatherDark,
+      torso,
+      'Belt',
+      [0, -0.24, 0],
+      [Math.PI / 2, 0, 0]
+    );
+    belt.scale.z = 0.78;
+
+    const buckle = box(
+      'BeltBuckle',
+      [0.15, 0.13, 0.055],
+      [0, -0.235, -0.32],
+      M.metal,
+      torso
+    );
+
+    // Belt pouch.
+    const pouch = group('BeltPouch', accessories);
+    pouch.position.set(0.31, -0.31, -0.05);
+    pouch.rotation.z = -0.12;
+
+    box('PouchBody', [0.25, 0.27, 0.16], [0, 0, 0], M.leather, pouch);
+    box('PouchFlap', [0.27, 0.11, 0.18], [0, 0.09, 0.005], M.leatherLight, pouch);
+    box('PouchBuckle', [0.065, 0.065, 0.035], [0, 0.01, 0.1], M.metal, pouch);
+
+    // ------------------------------------------------------------
+    // Legs and boots
+    // ------------------------------------------------------------
+
+    function buildLeg(side, legGroup) {
+      const name = side < 0 ? 'Left' : 'Right';
+
+      cylinder(
+        `${name}Trouser`,
+        0.15,
+        0.17,
+        0.53,
+        7,
+        [0, -0.02, 0],
+        M.tunicDark,
+        legGroup
+      );
+
+      const cuff = cylinder(
+        `${name}Cuff`,
+        0.18,
+        0.17,
+        0.12,
+        7,
+        [0, -0.29, 0],
+        M.leatherDark,
+        legGroup
+      );
+
+      const foot = ico(
+        `${name}Boot`,
+        0.23,
+        1,
+        [0, -0.46, -0.075],
+        M.leather,
+        legGroup,
+        [0.82, 0.5, 1.2]
+      );
+      foot.rotation.y = side * 0.06;
+
+      const toe = ico(
+        `${name}BootToe`,
+        0.18,
+        1,
+        [0, -0.48, -0.21],
+        M.leatherLight,
+        legGroup,
+        [0.75, 0.42, 0.9]
+      );
+      toe.rotation.y = side * 0.06;
+
+      box(
+        `${name}BootCuff`,
+        [0.31, 0.12, 0.31],
+        [0, -0.34, -0.055],
+        M.leatherLight,
+        legGroup
+      );
+    }
+
+    buildLeg(-1, leftLeg);
+    buildLeg(1, rightLeg);
+
+    // ------------------------------------------------------------
+    // Arms
+    // ------------------------------------------------------------
+
+    function buildArm(side, armGroup) {
+      const name = side < 0 ? 'Left' : 'Right';
+
+      const shoulder = ico(
+        `${name}Shoulder`,
+        0.19,
+        1,
+        [side * 0.37, 0.29, 0],
+        M.tunic,
+        armGroup,
+        [1.05, 0.88, 0.9]
+      );
+
+      cylinder(
+        `${name}Sleeve`,
+        0.145,
+        0.17,
+        0.39,
+        7,
+        [side * 0.43, -0.02, 0],
+        M.tunic,
+        armGroup,
+        [0, 0, side * -0.12]
+      );
+
+      const elbow = ico(
+        `${name}Elbow`,
+        0.135,
+        1,
+        [side * 0.48, -0.24, 0],
+        M.skin,
+        armGroup,
+        [0.9, 1.0, 0.9]
+      );
+
+      cylinder(
+        `${name}Forearm`,
+        0.105,
+        0.125,
+        0.28,
+        7,
+        [side * 0.50, -0.40, 0],
+        M.skin,
+        armGroup,
+        [0, 0, side * -0.10]
+      );
+
+      const hand = ico(
+        `${name}Hand`,
+        0.135,
+        1,
+        [side * 0.52, -0.59, -0.01],
+        M.skinLight,
+        armGroup,
+        [0.78, 1.05, 0.72]
+      );
+    }
+
+    var leftArm = group('LeftArm', body);
+    leftArm.position.set(-0.39, 0.31, 0);
+    leftArm.rotation.z = -0.08;
+    buildArm(-1, leftArm);
+
+    var rightArm = group('RightArm', body);
+    rightArm.position.set(0.39, 0.31, 0);
+    rightArm.rotation.z = 0.08;
+    buildArm(1, rightArm);
+
+    // ------------------------------------------------------------
+    // Head, hair, and face
+    // ------------------------------------------------------------
+
+    var head = group('Head', body);
+    head.position.set(0, 1.83, 0);
+
+    ico('Face', 0.32, 1, [0, 0, 0], M.skin, head, [0.9, 1.06, 0.9]);
+
+    const hairCap = ico(
+      'HairCap',
+      0.335,
+      1,
+      [0, 0.13, 0.015],
+      M.hair,
+      head,
+      [0.96, 0.72, 0.94]
+    );
+    hairCap.rotation.y = 0.08;
+
+    // Low-poly hair locks.
+    const hairLocks = [
+      [-0.22, 0.10, -0.18, 0.16, -0.25],
+      [-0.10, 0.17, -0.22, 0.13, -0.12],
+      [0.19, 0.11, -0.18, 0.15, 0.22],
+      [0.27, 0.04, -0.08, 0.11, 0.34]
+    ];
+    hairLocks.forEach((l, i) => {
+      const lock = cone(
+        `HairLock${i}`,
+        0.105,
+        0.29,
+        5,
+        [l[0], l[1], l[2]],
+        M.hair,
+        head,
+        [0.18, 0, l[3]]
+      );
+      lock.scale.x = 0.75;
+    });
+
+    // Eyes and nose.
+    ico('LeftEye', 0.042, 1, [-0.105, 0.055, -0.265], M.eye, head, [1, 0.75, 0.5]);
+    ico('RightEye', 0.042, 1, [0.105, 0.055, -0.265], M.eye, head, [1, 0.75, 0.5]);
+
+    const nose = ico(
+      'Nose',
+      0.075,
+      0,
+      [0, -0.035, -0.285],
+      M.skinLight,
+      head,
+      [0.72, 1.0, 1.1]
+    );
+
+    // Short beard.
+    const beard = ico(
+      'Beard',
+      0.205,
+      1,
+      [0, -0.16, -0.205],
+      M.beard,
+      head,
+      [0.9, 0.72, 0.62]
+    );
+    beard.rotation.y = 0.04;
+
+    const mouth = box(
+      'Mouth',
+      [0.115, 0.026, 0.025],
+      [0, -0.105, -0.265],
+      M.mouth,
+      head
+    );
+
+    // Woven scarf tail.
+    const scarfTail2 = box(
+      'ScarfTailEnd',
+      [0.16, 0.17, 0.055],
+      [0.17, 0.08, -0.34],
+      M.scarfDark,
+      torso,
+      [0.04, 0.12, -0.18]
+    );
+
+    // ------------------------------------------------------------
+    // Backpack, straps, bedroll, and small gear
+    // ------------------------------------------------------------
+
+    const backpack = group('Backpack', accessories);
+    backpack.position.set(0, 1.34, 0.37);
+
+    const packBody = ico(
+      'PackBody',
+      0.43,
+      1,
+      [0, 0, 0],
+      M.leather,
+      backpack,
+      [1.0, 1.05, 0.58]
+    );
+    packBody.rotation.y = 0.04;
+
+    const packFlap = box(
+      'PackFlap',
+      [0.73, 0.29, 0.11],
+      [0, 0.25, -0.28],
+      M.leatherLight,
+      backpack,
+      [0.04, 0, 0]
+    );
+
+    const packBuckle = box(
+      'PackBuckle',
+      [0.11, 0.10, 0.045],
+      [0, 0.16, -0.35],
+      M.metal,
+      backpack
+    );
+
+    // Front-facing straps over the shoulders.
+    const leftStrap = box(
+      'LeftShoulderStrap',
+      [0.115, 0.72, 0.055],
+      [-0.22, 0.13, -0.30],
+      M.leatherDark,
+      torso,
+      [0.02, 0, -0.10]
+    );
+    const rightStrap = box(
+      'RightShoulderStrap',
+      [0.115, 0.72, 0.055],
+      [0.22, 0.13, -0.30],
+      M.leatherDark,
+      torso,
+      [0.02, 0, 0.10]
+    );
+
+    // Small side pouch.
+    const sidePouch = group('SidePouch', accessories);
+    sidePouch.position.set(-0.39, -0.05, 0.06);
+    sidePouch.rotation.z = 0.18;
+
+    box('SidePouchBody', [0.18, 0.25, 0.19], [0, 0, 0], M.leather, sidePouch);
+    box('SidePouchFlap', [0.20, 0.10, 0.205], [0, 0.08, 0], M.leatherLight, sidePouch);
+
+    // Rolled bedroll atop the pack.
+    const bedroll = cylinder(
+      'Bedroll',
+      0.13,
+      0.13,
+      0.66,
+      9,
+      [0, 0.52, 0.04],
+      M.canvas,
+      backpack,
+      [0, 0, Math.PI / 2]
+    );
+
+    const bedrollEnd = cylinder(
+      'BedrollEnd',
+      0.14,
+      0.14,
+      0.055,
+      9,
+      [0.35, 0.52, 0.04],
+      M.scarfDark,
+      backpack,
+      [0, 0, Math.PI / 2]
+    );
+
+    // Small compass or belt ornament.
+    const compass = group('Compass', accessories);
+    compass.position.set(-0.27, -0.25, -0.32);
+    compass.rotation.z = 0.2;
+
+    cylinder('CompassBody', 0.085, 0.085, 0.055, 10, [0, 0, 0], M.metal, compass);
+    cylinder('CompassFace', 0.065, 0.065, 0.06, 10, [0, 0.006, 0], M.canvas, compass);
+    box('CompassNeedle', [0.015, 0.12, 0.018], [0, 0.02, 0.035], M.scarf, compass);
+
+    // ------------------------------------------------------------
+    // Subtle idle breathing pose
+    // ------------------------------------------------------------
+
+    character.position.y = 0.02;
+
+    const breath = new THREE.Group();
+    breath.name = 'IdleBreathing';
+    character.add(breath);
+
+    // Track the entire character's subtle vertical movement.
+    let basePosition = character.position.clone();
+    let baseScale = character.scale.clone();
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+      const wave = Math.sin(elapsed * 1.35);
+      const breathWave = Math.sin(elapsed * 2.1);
+
+      character.position.y = basePosition.y + wave * 0.018;
+      character.scale.setScalar(baseScale.x + breathWave * 0.008);
+
+      // A slight scarf movement adds a readable idle detail.
+      scarfTail.rotation.z = -0.16 + Math.sin(elapsed * 1.55) * 0.035;
+
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // ------------------------------------------------------------
+    // GLB export
+    // ------------------------------------------------------------
+
+    exportButton.addEventListener('click', async () => {
+      exportButton.disabled = true;
+      status.textContent = 'Building GLB…';
+
+      try {
+        // Export only the character hierarchy. Presentation ground, lights,
+        // camera, and controls are not included.
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(character, {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        });
+
+        const blob = new Blob([result], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'low_poly_adventurer.glb';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        const megabytes = (blob.size / 1024 / 1024).toFixed(2);
+        status.textContent = `Exported ${megabytes} MB GLB with breathing animation.`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = 'Export failed. See the browser console for details.';
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+
+    // ------------------------------------------------------------
+    // Resize handling
+    // ------------------------------------------------------------
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

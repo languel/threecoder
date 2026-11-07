@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carved Stone Lantern</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #070912;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      left: 22px;
+      top: 22px;
+      z-index: 10;
+      width: min(360px, calc(100vw - 44px));
+      padding: 18px 20px;
+      color: #eee9df;
+      background: linear-gradient(145deg, rgba(24, 25, 37, 0.9), rgba(10, 12, 22, 0.82));
+      border: 1px solid rgba(222, 193, 129, 0.25);
+      border-radius: 14px;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin-bottom: 6px;
+      color: #e9af57;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 27px;
+      font-weight: 500;
+      letter-spacing: 0.015em;
+    }
+
+    .description {
+      margin: 0 0 16px;
+      color: #aaa9a1;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 9px;
+      padding: 11px 16px;
+      color: #251407;
+      background: linear-gradient(#f3c46e, #d88a32);
+      box-shadow: 0 6px 18px rgba(210, 126, 37, 0.25);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 150ms ease, filter 150ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.5);
+      opacity: 0.65;
+    }
+
+    .hint {
+      margin-left: auto;
+      color: #77766f;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    #status {
+      position: fixed;
+      right: 22px;
+      bottom: 20px;
+      z-index: 10;
+      max-width: min(420px, calc(100vw - 44px));
+      padding: 10px 13px;
+      color: #c7c1b5;
+      background: rgba(8, 9, 17, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: right;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        left: 12px;
+        top: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .hint {
+        display: none;
+      }
+
+      #status {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <div class="eyebrow">Low-poly animated prop</div>
+    <h1>Carved Stone Lantern</h1>
+    <p class="description">
+      An ancient octagonal stone lantern with a glowing furnace core, rising
+      embers, and an enchanted firefly. Drag to orbit and scroll to zoom.
+    </p>
+
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <span class="hint">Animation included</span>
+    </div>
+  </section>
+
+  <div id="status">Preparing the lantern…</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x070912);
+    scene.fog = new THREE.FogExp2(0x070912, 0.055);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.7, 3.45, 6.4);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true,
+    });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.65, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 11;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // ---------------------------------------------------------------------
+    // Materials
+    // ---------------------------------------------------------------------
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x68645a,
+      roughness: 0.92,
+      metalness: 0.03,
+      flatShading: true,
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x36352f,
+      roughness: 0.96,
+      metalness: 0.02,
+      flatShading: true,
+    });
+
+    const lightStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8a8171,
+      roughness: 0.88,
+      metalness: 0.02,
+      flatShading: true,
+    });
+
+    const mortarMaterial = new THREE.MeshStandardMaterial({
+      color: 0x292824,
+      roughness: 1,
+      flatShading: true,
+    });
+
+    const runeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xbb7134,
+      emissive: 0xb54217,
+      emissiveIntensity: 1.45,
+      roughness: 0.48,
+      metalness: 0.18,
+      flatShading: true,
+    });
+
+    const coreMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff9d2f,
+      emissive: 0xff5a0a,
+      emissiveIntensity: 4.5,
+      roughness: 0.3,
+      flatShading: true,
+    });
+
+    const coreInnerMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffe27a,
+      emissive: 0xff9b22,
+      emissiveIntensity: 5.2,
+      roughness: 0.25,
+      flatShading: true,
+    });
+
+    const emberMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff6a1a,
+      emissive: 0xff3300,
+      emissiveIntensity: 4.8,
+      roughness: 0.5,
+      flatShading: true,
+    });
+
+    const wispMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffb13b,
+      emissive: 0xff6a00,
+      emissiveIntensity: 3.8,
+      roughness: 0.4,
+      flatShading: true,
+    });
+
+    // ---------------------------------------------------------------------
+    // Exportable model root
+    // ---------------------------------------------------------------------
+
+    const lantern = new THREE.Group();
+    lantern.name = "CarvedStoneLantern";
+    scene.add(lantern);
+
+    function mesh(geometry, material, name, position, rotation) {
+      const object = new THREE.Mesh(geometry, material);
+      object.name = name;
+      object.castShadow = true;
+      object.receiveShadow = true;
+
+      if (position) object.position.set(...position);
+      if (rotation) object.rotation.set(...rotation);
+
+      lantern.add(object);
+      return object;
+    }
+
+    // Dais and stepped base.
+    mesh(
+      new THREE.CylinderGeometry(1.42, 1.62, 0.24, 8),
+      darkStoneMaterial,
+      "Base_Lower",
+      [0, 0.12, 0]
+    );
+    mesh(
+      new THREE.CylinderGeometry(1.22, 1.38, 0.19, 8),
+      stoneMaterial,
+      "Base_Upper",
+      [0, 0.345, 0]
+    );
+    mesh(
+      new THREE.CylinderGeometry(1.03, 1.15, 0.16, 8),
+      lightStoneMaterial,
+      "Base_Cap",
+      [0, 0.52, 0]
+    );
+
+    // Central stone body.
+    mesh(
+      new THREE.CylinderGeometry(0.73, 0.91, 1.48, 8),
+      stoneMaterial,
+      "Lantern_Body",
+      [0, 1.38, 0]
+    );
+
+    // Carved horizontal bands.
+    mesh(
+      new THREE.CylinderGeometry(0.925, 0.925, 0.12, 8),
+      darkStoneMaterial,
+      "Body_Lower_Band",
+      [0, 0.77, 0]
+    );
+    mesh(
+      new THREE.CylinderGeometry(0.765, 0.765, 0.12, 8),
+      lightStoneMaterial,
+      "Body_Upper_Band",
+      [0, 1.99, 0]
+    );
+
+    // Vertical ribs follow the octagonal body.
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const radius = 0.815;
+      const rib = mesh(
+        new THREE.BoxGeometry(0.13, 1.34, 0.19),
+        i % 2 === 0 ? lightStoneMaterial : darkStoneMaterial,
+        `Body_Rib_${i + 1}`,
+        [Math.cos(angle) * radius, 1.38, Math.sin(angle) * radius]
+      );
+      rib.rotation.y = -angle;
+    }
+
+    // Decorative inset panels.
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const panel = mesh(
+        new THREE.BoxGeometry(0.38, 0.49, 0.075),
+        mortarMaterial,
+        `Inset_Panel_${i + 1}`,
+        [Math.cos(angle) * 0.87, 1.38, Math.sin(angle) * 0.87]
+      );
+      panel.rotation.y = -angle;
+
+      const rune = mesh(
+        new THREE.BoxGeometry(0.055, 0.27, 0.025),
+        runeMaterial,
+        `Panel_Rune_${i + 1}`,
+        [Math.cos(angle) * 0.915, 1.38, Math.sin(angle) * 0.915]
+      );
+      rune.rotation.y = -angle;
+    }
+
+    // Upper crown.
+    mesh(
+      new THREE.CylinderGeometry(0.83, 0.72, 0.23, 8),
+      lightStoneMaterial,
+      "Crown_Lower",
+      [0, 2.17, 0]
+    );
+    mesh(
+      new THREE.CylinderGeometry(0.68, 0.83, 0.19, 8),
+      darkStoneMaterial,
+      "Crown_Upper",
+      [0, 2.39, 0]
+    );
+    mesh(
+      new THREE.ConeGeometry(0.73, 0.72, 8),
+      stoneMaterial,
+      "Crown_Roof",
+      [0, 2.85, 0]
+    );
+    mesh(
+      new THREE.ConeGeometry(0.48, 0.43, 8),
+      lightStoneMaterial,
+      "Roof_Cap",
+      [0, 3.34, 0]
+    );
+    mesh(
+      new THREE.CylinderGeometry(0.16, 0.22, 0.18, 8),
+      darkStoneMaterial,
+      "Roof_Finial",
+      [0, 3.67, 0]
+    );
+
+    // Glowing furnace opening.
+    mesh(
+      new THREE.CylinderGeometry(0.57, 0.62, 0.16, 8),
+      runeMaterial,
+      "Furnace_Port",
+      [0, 0.66, 0]
+    );
+
+    // ---------------------------------------------------------------------
+    // Animated magical core
+    // ---------------------------------------------------------------------
+
+    const core = new THREE.Group();
+    core.name = "Glowing_Core";
+    lantern.add(core);
+
+    const coreShell = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.48, 1),
+      coreMaterial
+    );
+    coreShell.name = "Core_Shell";
+    coreShell.castShadow = true;
+    core.add(coreShell);
+
+    const coreInner = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.29, 1),
+      coreInnerMaterial
+    );
+    coreInner.name = "Core_Inner";
+    coreInner.castShadow = true;
+    core.add(coreInner);
+
+    const coreHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.69, 0.035, 5, 16),
+      wispMaterial
+    );
+    coreHalo.name = "Core_Halo";
+    coreHalo.rotation.x = Math.PI / 2;
+    core.add(coreHalo);
+
+    // Low-poly flame cluster.
+    const flameGroup = new THREE.Group();
+    flameGroup.name = "Magic_Flame";
+    lantern.add(flameGroup);
+
+    const flameCones = [];
+
+    function makeFlame(name, height, width, colorMaterial, position, rotation) {
+      const geometry = new THREE.ConeGeometry(width, height, 5);
+      const cone = new THREE.Mesh(geometry, colorMaterial);
+      cone.name = name;
+      cone.position.set(...position);
+      cone.rotation.set(...rotation);
+      cone.castShadow = true;
+      flameGroup.add(cone);
+      flameCones.push(cone);
+      return cone;
+    }
+
+    makeFlame(
+      "Flame_Main",
+      1.35,
+      0.34,
+      wispMaterial,
+      [0, 0.1, 0],
+      [0, 0, 0]
+    );
+    makeFlame(
+      "Flame_Left",
+      0.88,
+      0.23,
+      coreMaterial,
+      [-0.25, 0.04, 0.03],
+      [0.08, 0.25, -0.13]
+    );
+    makeFlame(
+      "Flame_Right",
+      0.8,
+      0.22,
+      coreMaterial,
+      [0.25, 0.03, -0.04],
+      [-0.08, -0.25, 0.12]
+    );
+    makeFlame(
+      "Flame_Back",
+      0.67,
+      0.18,
+      wispMaterial,
+      [0.03, 0.02, -0.24],
+      [0.15, 0, 0]
+    );
+
+    // ---------------------------------------------------------------------
+    // Rising embers
+    // ---------------------------------------------------------------------
+
+    const emberCount = 28;
+    const embers = [];
+
+    for (let i = 0; i < emberCount; i++) {
+      const angle = (i / emberCount) * Math.PI * 2;
+      const radius = 0.38 + (i % 4) * 0.11;
+      const height = 0.75 + ((i * 0.37) % 1.0);
+
+      const ember = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.032 + (i % 3) * 0.009, 0),
+        emberMaterial
+      );
+      ember.name = `Ember_${i + 1}`;
+      ember.position.set(
+        Math.cos(angle) * radius,
+        height,
+        Math.sin(angle) * radius
+      );
+      ember.castShadow = true;
+      lantern.add(ember);
+      embers.push({
+        object: ember,
+        angle,
+        radius,
+        speed: 0.65 + (i % 5) * 0.13,
+        phase: i * 0.73,
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // Animated firefly
+    // ---------------------------------------------------------------------
+
+    const fireflyGroup = new THREE.Group();
+    fireflyGroup.name = "Enchanted_Firefly";
+    lantern.add(fireflyGroup);
+
+    const fireflyStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.028, 1.05, 5),
+      wispMaterial
+    );
+    fireflyStem.name = "Firefly_Stem";
+    fireflyStem.position.y = 1.45;
+    fireflyGroup.add(fireflyStem);
+
+    const fireflyBalloons = [];
+
+    function makeWisp(name, position, scale, material) {
+      const object = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.085, 1),
+        material
+      );
+      object.name = name;
+      object.position.set(...position);
+      object.scale.setScalar(scale);
+      object.castShadow = true;
+      fireflyGroup.add(object);
+      fireflyBalloons.push(object);
+      return object;
+    }
+
+    makeWisp("Wisp_0", [0, 2.35, 0], 1.0, wispMaterial);
+    makeWisp("Wisp_1", [0.38, 1.95, 0.08], 0.72, wispMaterial);
+    makeWisp("Wisp_2", [-0.35, 1.6, -0.08], 0.6, wispMaterial);
+    makeWisp("Wisp_3", [0.18, 2.68, -0.18], 0.53, wispMaterial);
+    makeWisp("Wisp_4", [-0.24, 2.82, 0.18], 0.45, wispMaterial);
+
+    // ---------------------------------------------------------------------
+    // Animation clips
+    // ---------------------------------------------------------------------
+
+    const animationTracks = [];
+    const flameObjects = flameCones;
+
+    // Flame flicker and sway.
+    for (let i = 0; i < flameObjects.length; i++) {
+      const object = flameObjects[i];
+      const times = [0, 0.16, 0.32, 0.48, 0.64, 0.8, 1.0];
+      const positions = [];
+      const scales = [];
+
+      for (let j = 0; j < times.length; j++) {
+        const t = times[j];
+        const wave = Math.sin(t * 8.5 + i * 1.7) * 0.07 + Math.sin(t * 13 + i) * 0.025;
+        positions.push(
+          object.position.x + wave,
+          object.position.y + wave * 0.65,
+          object.position.z + wave * 0.8
+        );
+
+        const pulse = 0.87 + Math.sin(t * 11 + i * 2.1) * 0.12;
+        scales.push(pulse, pulse * (1.08 + i * 0.035), pulse);
+      }
+
+      animationTracks.push(
+        new THREE.VectorKeyframeTrack(`${object.name}.position`, times, positions),
+        new THREE.VectorKeyframeTrack(`${object.name}.scale`, times, scales)
+      );
+    }
+
+    // Firefly bob and wing pulse.
+    for (let i = 0; i < fireflyBalloons.length; i++) {
+      const object = fireflyBalloons[i];
+      const times = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+      const positions = [];
+      const scales = [];
+
+      for (let j = 0; j < times.length; j++) {
+        const t = times[j];
+        const y =
+          object.position.y +
+          Math.sin(t * 1.65 + i * 0.8) * 0.12 +
+          Math.sin(t * 3.1 + i * 1.4) * 0.05;
+
+        positions.push(
+          object.position.x + Math.sin(t * 2.1 + i) * 0.07,
+          y,
+          object.position.z + Math.cos(t * 2.4 + i) * 0.07
+        );
+
+        const pulse = 0.78 + Math.sin(t * 6 + i * 1.2) * 0.18;
+        scales.push(pulse, pulse, pulse);
+      }
+
+      animationTracks.push(
+        new THREE.VectorKeyframeTrack(`${object.name}.position`, times, positions),
+        new THREE.VectorKeyframeTrack(`${object.name}.scale`, times, scales)
+      );
+    }
+
+    // Embers rise and reset in a slow loop.
+    for (let i = 0; i < embers.length; i++) {
+      const { object, angle, radius, speed, phase } = embers[i];
+      const times = [0, 1.25, 2.5, 3.75, 5.0];
+      const positions = [];
+
+      for (let j = 0; j < times.length; j++) {
+        const t = times[j];
+        const travel = (phase + t * speed) % 1;
+        const newAngle = angle + travel * 0.42;
+        const newRadius = radius + travel * 0.15;
+
+        positions.push(
+          Math.cos(newAngle) * newRadius,
+          0.72 + travel * 1.35,
+          Math.sin(newAngle) * newRadius
+        );
+      }
+
+      animationTracks.push(
+        new THREE.VectorKeyframeTrack(`${object.name}.position`, times, positions)
+      );
+    }
+
+    const emberAnimation = new THREE.AnimationClip(
+      "Rising_Embers",
+      5,
+      animationTracks.filter((track) => track.name.includes(".position"))
+    );
+
+    const coreAnimation = new THREE.AnimationClip(
+      "Core_Flicker",
+      1.2,
+      animationTracks.filter((track) => track.name.includes(".scale"))
+    );
+
+    const fireflyAnimation = new THREE.AnimationClip(
+      "Firefly_Dance",
+      3,
+      animationTracks.filter((track) => track.name.includes(".position"))
+    );
+
+    lantern.animations = [emberAnimation, coreAnimation, fireflyAnimation];
+
+    // ---------------------------------------------------------------------
+    // Presentation-only ground and lighting
+    // ---------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(12, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0x0d101a,
+        roughness: 0.92,
+        metalness: 0.08,
+      })
+    );
+    ground.name = "Presentation_Ground";
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const grid = new THREE.GridHelper(16, 24, 0x382b20, 0x171923);
+    grid.position.y = 0.002;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.22;
+    scene.add(grid);
+
+    const ambient = new THREE.HemisphereLight(0x8296c8, 0x24130c, 1.25);
+    scene.add(ambient);
+
+    const keyLight = new THREE.DirectionalLight(0xffd3a0, 3.1);
+    keyLight.position.set(4, 7, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x536dff, 2.2);
+    rimLight.position.set(-4, 4, -5);
+    scene.add(rimLight);
+
+    const warmLight = new THREE.PointLight(0xff6a1a, 7, 5, 2);
+    warmLight.position.set(0, 1.25, 0);
+    scene.add(warmLight);
+
+    // ---------------------------------------------------------------------
+    // GLB export
+    // ---------------------------------------------------------------------
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      status.textContent = "Building binary GLB…";
+
+      try {
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(lantern, {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false,
+        });
+
+        const blob = new Blob([result], {
+          type: "model/gltf-binary",
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "carved_stone_lantern.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        status.textContent = `GLB exported successfully · ${(blob.size / 1024).toFixed(1)} KB`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Export failed. See the browser console for details.";
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // Render loop
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+    const elapsed = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const time = elapsed.getElapsedTime();
+
+      controls.update();
+
+      // Drive the animated systems.
+      lantern.updateMatrixWorld(true);
+
+      for (let i = 0; i < embers.length; i++) {
+        const { object, angle, radius, speed, phase } = embers[i];
+        object.position.y += speed * delta;
+
+        if (object.position.y > 1.95) {
+          object.position.y = 0.72;
+          object.rotation.y = angle + phase;
+        }
+
+        object.rotation.y += delta * (0.45 + i * 0.017);
+        object.rotation.x += delta * (0.2 + i * 0.01);
+      }
+
+      for (let i = 0; i < flameCones.length; i++) {
+        const object = flameCones[i];
+        object.rotation.y += delta * (0.65 + i * 0.09);
+        object.rotation.x += delta * (0.22 + i * 0.015);
+      }
+
+      for (let i = 0; i < fireflyBalloons.length; i++) {
+        const object = fireflyBalloons[i];
+        object.rotation.y += delta * (0.7 + i * 0.06);
+        object.rotation.x += delta * (0.35 + i * 0.02);
+      }
+
+      warmLight.intensity = 6.4 + Math.sin(time * 8.0) * 0.65;
+      coreMaterial.emissiveIntensity = 4.1 + Math.sin(time * 13.0) * 0.55;
+      wispMaterial.emissiveIntensity = 3.5 + Math.sin(time * 9.0) * 0.35;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    status.textContent = "Drag to orbit · Scroll to zoom · GLB includes animation";
+  </script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brushed-Gold Sphere</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #07111d;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+      outline: none;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .title-card {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      z-index: 2;
+      max-width: min(360px, calc(100vw - 64px));
+      padding: 18px 20px 16px;
+      color: #d8e4e8;
+      background: linear-gradient(135deg, rgba(15, 23, 27, 0.88), rgba(8, 17, 24, 0.82));
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      margin-bottom: 8px;
+      color: #9ca9a7;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 2.2vw, 31px);
+      line-height: 1;
+      letter-spacing: -0.055em;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .controls {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 2;
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 9px 13px;
+      color: #dce3e8;
+      background: rgba(12, 19, 25, 0.56);
+      box-shadow: 0 7px 18px rgba(0, 0, 0, 0.24);
+      cursor: pointer;
+      font: inherit;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      backdrop-filter: blur(8px);
+    }
+
+    button:hover,
+    button:focus-visible {
+      background: rgba(18, 31, 38, 0.78);
+      border-color: #9ca9a7;
+      color: #e8eeee;
+      outline: none;
+    }
+
+    .hint {
+      position: fixed;
+      left: 50%;
+      bottom: 25px;
+      z-index: 2;
+      transform: translate(-50%, -100%);
+      white-space: nowrap;
+      color: rgba(255, 255, 255, 0.52);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .hint::before,
+    .hint::after {
+      content: "";
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #e8eeee;
+      box-shadow: 0 0 10px rgba(232, 237, 235, 0.3);
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 18px;
+        left: 18px;
+        max-width: calc(100vw - 36px);
+        padding: 14px 16px;
+      }
+
+      .subtitle,
+      .hint {
+        display: none;
+      }
+
+      .controls {
+        right: 12px;
+        bottom: 12px;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <section class="title-card" aria-label="Scene title">
+    <div class="eyebrow">Brushed study / No. 01</div>
+    <h1>Gold<br />Sphere</h1>
+    <div class="subtitle">A polished sphere resting on a dark stone slab.</div>
+  </section>
+
+  <div class="controls" aria-label="Scene controls">
+    <button id="reset" type="button" title="Reset camera" aria-label="Reset camera">↺</button>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Double-click to reset</div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // ---------------------------------------------------------------------
+    // Renderer, scene, and camera
+    // ---------------------------------------------------------------------
+
+    const stage = document.getElementById("stage");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene with a brushed gold sphere on stone"
+    );
+
+    stage.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x07111d);
+    scene.fog = new THREE.Fog(0x07111d, 13, 28);
+
+    const camera = new THREE.PerspectiveCamera(
+      34,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // ---------------------------------------------------------------------
+    // Procedural texture for the brushed gold surface
+    // ---------------------------------------------------------------------
+
+    function makeBrushedGoldTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#d9dce5";
+      ctx.fillRect(0, 0, 512, 512);
+
+      const brushCount = 120;
+      const brushRadius = 1.4;
+
+      for (let i = 0; i < brushCount; i++) {
+        const angle = (i / brushCount) * Math.PI * 2;
+        const radius = 3 + Math.random() * 7;
+        const alpha = 0.025 + Math.random() * 0.11;
+
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+
+        for (let y = 0; y <= 512; y += brushRadius) {
+          const x = radius * Math.cos(angle) + Math.sin(y * 0.003) * (brushRadius * 0.65);
+          ctx.lineTo(x, y);
+        }
+
+        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(0.56, 0.56);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    const goldTexture = makeBrushedGoldTexture();
+
+    // ---------------------------------------------------------------------
+    // Materials
+    // ---------------------------------------------------------------------
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: goldTexture,
+      roughness: 0.82,
+      metalness: 0.02,
+      side: THREE.DoubleSide
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111417,
+      map: goldTexture,
+      roughness: 1,
+      metalness: 0,
+      side: THREE.DoubleSide
+    });
+
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc9d7d3,
+      map: goldTexture,
+      roughness: 0.35,
+      metalness: 0.72
+    });
+
+    const bronzeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9b8d79,
+      roughness: 0.66,
+      metalness: 0.88
+    });
+
+    // ---------------------------------------------------------------------
+    // Geometry helpers
+    // ---------------------------------------------------------------------
+
+    function makeGlow() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, 512, 512);
+
+      const gradient = ctx.createRadialGradient(256, 256, 20, 256, 256, 250);
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    const stone = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 64, 32),
+      stoneMaterial
+    );
+
+    const darkStone = new THREE.Mesh(
+      new THREE.CircleGeometry(1.2, 64, 32),
+      darkStoneMaterial
+    );
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({
+        color: 0x111a1e,
+        map: goldTexture,
+        roughness: 1
+      })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.055;
+    ground.receiveShadow = true;
+
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 96, 48),
+      goldMaterial
+    );
+
+    sphere.position.set(-1.35, 0.08, 0);
+    sphere.scale.setScalar(1);
+    sphere.castShadow = true;
+    sphere.receiveShadow = true;
+
+    const sphereLight = new THREE.PointLight(
+      0xd8efff,
+      85,
+      17,
+      2
+    );
+
+    sphereLight.position.set(0.5, 0.35, 0);
+    sphereLight.target.position.set(0, 0, 0);
+    sphereLight.castShadow = true;
+    sphereLight.shadow.mapSize.set(1024, 1024);
+    sphereLight.shadow.camera.left = -3.2;
+    sphereLight.shadow.camera.right = 3.2;
+    sphereLight.shadow.camera.top = 3.5;
+    sphereLight.shadow.camera.bottom = -2.8;
+    sphereLight.shadow.camera.near = 0.5;
+    sphereLight.shadow.camera.far = 10;
+    sphereLight.shadow.bias = -0.00015;
+
+    const groundMark = new THREE.Mesh(
+      new THREE.CircleGeometry(3.4, 64, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0x1b2227,
+        map: goldTexture,
+        roughness: 1
+      })
+    );
+
+    groundMark.rotation.x = -Math.PI / 2;
+    groundMark.position.set(0, -0.055, 0);
+    groundMark.receiveShadow = true;
+
+    // ---------------------------------------------------------------------
+    // Pedestal base
+    // ---------------------------------------------------------------------
+
+    const pedestal = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.7, 2.75, 0.18, 64),
+      stoneMaterial
+    );
+
+    pedestal.position.set(0, -0.08, 0);
+    pedestal.castShadow = true;
+    pedestal.receiveShadow = true;
+
+    const pedestalInner = new THREE.Mesh(
+      new THREE.CircleGeometry(2.44, 64, 32),
+      darkStoneMaterial
+    );
+
+    pedestalInner.position.set(0, -0.12, 0);
+    pedestalInner.castShadow = true;
+    pedestalInner.receiveShadow = true;
+
+    const pedestalFoot = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.1, 2.1, 0.13, 64),
+      stoneMaterial
+    );
+
+    pedestalFoot.position.set(0, -0.12, -1.25);
+    pedestalFoot.castShadow = true;
+    pedestalFoot.receiveShadow = true;
+
+    const pedestalRim = new THREE.Mesh(
+      new THREE.TorusGeometry(2.48, 0.11, 14, 64),
+      goldMaterial
+    );
+
+    pedestalRim.position.set(0, -0.12, 1.25);
+    pedestalRim.castShadow = true;
+    pedestalRim.receiveShadow = true;
+
+    // ---------------------------------------------------------------------
+    // Floor and lighting
+    // ---------------------------------------------------------------------
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.MeshStandardMaterial({
+        color: 0x111a1e,
+        map: goldTexture,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.012;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const hemisphere = new THREE.HemisphereLight(
+      0x9cc9d8,
+      0x3b3038,
+      1.55
+    );
+
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xd8efff, 3.1);
+    keyLight.position.set(-4.5, 7.5, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -5.5;
+    keyLight.shadow.camera.right = 5.5;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 15;
+    keyLight.shadow.bias = -0.00035;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x8bc9d7, 1.2);
+    fillLight.position.set(5, 3, 4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffa966, 1.1);
+    rimLight.position.set(-4, 1, -4);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Ground contact shadow for the dark stone
+    // ---------------------------------------------------------------------
+
+    const stoneShadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.25, 3.25),
+      new THREE.MeshStandardMaterial({
+        color: 0x111a1e,
+        map: goldTexture,
+        roughness: 1
+      })
+    );
+
+    stoneShadow.rotation.x = -Math.PI / 2;
+    stoneShadow.position.set(0, -0.012, 2.5);
+    stoneShadow.receiveShadow = true;
+    scene.add(stoneShadow);
+
+    // ---------------------------------------------------------------------
+    // Sphere and pedestal interaction
+    // ---------------------------------------------------------------------
+
+    const sphereRadius = 1.15;
+    sphere.scale.set(1, 1, 1);
+    sphere.position.set(-0.9, 0.08, 0);
+
+    sphereLight.target.position.set(0, 0, 0);
+    sphereLight.castShadow = true;
+    sphereLight.shadow.mapSize.set(1024, 1024);
+    sphereLight.shadow.bias = -0.00015;
+
+    const pedestalRadius = 2.8;
+    sphereLight.position.set(-0.45, 0.28, 0);
+
+    // A small dark contact shadow near the top of the sphere.
+    const contactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.34, 64, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0x17171f,
+        roughness: 1
+      })
+    );
+
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.set(-0.55, 0.48, 0);
+    scene.add(contactShadow);
+
+    // ---------------------------------------------------------------------
+    // Direct camera controls; no addons are used
+    // ---------------------------------------------------------------------
+
+    const controls = {
+      theta: 0.67,
+      phi: 1.18,
+      radius: 6.8,
+      target: new THREE.Vector3(0, 0.45, 0)
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(controls.phi);
+
+      camera.position.set(
+        controls.target.x + controls.radius * sinPhi * Math.sin(controls.theta),
+        controls.target.y + controls.radius * Math.cos(controls.phi),
+        controls.target.z + controls.radius * sinPhi * Math.cos(controls.theta)
+      );
+
+      camera.lookAt(controls.target);
+    }
+
+    function resetCamera() {
+      controls.theta = 0.67;
+      controls.phi = 1.18;
+      controls.radius = 6.8;
+      controls.target.set(0, 0.45, 0);
+      updateCamera();
+    }
+
+    document.getElementById("reset").addEventListener("click", resetCamera);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetCamera();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ---------------------------------------------------------------------
+    // Render loop
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const deltaTime = Math.min(clock.getDelta(), 0.05);
+
+      if (controls.theta !== 0.67) {
+        controls.theta += deltaTime * 0.025;
+      }
+
+      if (controls.phi !== 1.18) {
+        controls.phi += deltaTime * 0.012;
+      }
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    updateCamera();
+    renderer.setAnimation(animate);
+  </script>
+</body>
+</html>

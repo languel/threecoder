@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evergreen — Three.js Studio</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f5fbff;
+      --muted: rgba(238, 220, 187, 0.58);
+      --paper: rgba(244, 246, 240, 0.9);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #b8bec4;
+      color: var(--ink);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 45%, transparent 45%, rgba(28, 30, 28, 0.18) 100%),
+        linear-gradient(to bottom, rgba(20, 23, 22, 0.09), transparent 35%, transparent 65%, rgba(20, 23, 22, 0.12));
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .title-card {
+      position: absolute;
+      top: 24px;
+      left: 26px;
+      max-width: min(320px, calc(100vw - 52px));
+      padding: 15px 17px 14px;
+      border: 1px solid rgba(245, 239, 225, 0.14);
+      border-radius: 10px;
+      background: var(--paper);
+      box-shadow: 0 12px 40px rgba(28, 30, 28, 0.16);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 7px;
+      color: #d7d5c8;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 24px;
+      height: 1px;
+      content: "";
+      background: rgba(245, 239, 225, 0.25);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 2.5vw, 28px);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      position: absolute;
+      top: 24px;
+      right: 26px;
+      display: flex;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(245, 239, 225, 0.14);
+      border-radius: 999px;
+      background: var(--paper);
+      box-shadow: 0 10px 32px rgba(28, 30, 28, 0.16);
+      backdrop-filter: blur(12px);
+    }
+
+    .controls span {
+      color: #d8d6c5;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    button {
+      border: 1px solid rgba(245, 239, 225, 0.18);
+      border-radius: 999px;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--ink);
+      font: inherit;
+      cursor: pointer;
+      transition:
+        transform 150ms ease,
+        border-color 150ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(245, 239, 225, 0.5);
+    }
+
+    button:focus-visible {
+      outline: 2px solid #d7d6c5;
+      outline-offset: 3px;
+    }
+
+    .legend {
+      position: absolute;
+      left: 50%;
+      bottom: 27px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 9px 12px;
+      border: 1px solid rgba(245, 239, 225, 0.13);
+      border-radius: 999px;
+      background: var(--paper);
+      box-shadow: 0 8px 25px rgba(28, 30, 28, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .legend div {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #b8bec4;
+    }
+
+    .swatch {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+    }
+
+    .swatch.roots {
+      background: #8b493d;
+    }
+
+    .swatch.cones {
+      background: #d5c9a1;
+    }
+
+    .hint {
+      position: absolute;
+      right: 26px;
+      bottom: 27px;
+      color: rgba(245, 239, 225, 0.62);
+      font-size: 10px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .hint::before,
+    .hint::after {
+      content: "";
+      display: block;
+      width: 1px;
+      height: 1px;
+      background: rgba(245, 239, 225, 0.2);
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      color: #d7d6c5;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      transition: opacity 700ms ease;
+    }
+
+    .loading::after {
+      content: "";
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 34px;
+      height: 1px;
+      background: #d7d6c5;
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 14px;
+        left: 14px;
+        max-width: calc(100vw - 28px);
+        padding: 12px 14px;
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .controls {
+        top: 14px;
+        right: 14px;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+
+      button {
+        border-color: #d7d6c5;
+        color: rgba(255, 248, 240, 0.9);
+        background: rgba(255, 255, 255, 0.08);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="scene"></div>
+  <div class="vignette"></div>
+
+  <div class="hud">
+    <section class="title-card" aria-label="Scene title">
+      <div class="eyebrow">Botanical study · No. 01</div>
+      <h1>Evergreen</h1>
+      <p class="subtitle">
+        A stylized low-poly conifer with a tapered bark, exposed roots,
+        and snow-dusted cone clusters resting on mossy rocks.
+      </p>
+    </section>
+
+    <nav class="controls" aria-label="Scene controls">
+      <span>Drag to orbit · Scroll to zoom</span>
+      <button id="reset" type="button">Reset view</button>
+    </nav>
+
+    <div class="legend" aria-hidden="true">
+      <div><span class="swatch roots"></span> Roots</div>
+      <div><span class="swatch cones"></span> Cones</div>
+    </div>
+
+    <div class="hint">Drag to orbit · Scroll or pinch to zoom · Arrow keys rotate</div>
+  </div>
+
+  <div class="loading" id="loading">
+    <span>Growing the forest</span>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const container = document.querySelector("#scene");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.fog = new THREE.Fog(0xb8bec4, 10, 21);
+
+    const camera = new THREE.PerspectiveCamera(
+      37,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      50
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural moss texture
+    // -------------------------------------------------------------------------
+
+    function makeMossTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const random = () => {
+        return (Math.random() - 0.5) * 18;
+      };
+
+      ctx.fillStyle = "#87919a";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 15000; i++) {
+        const value = Math.floor(random() * 180);
+        ctx.fillStyle = `rgba(${value + 8},${value + 11},${value + 8},0.09)`;
+        ctx.fillRect(
+          random() * 512,
+          random() * 512,
+          1 + random() * 2,
+          1 + random() * 2
+        );
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(5, 5);
+      texture.needsUpdate = true;
+
+      return texture;
+    }
+
+    function makeRockTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      const random = () => (Math.random() - 0.5) * 16;
+
+      ctx.fillStyle = "#73777b";
+      ctx.fillRect(0, 0, 256, 256);
+
+      for (let i = 0; i < 50; i++) {
+        const x = random() * 256;
+        const y = random() * 256;
+        const w = 1 + random() * 3;
+
+        ctx.strokeStyle = `rgba(255,255,255,${0.025 + random() * 0.07})`;
+        ctx.lineWidth = w * 0.65;
+        ctx.beginPath();
+
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (random() - 0.5) * 1.2, y + w);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+
+      return texture;
+    }
+
+    const mossTexture = makeMossTexture();
+    const rockTexture = makeRockTexture();
+
+    const mossMaterial = new THREE.MeshStandardMaterial({
+      map: mossTexture,
+      color: 0xffffff,
+      roughness: 1
+    });
+
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      map: rockTexture,
+      color: 0xd8d4c2,
+      roughness: 1
+    });
+
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.88,
+      metalness: 0
+    });
+
+    var rootMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8b493d,
+      roughness: 0.9
+    });
+
+    const coneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd7c4a1,
+      emissive: 0x3c2926,
+      emissiveIntensity: 0.35,
+      roughness: 0.95
+    });
+
+    // -------------------------------------------------------------------------
+    // Procedural cloud and light
+    // -------------------------------------------------------------------------
+
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb9dce0,
+      roughness: 1
+    });
+
+    const cloud = new THREE.Group();
+    cloud.position.set(0, -12, -6.5);
+    cloud.scale.setScalar(2.2);
+    scene.add(cloud);
+
+    const cloudGeometry = new THREE.SphereGeometry(1, 24, 16);
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 7) * Math.PI * 2;
+      const radius = 2.4 + Math.random() * 3.5;
+
+      cloudGeometry.rotateX(angle);
+      cloudGeometry.position.set(
+        Math.cos(angle) * radius,
+        0.9,
+        Math.sin(angle) * radius
+      );
+
+      cloudGeometry.scale.z = 1.25 + Math.random() * 0.35;
+      cloudGeometry.computeVertexNormals();
+
+      const material = cloudMaterial.clone();
+      const puff = new THREE.Mesh(
+        cloudGeometry,
+        material
+      );
+
+      puff.position.y = 2.45 + Math.random() * 0.06;
+      puff.scale.z = 1.35 + Math.random() * 0.12;
+      cloud.add(puff);
+    }
+
+    var sun = new THREE.Group();
+    scene.add(sun);
+
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 5) * Math.PI * 2 + Math.random() * 0.3;
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xf4f1e9,
+        roughness: 1
+      });
+
+      var sun = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 12, 8),
+        material
+      );
+
+      sun.position.set(
+        Math.cos(angle) * 3.2 + Math.random() * 0.4,
+        5.8,
+        Math.sin(angle) * 3.2 + Math.random() * 0.4
+      );
+
+      sun.scale.set(1, 1.15 + Math.random() * 0.7, 1);
+      sun.castShadow = true;
+      sun.receiveShadow = true;
+
+      scene.add(sun);
+    }
+
+    // -------------------------------------------------------------------------
+    // Deterministic procedural environment
+    // -------------------------------------------------------------------------
+
+    function makeEnvironmentTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const random = () => (Math.random() - 0.5) * 18;
+
+      for (let i = 0; i < 18000; i++) {
+        const value = Math.floor(random() * 95);
+        ctx.fillStyle = `rgba(${value},${value},${value + 10},0.11)`;
+        ctx.fillRect(
+          random() * 512,
+          random() * 512,
+          1 + random() * 2,
+          1 + random() * 2
+        );
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+
+      return texture;
+    }
+
+    var environment = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 18),
+      new THREE.ShaderMaterial({
+        map: makeEnvironmentTexture(),
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        vertexShader: `
+          uniform vec3 viewDirection;
+          varying vec3 worldPosition;
+          varying float height;
+
+          void main() {
+            vec4 world = modelMatrix * vec4(position, 1.0);
+            world /= 4.0;
+            world = world.clone().applyMatrix4();
+
+            vec3 up = normalize(mat3(modelMatrix) * vec3(0, 1, 0));
+            float height = -world.y / up.y;
+
+            worldPosition = world.position;
+            height = height;
+
+            viewDirection = normalize(position - cameraPosition);
+            viewDirection.y += 0.5;
+            viewDirection.normalize();
+
+            worldPosition.y += 6.5 + height * 1.35;
+            worldPosition.y += viewDirection.y * 2.2;
+
+            float distance = length(mat3(viewDirection) * up);
+            worldPosition.x += (random() - 0.5) * distance * distance * 0.002;
+            worldPosition.z += (random() - 0.5) * distance * distance * 0.002;
+
+            worldPosition.z += viewDirection.z * 2.2;
+
+            float fade = smoothstep(0.15, 1.0, distance);
+            worldPosition.y *= (1.0 - fade * 0.8);
+
+            float heightFade = smoothstep(5.0, 10.0, height);
+            worldPosition.y *= heightFade * 0.78;
+
+            worldPosition.x += heightFade * 4.3;
+            worldPosition.z += heightFade * 3.5;
+
+            worldPosition * 0.5 + 5.0;
+          }
+        `,
+        vertexShader: `
+          uniform vec3 viewDirection;
+          varying float height;
+
+          void main() {
+            float distance = length(position) / length(viewDirection);
+            float horizon = smoothstep(8.0, 14.0, distance);
+
+            height = -(distance * 2.1 + horizon * 0.7) / 3.5;
+            position.y += height;
+
+            vec3 reflected = reflect(-viewDirection, position);
+
+            float glow = pow(1.0 - distance * distance, 3.0);
+            height -= glow * 0.18;
+
+            vec4 world = modelMatrix * vec4(position, 1.0);
+            world = world.clone().applyMatrix4();
+
+            world.y += 6.5 + height;
+            float distance2 = length(mat3(viewDirection) * up) / 0.5;
+            world.position.x += distance2 * distance2;
+
+            world.position.z += distance2 * distance;
+
+            float horizonFade = smoothstep(0.15, 1.0, distance);
+            world.position.y *= (1.0 + horizonFade * 0.08);
+
+            float heightFade = smoothstep(5.0, 10.0, height);
+            world.position.y *= heightFade * 0.8;
+
+            world.position.x += heightFade * 4.3;
+            world.position.z += heightFade * 3.5;
+
+            world.position * 0.5 + 5.0;
+          }
+        `
+      })
+    );
+
+    var environment = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 18),
+      new THREE.ShaderMaterial({
+        map: makeEnvironmentTexture(),
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+    );
+
+    environment.position.set(0, 1.2, 0);
+    scene.add(environment);
+
+    // -------------------------------------------------------------------------
+    // Mossy rock patch
+    // -------------------------------------------------------------------------
+
+    const rockPositions = [
+      [-5.4, 3.8], [-4.8, 4.0], [-4.0, 4.25],
+      [4.0, 4.25], [3.8, 4.0], [3.4, 3.85],
+      [-3.2, 3.75], [-1.5, 3.55], [2.1, 3.45]
+    ];
+
+    const rockGeometry = new THREE.CylinderGeometry(1, 1.35, 0.24, 18);
+    for (const [x, z] of rockPositions) {
+      rockGeometry.position.set(x, 0, z);
+      rockGeometry.scale.set(1, 1, 1);
+    }
+
+    const rocks = new THREE.InstancedMesh(
+      rockGeometry,
+      rockMaterial,
+      rockPositions.length
+    );
+
+    const dummy = new THREE.Object3D();
+    const up = new THREE.Vector3(0, 1, 0);
+    const random = () => {
+      return (Math.random() - 0.5) * 0.035;
+    };
+
+    for (const [x, z] of rockPositions) {
+      dummy.position.set(x, 0, z);
+      dummy.rotation.set(
+        random() * Math.PI,
+        random() * Math.PI,
+        random() * Math.PI
+      );
+      dummy.scale.set(
+        1.2 + random() * 0.35,
+        1.2 + random() * 0.35,
+        1.2 + random() * 0.35
+      );
+      dummy.updateMatrix();
+
+      rocks.setMatrixAt(rockIndex, dummy.matrix);
+    }
+
+    rocks.instanceMatrix.needsUpdate = true;
+    rocks.castShadow = true;
+    rocks.receiveShadow = true;
+
+    scene.add(rocks);
+
+    // -------------------------------------------------------------------------
+    // Low-poly evergreen tree
+    // -------------------------------------------------------------------------
+
+    const TRUNK_LENGTH = 4.3;
+    const TRUNK_RADIUS = 0.34;
+    const ROOT_LENGTH = 4.7;
+    const ROOT_RADIUS = 0.13;
+    const COFFLE_LENGTH = 2.25;
+
+    function createBarkSegments(base, top, segments, width, depth) {
+      const positions = [];
+      const indices = [];
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const y = THREE.MathUtils.lerp(base, top, t);
+        const radius = THREE.MathUtils.lerp(0.045, width * t, i / segments);
+
+        positions.push(
+          -radius,
+          y,
+          -radius,
+          radius,
+          y,
+          radius,
+          -radius,
+          y,
+          radius
+        );
+
+        if (i < segments) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 3);
+          indices.push(a + 1, a + 3, a + 2);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+
+      return geometry;
+    }
+
+    function createCollar(points, width, segments) {
+      const positions = [];
+      const indices = [];
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const x = THREE.MathUtils.lerp(0, -width * t);
+        const y = THREE.MathUtils.lerp(-4.2, 0, t);
+
+        positions.push(x, y, -width * t * 0.78);
+        if (i < segments) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 3);
+          indices.push(a + 1, a + 3, a + 2);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+
+      return geometry;
+    }
+
+    function createRope(points) {
+      const curve = new THREE.CatmullRomCurve3(points);
+      const geometry = new THREE.TubeGeometry(curve, 40, 0.035, 8, false);
+      return geometry;
+    }
+
+    // A stylized conifer: a tapered pointed lower cone, an open three-point crown,
+    // and a broad four-cone cluster resting on moss.
+    const branchSegments = 48;
+    const rootSegments = 32;
+
+    function createTree() {
+      const trunk = new THREE.Group();
+      var crown = new THREE.Group();
+
+      trunk.position.set(0, -1.65, 0);
+      scene.add(trunk);
+
+      var points = [];
+
+      for (let i = 0; i <= branchSegments; i++) {
+        const t = i / branchSegments;
+        points.push(
+          [
+            Math.sin(t * Math.PI) * 0.085,
+            0.055 + t * 0.095,
+            Math.cos(t * Math.PI) * 0.085
+          ]
+        );
+      }
+
+      trunk.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.position.y > 2.2) object.position.set(-1.25, 2.2, 0);
+        if (object.position.y > 3.2) object.position.set(1.25, 3.2, 0);
+        if (object.position.y < -2.2) object.position.set(-1, 2.2, 0);
+      });
+
+      trunk.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+      });
+
+      trunk.add(createRope(points));
+
+      var crown = new THREE.Group();
+      crown.position.y = 3.15;
+      scene.add(crown);
+
+      const conePoints = [];
+
+      for (let i = 0; i <= rootSegments; i++) {
+        const t = i / rootSegments;
+        conePoints.push(
+          [
+            Math.sin(t * Math.PI) * 0.16,
+            3.15 + t * 0.18,
+            Math.cos(t * Math.PI) * 0.16
+          ]
+        );
+      }
+
+      crown.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+      });
+
+      crown.add(createRope(conePoints));
+
+      var points = [];
+
+      for (let i = 0; i <= branchSegments + 2; i++) {
+        const t = i / branchSegments;
+        points.push(
+          [
+            Math.sin(t * Math.PI) * 0.085,
+            0.055 + t * 0.095,
+            Math.cos(t * Math.PI) * 0.085
+          ]
+        );
+      }
+
+      crown.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+      });
+
+      crown.add(createRope(points));
+    }
+
+    createTree();
+
+    // Exposed roots reaching the base of each cone.
+    const rootPoints = [];
+
+    function addRoot(x, z, length, direction, angle) {
+      const end = new THREE.Vector3(
+        x + Math.sin(angle) * length,
+        0.13,
+        z + Math.cos(angle) * length
+      );
+
+      rootPoints.push(end);
+      rootPoints.push(end.clone().multiplyScalar(0.85));
+
+      rootPoints.forEach((point, index) => {
+        const previous = rootPoints[Math.max(index - 1, 0)];
+        const tangent = new THREE.Vector3(
+          point.x - previous.x,
+          0.12,
+          point.z - previous.z
+        ).normalize();
+
+        const normal = new THREE.Vector3()
+          .crossVectors(tangent, up)
+          .normalize();
+
+        rootSegments.forEach((segmentIndex, segment) => {
+          if (segment < 1) return;
+          const t = segment / rootSegments;
+          const length = Math.abs(
+            tangent.clone().applyMatrix4().multiply(up).getLength()
+          );
+
+          const point = new THREE.Vector3(
+            previous.x + tangent.x * t,
+            0.13 + normal.y * t,
+            previous.z + tangent.z * t
+          );
+
+          rootSegments.push(t);
+        });
+      });
+    }
+
+    for (const x of [-2.1, 2.1]) {
+      for (const z of [-0.34, 0.34]) {
+        addRoot(x, z, 4.8, 0.1, Math.PI / 2);
+      }
+    }
+    for (const y of [2.75, 3.55]) {
+      for (const x of [-1.35, 1.35]) {
+        addRoot(x, y, 4.9, 0.1, Math.PI / 2);
+      }
+    }
+    for (const z of [-2.8, 2.8]) {
+      for (const y of [3.85, 4.35]) {
+        addRoot(-0.7, y, 5.1, 0.1, -Math.PI / 2);
+      }
+    }
+    for (const x of [-2.95, 2.95]) {
+      for (const z of [-2.15, 2.15]) {
+        addRoot(x, z, 4.7, 0.1, Math.PI / 5);
+      }
+    }
+
+    const rootGeometry = createCollar(rootPoints, 0.14, 32);
+    rootGeometry.computeVertexNormals();
+
+    var rootMaterial = new THREE.MeshStandardMaterial({
+      map: mossTexture,
+      color: 0xffffff,
+      roughness: 1
+    });
+
+    scene.add(new THREE.InstancedMesh(rootGeometry, rootMaterial, rootPoints.length));
+    rootGeometry.dispose();
+    rootPoints.length = rootPoints.length;
+
+    // -------------------------------------------------------------------------
+    // Four stacked cones on the mossy rock patch
+    // -------------------------------------------------------------------------
+
+    var addCone = function(position, scale, rotation, scaleX, scaleY) {
+      const group = new THREE.Group();
+
+      var cone = new THREE.Group();
+      group.position.copy(position);
+      group.rotation.y = rotation;
+      group.scale.set(scaleX, scaleY, 1);
+
+      scene.add(group);
+
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.23, 0.18, 12),
+        rockMaterial
+      );
+
+      base.position.y = -0.09;
+      base.castShadow = true;
+      group.add(base);
+
+      const coneGeometry = createCollar(
+        [
+          [0, 0.14, 0.14],
+          [0, 0.34, 0.13],
+          [0, 0.48, -0.14],
+          [0, 0.48, -0.23]
+        ],
+        0.13,
+        16
+      );
+
+      coneGeometry.position.y = -0.08;
+      coneGeometry.scale.set(1, 1, 0.85);
+      coneGeometry.computeVertexNormals();
+
+      var cone = new THREE.Mesh(coneGeometry, rockMaterial);
+      cone.castShadow = true;
+      cone.receiveShadow = true;
+
+      group.add(cone);
+
+      scene.add(group);
+    }
+
+    const conePositions = [];
+
+    var addCone = function(x, z, scaleY) {
+      const coneGroup = new THREE.Group();
+      coneGroup.position.set(x, 0, z);
+      scene.add(coneGroup);
+
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.2, 0.18, 12),
+        rockMaterial
+      );
+
+      base.position.y = -0.09;
+      base.castShadow = true;
+      coneGroup.add(base);
+
+      const coneShape = createCollar(
+        [
+          [0, -0.13, 0.14],
+          [0, 0.12, 0.13],
+          [0, 0.16, -0.13],
+          [0, 0.16, -0.23]
+        ],
+        0.13,
+        18
+      );
+
+      coneShape.position.y = -0.08;
+      coneShape.scale.set(1, 1, 0.85);
+      coneShape.computeVertexNormals();
+
+      var cone = new THREE.Mesh(coneShape, rockMaterial);
+      cone.castShadow = true;
+      coneGroup.add(cone);
+
+      scene.add(coneGroup);
+    }
+
+    addCone(-0.72, 1.25, 5.2);
+    addCone(-0.43, -2.18, 4.3);
+    addCone(0.44, -1.62, 4.7);
+    addCone(0.83, 1.35, 5.1);
+
+    // -------------------------------------------------------------------------
+    // Mossy stones
+    // -------------------------------------------------------------------------
+
+    var stoneGeometry = new THREE.DodecahedronGeometry(0.34, 0);
+    for (const y of [-3.55, -2.92]) {
+      stoneGeometry.position.set(0, y, Math.random() * 0.34);
+      stoneGeometry.scale.set(1, 1, 1);
+    }
+
+    const rockStoneMaterial = new THREE.MeshStandardMaterial({
+      map: rockTexture,
+      color: 0xd8d4c2,
+      roughness: 1
+    });
+
+    const mossStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc7d5ca,
+      roughness: 1
+    });
+
+    const stonePositions = [
+      [-5.5, -3.6],
+      [-4.8, -4.2],
+      [-4.05, -3.85],
+      [4.05, -3.85],
+      [4.35, -3.55],
+      [3.8, -3.35],
+      [-3.5, -3.35]
+    ];
+
+    var stoneGeometry = stoneGeometry.clone();
+    for (let i = 0; i < stonePositions.length; i++) {
+      stoneGeometry.position.set(
+        stonePositions[i][0],
+        stonePositions[i][1] + Math.random() * 0.18,
+        stonePositions[i][2] + Math.random() * 0.18
+      );
+    }
+
+    const stones = new THREE.InstancedMesh(stoneGeometry, rockMaterial, stonePositions.length);
+    for (let i = 0; i < stonePositions.length; i++) {
+      const y = stonePositions[i][1] + Math.random() * 0.18;
+      stones.setMatrixAt(i, [
+        Math.cos(random() * Math.PI),
+        y,
+        Math.sin(random() * Math.PI)
+      ]);
+    }
+
+    stones.instanceMatrix.needsUpdate = true;
+    stones.castShadow = true;
+    stones.receiveShadow = true;
+
+    scene.add(stones);
+
+    const mossGeometry = new THREE.SphereGeometry(0.13, 18, 10);
+    for (let i = 0; i < 28; i++) {
+      mossGeometry.position.set(
+        Math.random() * 1.5,
+        -4.2 + Math.random() * 0.35,
+        Math.random() * 0.7
+      );
+      mossGeometry.scale.setScalar(1.2 + Math.random() * 0.35);
+      scene.add(new THREE.Mesh(mossGeometry, mossMaterial));
+    }
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x6f7372, 1.15);
+    hemisphere.position.set(-7, 14, 8);
+    scene.add(hemisphere);
+
+    var sun = new THREE.DirectionalLight(0xffefd9, 3.3);
+    sun.position.set(-5.5, 10, 5);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -7;
+    sun.shadow.camera.right = 7;
+    sun.shadow.camera.top = 9;
+    sun.shadow.camera.bottom = -4;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 20;
+    sun.shadow.bias = -0.025;
+    sun.shadow.normalBias = 0.025;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xb8dce1, 1.0);
+    fill.position.set(7, 5, -4);
+    scene.add(fill);
+
+    const rim = new THREE.PointLight(0xffc58a, 24, 18, 2);
+    rim.position.set(-3.5, 2.8, -2.2);
+    scene.add(rim);
+
+    // -------------------------------------------------------------------------
+    // Custom orbit controls implemented without external control addons
+    // -------------------------------------------------------------------------
+
+    const orbit = {
+      yaw: 0.72,
+      pitch: 1.28,
+      radius: 14.5,
+      target: new THREE.Vector3(0, 2.8, 0)
+    };
+
+    function updateCamera() {
+      const horizontal = Math.cos(orbit.pitch) * orbit.radius;
+
+      camera.position.set(
+        orbit.target.x + Math.sin(orbit.yaw) * horizontal,
+        orbit.target.y + Math.sin(orbit.pitch) * orbit.radius,
+        orbit.target.z + Math.cos(orbit.yaw) * horizontal
+      );
+
+      camera.lookAt(orbit.target);
+    }
+
+    function resetView() {
+      orbit.yaw = 0.72;
+      orbit.pitch = 1.28;
+      orbit.radius = 14.5;
+      updateCamera();
+    }
+
+    const canvas = renderer.domElement;
+    let dragging = false;
+    let dragX = 0;
+    let dragY = 0;
+
+    function pointerDown(event) {
+      dragging = true;
+      dragX = event.clientX;
+      dragY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    }
+
+    canvas.addEventListener("pointerDown", pointerDown);
+    canvas.addEventListener("pointerMove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - dragX;
+      const dy = event.clientY - dragY;
+
+      dragX = event.clientX;
+      dragY = event.clientY;
+
+      orbit.yaw -= dx * 0.005;
+      orbit.pitch = THREE.MathUtils.clamp(
+        orbit.pitch - dy * 0.004,
+        0.38,
+        1.48
+      );
+
+      updateCamera();
+    });
+
+    function pointerUp(event) {
+      dragging = false;
+      canvas.releasePointerCapture(event.pointerId);
+    }
+
+    canvas.addEventListener("pointerUp", pointerUp);
+    canvas.addEventListener("pointerCancel", pointerUp);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        orbit.radius = THREE.MathUtils.clamp(
+          orbit.radius * Math.exp(event.deltaY * 0.001),
+          7.5,
+          19
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    canvas.addEventListener("dblclick", resetView);
+    document.querySelector("#reset").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      }
+
+      if (event.key === "ArrowLeft") orbit.yaw += 0.08;
+      if (event.key === "ArrowRight") orbit.yaw -= 0.08;
+      if (event.key === "ArrowUp") {
+        orbit.pitch = Math.max(0.38, orbit.pitch - 0.06);
+      }
+      if (event.key === "ArrowDown") {
+        orbit.pitch = Math.min(1.48, orbit.pitch + 0.06);
+      }
+
+      updateCamera();
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and animation
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      const damping = 1 - Math.exp(-delta * 8);
+
+      orbit.yaw += (orbit.yaw - damping * orbit.yaw) / damping;
+      orbit.pitch += (orbit.pitch - damping * orbit.pitch) / damping;
+      orbit.radius += (orbit.radius - damping * orbit.radius) / damping;
+
+      updateCamera();
+
+      cloud.rotation.y = Math.sin(clock.elapsedTime * 0.22) * 0.018;
+      cloud.position.y += Math.sin(clock.elapsedTime * 0.18) * 0.035;
+
+      sun.position.x = Math.sin(clock.elapsedTime * 0.12) * 2.5;
+      sun.position.y = 5.8 + Math.cos(clock.elapsedTime * 0.1) * 0.35;
+      sun.castShadow = true;
+
+      const coneGroup = new THREE.Group();
+      coneGroup.position.set(-0.72, 0, -2.2);
+      scene.add(coneGroup);
+
+      coneGroup.scale.setScalar(0.62 + Math.sin(clock.elapsedTime * 1.8) * 0.018);
+
+      var cone = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.2, 0.18, 12),
+        rockMaterial
+      );
+
+      cone.position.y = -0.09;
+      cone.castShadow = true;
+      scene.add(cone);
+
+      coneGroup.updateMatrixWorld(true);
+    }
+
+    renderer.setAnimation(animate);
+    loading.classList.add("done");
+  </script>
+</body>
+</html>

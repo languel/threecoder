@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Barn Owl — GLB Asset Studio</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(20, 24, 25, 0.88);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f4eee2;
+      --muted: #b9b2a6;
+      --accent: #d99545;
+      --accent-hover: #efad61;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #171b1d;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 10;
+      top: 20px;
+      left: 20px;
+      width: min(340px, calc(100vw - 40px));
+      padding: 18px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin-bottom: 5px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+
+    .description {
+      margin: 9px 0 16px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    button {
+      min-height: 42px;
+      padding: 0 14px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.13);
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      grid-column: 1 / -1;
+      color: #24180d;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button.primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .options {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .options input {
+      accent-color: var(--accent);
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 5px 8px;
+      color: #ddd5c9;
+      background: rgba(255, 255, 255, 0.045);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 5;
+      right: 18px;
+      bottom: 16px;
+      padding: 8px 11px;
+      color: rgba(255, 255, 255, 0.6);
+      background: rgba(15, 18, 19, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      font-size: 11px;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 14px;
+      }
+
+      .description {
+        margin-bottom: 12px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <div class="eyebrow">Procedural Character Asset</div>
+    <h1>Barn Owl</h1>
+    <p class="description">
+      A gentle low-poly barn owl perched on a gnarled branch, with layered feathers,
+      amber eyes, and an idle animation of head movement and breathing wing motion.
+    </p>
+
+    <div class="controls">
+      <button id="exportButton" class="primary">Export Animated GLB</button>
+      <button id="playButton">Pause Animation</button>
+      <button id="resetButton">Reset View</button>
+    </div>
+
+    <label class="options">
+      <input id="spinToggle" type="checkbox" />
+      <span>Turntable preview</span>
+    </label>
+
+    <div class="badge">Low-poly · Rigged nodes · 1 animation</div>
+    <div id="status">Ready to export.</div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const statusElement = document.getElementById("status");
+    const exportButton = document.getElementById("exportButton");
+    const playButton = document.getElementById("playButton");
+    const resetButton = document.getElementById("resetButton");
+    const spinToggle = document.getElementById("spinToggle");
+
+    // -------------------------------------------------------------------------
+    // Renderer and camera
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x171b1d);
+    scene.fog = new THREE.Fog(0x171b1d, 12, 24);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(7.2, 4.6, 8.4);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.25, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 5;
+    controls.maxDistance = 17;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemisphere = new THREE.HemisphereLight(0xc9dded, 0x514331, 2.1);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffe7c1, 3.2);
+    keyLight.position.set(4.5, 8, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -7;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x91b9d6, 2.0);
+    rimLight.position.set(-5, 4, -5);
+    scene.add(rimLight);
+
+    const fillLight = new THREE.PointLight(0xffb866, 10, 10, 2);
+    fillLight.position.set(-2, 2.8, 3);
+    scene.add(fillLight);
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    function material(color, options = {}) {
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: options.roughness ?? 0.82,
+        metalness: options.metalness ?? 0,
+        flatShading: options.flatShading ?? true,
+        side: options.side ?? THREE.FrontSide,
+        transparent: options.transparent ?? false,
+        opacity: options.opacity ?? 1
+      });
+    }
+
+    const materials = {
+      branch: material(0x594332),
+      branchDark: material(0x382b23),
+      branchLight: material(0x77604a),
+      knot: material(0x352820),
+      owlBelly: material(0xd7c9a8),
+      owlBellyShade: material(0xbca982),
+      owlFeather: material(0x8d7656),
+      owlFeatherLight: material(0xa78b63),
+      owlWing: material(0x62513c),
+      owlEar: material(0x7a654c),
+      face: material(0xf0dfb9),
+      eyeOuter: material(0x17130f),
+      iris: material(0xe8a532, { roughness: 0.38 }),
+      pupil: material(0x090807, { roughness: 0.25 }),
+      glint: material(0xfff8dc, { roughness: 0.18 }),
+      beak: material(0xd98232, { roughness: 0.55 }),
+      feet: material(0x6d4b31),
+      claw: material(0x4a3427)
+    };
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function mesh(geometry, mat, parent, position = [0, 0, 0], scale = [1, 1, 1]) {
+      const object = new THREE.Mesh(geometry, mat);
+      object.position.set(...position);
+      object.scale.set(...scale);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function dodecahedron(radius, detail, mat, parent, position, scale) {
+      return mesh(
+        new THREE.DodecahedronGeometry(radius, detail),
+        mat,
+        parent,
+        position,
+        scale
+      );
+    }
+
+    function icoSphere(radius, detail, mat, parent, position, scale) {
+      return mesh(
+        new THREE.IcosahedronGeometry(radius, detail),
+        mat,
+        parent,
+        position,
+        scale
+      );
+    }
+
+    function cylinderBetween(start, end, radiusStart, radiusEnd, mat, parent, radialSegments = 7) {
+      const a = new THREE.Vector3(...start);
+      const b = new THREE.Vector3(...end);
+      const direction = b.clone().sub(a);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(
+        radiusEnd,
+        radiusStart,
+        length,
+        radialSegments,
+        1,
+        false
+      );
+
+      const object = mesh(geometry, mat, parent);
+      object.position.copy(a).add(b).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      return object;
+    }
+
+    function coneBetween(start, end, radius, mat, parent, radialSegments = 5) {
+      const a = new THREE.Vector3(...start);
+      const b = new THREE.Vector3(...end);
+      const direction = b.clone().sub(a);
+      const length = direction.length();
+
+      const geometry = new THREE.ConeGeometry(radius, length, radialSegments, 1, false);
+      const object = mesh(geometry, mat, parent);
+      object.position.copy(a).add(b).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      return object;
+    }
+
+    // -------------------------------------------------------------------------
+    // Gnarled branch asset
+    // -------------------------------------------------------------------------
+
+    const branchGroup = new THREE.Group();
+    branchGroup.name = "GnarledBranch";
+    scene.add(branchGroup);
+
+    const mainBranch = cylinderBetween(
+      [-3.25, 1.25, 0],
+      [2.85, 1.48, 0.04],
+      0.34,
+      0.23,
+      materials.branch,
+      branchGroup,
+      8
+    );
+    mainBranch.name = "MainBranch";
+
+    // Uneven bark ridges.
+    const ridgeData = [
+      [-2.75, 1.36, 0.02, -0.18, 0.42, 0.12],
+      [-1.85, 1.43, -0.03, 0.14, 0.52, -0.08],
+      [-0.85, 1.48, 0.02, -0.12, 0.43, 0.1],
+      [0.35, 1.51, -0.02, 0.16, 0.48, -0.1],
+      [1.42, 1.54, 0.01, -0.14, 0.4, 0.08],
+      [2.35, 1.58, -0.02, 0.12, 0.34, -0.06]
+    ];
+
+    ridgeData.forEach(([x, y, z, rx, rz, width], index) => {
+      const ridge = mesh(
+        new THREE.DodecahedronGeometry(0.5, 0),
+        index % 2 === 0 ? materials.branchDark : materials.branchLight,
+        branchGroup,
+        [x, y, z],
+        [width, 0.28, 0.24]
+      );
+      ridge.rotation.set(rx, 0.15 * (index % 2 ? 1 : -1), rz);
+    });
+
+    // Branches and twigs.
+    const twigPaths = [
+      [[-2.25, 1.37, 0.02], [-2.78, 1.83, 0.12], [-3.12, 2.02, 0.08]],
+      [[-1.42, 1.43, -0.01], [-1.72, 1.84, -0.14], [-2.0, 2.03, -0.18]],
+      [[-0.45, 1.49, 0.02], [-0.2, 1.86, 0.18], [0.05, 2.05, 0.2]],
+      [[0.58, 1.52, -0.02], [0.84, 1.86, -0.17], [1.13, 2.02, -0.2]],
+      [[1.62, 1.55, 0.01], [1.88, 1.88, 0.14], [2.23, 2.04, 0.16]],
+      [[2.4, 1.58, -0.02], [2.75, 1.88, -0.12], [3.12, 2.02, -0.1]]
+    ];
+
+    twigPaths.forEach((path, index) => {
+      for (let i = 0; i < path.length - 1; i++) {
+        const t = i / (path.length - 1);
+        cylinderBetween(
+          [
+            THREE.MathUtils.lerp(path[0], path[1], t),
+            THREE.MathUtils.lerp(path[2], path[3], t),
+            THREE.MathUtils.lerp(path[4], path[5], t)
+          ],
+          [
+            THREE.MathUtils.lerp(path[0], path[1], t + 0.28),
+            THREE.MathUtils.lerp(path[2], path[3], t + 0.28),
+            THREE.MathUtils.lerp(path[4], path[5], t + 0.28)
+          ],
+          0.105 - i * 0.014,
+          0.073 - i * 0.012,
+          i % 2 ? materials.branchLight : materials.branch,
+          branchGroup,
+          6
+        );
+      }
+    });
+
+    // Knots and raised bark knots.
+    [
+      [-1.05, 1.4, 0.18, 0.32],
+      [0.72, 1.47, -0.18, 0.27],
+      [2.62, 1.51, 0.11, 0.22]
+    ].forEach(([x, y, z, radius], index) => {
+      const knot = dodecahedron(
+        radius,
+        0,
+        materials.knot,
+        branchGroup,
+        [x, y, z],
+        [1.15, 0.72, 0.58]
+      );
+      knot.rotation.set(0.15, index * 0.8, -0.18);
+    });
+
+    // Small roots projecting from the trunk.
+    [
+      [[-2.65, 1.29, 0.02], [-3.05, 1.13, 0.2]],
+      [[-1.82, 1.35, -0.02], [-2.18, 1.12, -0.28]],
+      [[0.35, 1.44, 0.02], [0.72, 1.16, 0.3]],
+      [[1.7, 1.49, -0.02], [2.05, 1.22, -0.3]]
+    ].forEach((root, index) => {
+      cylinderBetween(root[0], root[1], 0.13, 0.055, materials.branch, branchGroup, 6);
+    });
+
+    // -------------------------------------------------------------------------
+    // Barn owl model
+    // -------------------------------------------------------------------------
+
+    const owl = new THREE.Group();
+    owl.name = "BarnOwl";
+    owl.position.set(0.12, 1.48, 0.16);
+    owl.rotation.y = -0.08;
+    scene.add(owl);
+
+    // Torso and neck.
+    const body = icoSphere(
+      1,
+      2,
+      materials.owlFeather,
+      owl,
+      [0, 0.58, 0],
+      [0.76, 1.03, 0.58]
+    );
+    body.name = "OwlTorso";
+
+    const chest = icoSphere(
+      1,
+      2,
+      materials.owlBelly,
+      owl,
+      [0, 0.54, 0.43],
+      [0.53, 0.76, 0.17]
+    );
+    chest.name = "OwlChest";
+
+    const neck = icoSphere(
+      1,
+      1,
+      materials.owlFeather,
+      owl,
+      [0, 1.25, 0.01],
+      [0.58, 0.52, 0.5]
+    );
+    neck.name = "OwlNeck";
+
+    // Head is a separate animated node.
+    const head = new THREE.Group();
+    head.name = "OwlHead";
+    head.position.set(0, 1.67, 0.05);
+    owl.add(head);
+
+    const skull = icoSphere(
+      1,
+      2,
+      materials.owlFeather,
+      head,
+      [0, 0, 0],
+      [0.76, 0.69, 0.64]
+    );
+    skull.name = "OwlSkull";
+
+    // Face discs.
+    [-0.285, 0.285].forEach((x, index) => {
+      const face = icoSphere(
+        1,
+        1,
+        materials.face,
+        head,
+        [x, 0.02, 0.49],
+        [0.31, 0.31, 0.105]
+      );
+      face.name = index === 0 ? "OwlFaceDiscLeft" : "OwlFaceDiscRight";
+    });
+
+    // Eyes.
+    [-0.285, 0.285].forEach((x, index) => {
+      const eye = icoSphere(
+        1,
+        1,
+        materials.eyeOuter,
+        head,
+        [x, 0.06, 0.575],
+        [0.145, 0.16, 0.055]
+      );
+      eye.name = index === 0 ? "OwlEyeLeft" : "OwlEyeRight";
+
+      const iris = icoSphere(
+        1,
+        1,
+        materials.iris,
+        head,
+        [x, 0.055, 0.622],
+        [0.09, 0.105, 0.035]
+      );
+      iris.name = index === 0 ? "OwlIrisLeft" : "OwlIrisRight";
+
+      const pupil = icoSphere(
+        1,
+        1,
+        materials.pupil,
+        head,
+        [x, 0.05, 0.652],
+        [0.047, 0.064, 0.022]
+      );
+      pupil.name = index === 0 ? "OwlPupilLeft" : "OwlPupilRight";
+
+      const glint = icoSphere(
+        1,
+        0,
+        materials.glint,
+        head,
+        [x - 0.023, 0.081, 0.674],
+        [0.022, 0.022, 0.012]
+      );
+      glint.name = index === 0 ? "OwlEyeGlintLeft" : "OwlEyeGlintRight";
+    });
+
+    // Beak.
+    coneBetween(
+      [0, -0.13, 0.57],
+      [0, -0.24, 0.91],
+      0.19,
+      materials.beak,
+      head,
+      5
+    );
+    const beakTip = icoSphere(
+      1,
+      0,
+      materials.beak,
+      head,
+      [0, -0.24, 0.91],
+      [0.08, 0.07, 0.07]
+    );
+    beakTip.name = "OwlBeakTip";
+
+    // Ear tufts.
+    [-0.48, 0.48].forEach((x, index) => {
+      const ear = icoSphere(
+        1,
+        1,
+        materials.owlEar,
+        head,
+        [x, 0.48, -0.015],
+        [0.22, 0.31, 0.19]
+      );
+      ear.name = index === 0 ? "OwlEarLeft" : "OwlEarRight";
+      ear.rotation.z = x < 0 ? -0.24 : 0.24;
+    });
+
+    // Wings, each separate from the body and animated independently.
+    function createWing(side) {
+      const wing = new THREE.Group();
+      wing.name = side < 0 ? "OwlWingLeft" : "OwlWingRight";
+      wing.position.set(side * 0.58, 0.61, -0.01);
+      wing.rotation.z = side * -0.18;
+      owl.add(wing);
+
+      const upper = icoSphere(
+        1,
+        1,
+        materials.owlWing,
+        wing,
+        [side * 0.04, 0.1, 0],
+        [0.27, 0.55, 0.32]
+      );
+      upper.name = side < 0 ? "OwlWingUpperLeft" : "OwlWingUpperRight";
+
+      const lower = icoSphere(
+        1,
+        1,
+        materials.owlFeather,
+        wing,
+        [side * 0.07, -0.34, 0.035],
+        [0.31, 0.43, 0.29]
+      );
+      lower.name = side < 0 ? "OwlWingLowerLeft" : "OwlWingLowerRight";
+
+      const tip = icoSphere(
+        1,
+        0,
+        materials.owlWing,
+        wing,
+        [side * 0.12, -0.68, 0.05],
+        [0.17, 0.25, 0.19]
+      );
+      tip.name = side < 0 ? "OwlWingTipLeft" : "OwlWingTipRight";
+
+      return wing;
+    }
+
+    const leftWing = createWing(-1);
+    const rightWing = createWing(1);
+
+    // Tail feathers.
+    const tail = new THREE.Group();
+    tail.name = "OwlTail";
+    tail.position.set(0, 0.12, -0.52);
+    owl.add(tail);
+
+    [
+      [-0.22, 0.02, -0.13, 0.11],
+      [0, -0.03, -0.18, 0.13],
+      [0.22, 0.02, -0.13, 0.11]
+    ].forEach(([x, y, z, radius], index) => {
+      const feather = icoSphere(
+        1,
+        0,
+        index === 1 ? materials.owlFeatherLight : materials.owlFeather,
+        tail,
+        [x, y, z],
+        [0.11, 0.48, 0.1]
+      );
+      feather.rotation.x = -0.35;
+      feather.name = `OwlTailFeather${index + 1}`;
+    });
+
+    // Legs and feet.
+    function createFoot(side) {
+      const leg = cylinderBetween(
+        [side * 0.29, 0.16, 0.08],
+        [side * 0.34, -0.3, 0.12],
+        0.095,
+        0.07,
+        materials.feet,
+        owl,
+        6
+      );
+      leg.name = side < 0 ? "OwlLegLeft" : "OwlLegRight";
+
+      const foot = icoSphere(
+        1,
+        1,
+        materials.feet,
+        owl,
+        [side * 0.34, -0.32, 0.15],
+        [0.19, 0.11, 0.27]
+      );
+      foot.name = side < 0 ? "OwlFootLeft" : "OwlFootRight";
+
+      for (let toe = -1; toe <= 1; toe++) {
+        const claw = coneBetween(
+          [side * 0.34 + toe * 0.085, -0.35, 0.3],
+          [side * 0.34 + toe * 0.09, -0.41, 0.46],
+          0.045,
+          materials.claw,
+          owl,
+          5
+        );
+        claw.name = `OwlClaw${side < 0 ? "L" : "R"}${toe + 2}`;
+      }
+    }
+
+    createFoot(-1);
+    createFoot(1);
+
+    // Perch details.
+    const branchKnot = dodecahedron(
+      0.5,
+      0,
+      materials.knot,
+      branchGroup,
+      [-0.02, 1.53, 0.04],
+      [1.4, 0.52, 0.72]
+    );
+    branchKnot.name = "BranchKnot";
+
+    // -------------------------------------------------------------------------
+    // Ground and presentation
+    // -------------------------------------------------------------------------
+
+    const ground = mesh(
+      new THREE.CircleGeometry(8, 48),
+      material(0x252a27, { roughness: 1 }),
+      scene,
+      [0, -0.03, 0]
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.castShadow = false;
+
+    const pedestal = mesh(
+      new THREE.CylinderGeometry(2.05, 2.35, 0.13, 32),
+      material(0x303531, { roughness: 0.95 }),
+      scene,
+      [0, -0.08, 0]
+    );
+    pedestal.castShadow = false;
+
+    // Decorative grass / leaves around the pedestal.
+    const leafMaterial = material(0x567342);
+    const leafLightMaterial = material(0x789052);
+
+    for (let i = 0; i < 28; i++) {
+      const angle = (i / 28) * Math.PI * 2;
+      const radius = 2.25 + (i % 3) * 0.18;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = 0.02 + (i % 4) * 0.012;
+
+      const leaf = mesh(
+        new THREE.CircleGeometry(0.13 + (i % 3) * 0.025, 5),
+        i % 2 ? leafMaterial : leafLightMaterial,
+        scene,
+        [x, y, z]
+      );
+      leaf.rotation.set(-Math.PI / 2, 0, angle + Math.PI);
+      leaf.rotation.z = (i % 2 ? 1 : -1) * 0.18;
+      leaf.castShadow = false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Animation
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+    const mixer = new THREE.AnimationMixer(owl);
+
+    const times = [0, 1.25, 2.5, 3.75, 5, 6.25];
+
+    const headPositions = [
+      new THREE.Vector3(0, 1.67, 0.05),
+      new THREE.Vector3(0.045, 1.72, 0.02),
+      new THREE.Vector3(-0.035, 1.68, 0.09),
+      new THREE.Vector3(0.025, 1.73, 0.015),
+      new THREE.Vector3(-0.02, 1.67, 0.06),
+      new THREE.Vector3(0, 1.67, 0.05)
+    ];
+
+    const leftWingRotations = [
+      new THREE.Euler(0, 0, -0.18),
+      new THREE.Euler(0.02, 0, -0.27),
+      new THREE.Euler(-0.02, 0, -0.15),
+      new THREE.Euler(0.015, 0, -0.25),
+      new THREE.Euler(-0.01, 0, -0.17),
+      new THREE.Euler(0, 0, -0.18)
+    ];
+
+    const rightWingRotations = [
+      new THREE.Euler(0, 0, 0.18),
+      new THREE.Euler(-0.02, 0, 0.27),
+      new THREE.Euler(0.02, 0, 0.15),
+      new THREE.Euler(-0.015, 0, 0.25),
+      new THREE.Euler(0.01, 0, 0.17),
+      new THREE.Euler(0, 0, 0.18)
+    ];
+
+    const bodyRootPositions = [
+      new THREE.Vector3(0.12, 1.48, 0.16),
+      new THREE.Vector3(0.105, 1.515, 0.16),
+      new THREE.Vector3(0.135, 1.495, 0.16),
+      new THREE.Vector3(0.11, 1.52, 0.16),
+      new THREE.Vector3(0.125, 1.505, 0.16),
+      new THREE.Vector3(0.12, 1.48, 0.16)
+    ];
+
+    const tracks = [
+      new THREE.VectorKeyframeTrack(
+        "OwlHead.position",
+        times,
+        headPositions.flatMap((value) => value.toArray())
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        "OwlHead.quaternion",
+        times,
+        headPositions.flatMap((value) => {
+          const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...value));
+          return q.toArray();
+        })
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        "OwlWingLeft.quaternion",
+        times,
+        leftWingRotations.flatMap((value) => {
+          const q = new THREE.Quaternion().setFromEuler(value);
+          return q.toArray();
+        })
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        "OwlWingRight.quaternion",
+        times,
+        rightWingRotations.flatMap((value) => {
+          const q = new THREE.Quaternion().setFromEuler(value);
+          return q.toArray();
+        })
+      ),
+      new THREE.VectorKeyframeTrack(
+        "OwlRoot.position",
+        times,
+        bodyRootPositions.flatMap((value) => value.toArray())
+      )
+    ];
+
+    const idleClip = new THREE.AnimationClip("BarnOwl_Idle", 6.25, tracks);
+    const idleAction = mixer.clipAction(idleClip);
+    idleAction.play();
+
+    let animationPlaying = true;
+
+    playButton.addEventListener("click", () => {
+      animationPlaying = !animationPlaying;
+      playButton.textContent = animationPlaying ? "Pause Animation" : "Play Animation";
+      if (animationPlaying) {
+        idleAction.play();
+      } else {
+        idleAction.paused = true;
+      }
+    });
+
+    spinToggle.addEventListener("change", () => {
+      scene.rotation.y = spinToggle.checked ? Math.sin(clock.getElapsedTime() * 0.18) * 0.12 : 0;
+    });
+
+    resetButton.addEventListener("click", () => {
+      camera.position.set(7.2, 4.6, 8.4);
+      controls.target.set(0, 1.25, 0);
+      controls.update();
+    });
+
+    // -------------------------------------------------------------------------
+    // GLB export
+    // -------------------------------------------------------------------------
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      exportButton.textContent = "Preparing GLB…";
+      statusElement.textContent = "Building geometry, materials, hierarchy, and animation…";
+
+      try {
+        // Ensure a clean export root without preview-only pedestal rotation.
+        const exportRoot = new THREE.Group();
+        exportRoot.name = "BarnOwlAsset";
+        exportRoot.add(owl);
+        scene.remove(owl);
+
+        // Clone the asset so the exporter does not mutate the source hierarchy.
+        const clone = exportRoot.clone(true);
+        clone.position.set(0.12, 1.48, 0.16);
+        clone.rotation.set(0, -0.08, 0);
+        exportRoot.add(clone);
+
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(exportRoot, {
+          binary: true,
+          animations: [idleClip],
+          onlyVisible: true,
+          truncateDrawRange: true,
+          includeCustomExtensions: false
+        });
+
+        const blob = new Blob([result], { type: "model/gltf-binary" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "animated_low_poly_barn_owl.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        const sizeKB = (blob.size / 1024).toFixed(1);
+        statusElement.textContent =
+          `Exported animated_barn_owl.glb (${sizeKB} KB) with idle animation.`;
+      } catch (error) {
+        console.error(error);
+        statusElement.textContent =
+          "Export failed. Check the browser console for details.";
+      } finally {
+        exportButton.disabled = false;
+        exportButton.textContent = "Export Animated GLB";
+      }
+    });
+
+    // Restore the preview hierarchy.
+    scene.add(owl);
+
+    // -------------------------------------------------------------------------
+    // Render loop
+    // -------------------------------------------------------------------------
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      if (animationPlaying) {
+        mixer.update(delta);
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

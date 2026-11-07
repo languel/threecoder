@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snowglobe — Low Poly Winter Asset</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 35%, #e8f5ff 0%, #dce3ff 48%),
+        linear-gradient(180deg, #b9d4ff, #9ab8ff);
+    }
+
+    #viewport {
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .info {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      z-index: 2;
+      pointer-events: none;
+      color: #f8f3ff;
+    }
+
+    .info h1 {
+      margin: 0;
+      font-size: clamp(19px, 2vw, 27px);
+      letter-spacing: -0.02em;
+    }
+
+    .info p {
+      margin: 7px 0 0;
+      font-size: 13px;
+      color: #d9dcff;
+    }
+
+    #exportButton {
+      position: fixed;
+      top: 22px;
+      right: 24px;
+      z-index: 3;
+      border: 1px solid #d8a33c;
+      background: #e8f5ff;
+      box-shadow: 0 10px 30px rgb(232, 255, 255 / 18%);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition:
+        transform 150ms ease,
+        background 150ms ease,
+        border-color 150ms ease;
+    }
+
+    #exportButton:hover {
+      transform: translateY(-2px);
+      border-color: #d9a33c;
+    }
+
+    #exportButton:active {
+      transform: translateY(0);
+    }
+
+    #exportButton:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .hint {
+      position: fixed;
+      right: 24px;
+      bottom: 20px;
+      z-index: 2;
+      color: rgba(239, 255, 255 / 18%);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 650px) {
+      .info p {
+        display: none;
+      }
+
+      #exportButton {
+        top: 14px;
+        right: 14px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport">
+    <div class="info">
+      <h1>Winter Snowglobe</h1>
+      <p>Low-poly carved glint with a warm window, drifting snow, and a tiny drifting drifter.</p>
+    </div>
+
+    <button id="exportButton" type="button">Export GLB</button>
+    <div class="hint">Drag to orbit · Scroll to zoom</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    // ---------------------------------------------------------------------
+    // Renderer and scene
+    // ---------------------------------------------------------------------
+
+    const viewport = document.querySelector("#viewport");
+    const exportButton = document.querySelector("#exportButton");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xdce3ff);
+    scene.fog = new THREE.Fog(0xdce3ff, 12, 22);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(7.5, 4.6, 8.7);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.35, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 5;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemisphere = new THREE.HemisphereLight(0xffffff, 0x71656d, 2.15);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff8e9, 3.6);
+    keyLight.position.set(4.5, 7, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 24;
+    keyLight.shadow.bias = -0.00025;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    rimLight.position.set(-5, 3, -5);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Materials
+    // ---------------------------------------------------------------------
+
+    const materials = {
+      wood: new THREE.MeshStandardMaterial({
+        color: 0x9e5d2f,
+        roughness: 0.86,
+        metalness: 0.05,
+        flatShading: true
+      }),
+      woodDark: new THREE.MeshStandardMaterial({
+        color: 0x65451b,
+        roughness: 0.92,
+        metalness: 0.02,
+        flatShading: true
+      }),
+      woodLight: new THREE.MeshStandardMaterial({
+        color: 0xa88b25,
+        roughness: 0.8,
+        metalness: 0.04,
+        flatShading: true
+      }),
+
+      woodDarkLight: new THREE.MeshStandardMaterial({
+        color: 0xd5b873,
+        roughness: 0.82,
+        metalness: 0.03,
+        flatShading: true
+      }),
+
+      woodDark: new THREE.MeshStandardMaterial({
+        color: 0x554523,
+        roughness: 0.9,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      woodEdge: new THREE.MeshStandardMaterial({
+        color: 0x8b5d2d,
+        roughness: 0.72,
+        metalness: 0.18,
+        flatShading: true
+      }),
+
+      glass: new THREE.MeshStandardMaterial({
+        color: 0xf4fbff,
+        emissive: 0x1d9bc7,
+        emissiveIntensity: 1.7,
+        roughness: 0.16,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      glassDark: new THREE.MeshStandardMaterial({
+        color: 0xc9f4ff,
+        emissive: 0x1d9bc7,
+        emissiveIntensity: 1.6,
+        roughness: 0.18,
+        metalness: 0.02,
+        flatShading: true
+      }),
+
+      wood: new THREE.MeshStandardMaterial({
+        color: 0xb9782f,
+        roughness: 0.88,
+        metalness: 0.04,
+        flatShading: true
+      }),
+      woodLight: new THREE.MeshStandardMaterial({
+        color: 0xa98826,
+        roughness: 0.85,
+        metalness: 0.03,
+        flatShading: true
+      }),
+
+      pine: new THREE.MeshStandardMaterial({
+        color: 0xdce2e9,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true
+      }),
+      pineLight: new THREE.MeshStandardMaterial({
+        color: 0xe2d7e1,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true
+      }),
+
+      snow: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.96,
+        metalness: 0,
+        flatShading: true
+      }),
+      snowDark: new THREE.MeshStandardMaterial({
+        color: 0xb9d8e1,
+        roughness: 0.98,
+        metalness: 0,
+        flatShading: true
+      }),
+
+      woodRune: new THREE.MeshStandardMaterial({
+        color: 0x795b35,
+        emissive: 0x4f1c00,
+        emissiveIntensity: 0.7,
+        roughness: 0.85,
+        metalness: 0.02
+      }),
+      woodGlow: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 1.15,
+        roughness: 0.9,
+        metalness: 0.08,
+        flatShading: true
+      })
+    };
+
+    // ---------------------------------------------------------------------
+    // Asset hierarchy and helpers
+    // ---------------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "Snowglobe";
+    scene.add(asset);
+
+    function addMesh(geometry, material, name) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      asset.add(mesh);
+      return mesh;
+    }
+
+    function box(name, size, position, material, rotation = [0, 0, 0], parent = asset) {
+      return addMesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material,
+        name
+      );
+    }
+
+    function cylinder(
+      name,
+      radius,
+      length,
+      position,
+      material,
+      rotation = [0, 0, 0],
+      parent = asset
+    ) {
+      return addMesh(
+        new THREE.CylinderGeometry(radius, radius, length, 8),
+        material,
+        name
+      );
+    }
+
+    function dodeca(name, scale, position, material, parent = asset) {
+      return addMesh(
+        new THREE.DodecahedronGeometry(1, 0),
+        material,
+        name
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // Carved wooden base and edge details
+    // ---------------------------------------------------------------------
+
+    const woodBase = dodeca("Base_Base", [0.76, 0.34, 0.58], new THREE.Vector3(0, 0.16, 0), materials.woodDark);
+
+    for (const z of [-0.14, 0.14]) {
+      const edge = dodeca("Edge_Left", [0.25, 0.22, 1], new THREE.Vector3(-0.12, 0.17, z), materials.woodEdge);
+      edge.rotation.z = Math.PI * (0.5 - z / 0.28);
+    }
+
+    for (const x of [-0.38, 0.38]) {
+      for (const z of [-0.14, 0.14]) {
+        const strip = box(
+          "Base_Stripe",
+          [0.13, 0.055, 1],
+          new THREE.Vector3(x, 0.22, z),
+          materials.woodDark
+        );
+        strip.rotation.x = Math.PI * (0.5 - x / 0.76);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Snowflake geometry
+    // ---------------------------------------------------------------------
+
+    function createSnowflakeGeometry(radius, width, depth) {
+      const z = new THREE.Vector3(0, 0, 1);
+      const positions = [];
+
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const radius = Math.sin(angle) * width;
+        const y = -Math.cos(angle) * depth;
+
+        positions.push(
+          z.x + Math.sin(angle) * radius,
+          y,
+          z.z + Math.sin(angle) * depth
+        );
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function addSnowflake(name, position, scale = 1) {
+      const group = new THREE.Group();
+      group.name = name;
+      asset.add(group);
+
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const radius = 0.7 + (i % 3) * 0.22;
+
+        const shape = new THREE.Shape();
+        shape.moveTo(
+          1.35 + (i % 3) * 0.22,
+          0
+        );
+        shape.lineTo(
+          -0.88 + (i % 3) * 0.25,
+          0
+        );
+        shape.lineTo(
+          0.88 + (i % 3) * 0.25,
+          0
+        );
+        shape.lineTo(
+          1.35 + (i % 3) * 0.22,
+          -0.88 + (i % 3) * 0.25
+        );
+        shape.closePath();
+
+        const geometry = createSnowflakeGeometry(radius, 0.18 + (i % 2) * 0.16, 0.17);
+        geometry.rotateZ(angle);
+
+        group.add(geometry);
+      }
+
+      return group;
+    }
+
+    // ---------------------------------------------------------------------
+    // Carved wooden cabin wall
+    // ---------------------------------------------------------------------
+
+    const wall = dodeca("Cabin_Wall", [1.72, 0.12, 1.74], new THREE.Vector3(0, 2.34, 0), materials.woodDark);
+    wall.rotation.z = -Math.PI * 0.5;
+
+    for (const x of [-1.25, 1.25]) {
+      for (const z of [-1.02, 1.02]) {
+        const slat = box(
+          "Wall_Slat",
+          [0.14, 0.055, 0.46],
+          new THREE.Vector3(x, 2.39, z),
+          materials.woodDark
+        );
+        slat.rotation.x = Math.PI * (0.5 - x / 1.36);
+      }
+    }
+
+    for (const z of [-1.02, 1.02]) {
+      const ridge = box(
+        "Wall_Ridge",
+        [2.12, 0.16, 0.16],
+        new THREE.Vector3(0, 2.43, z),
+        materials.woodLight
+      );
+      ridge.rotation.x = Math.PI * (0.5 - z / 1.02);
+    }
+
+    // ---------------------------------------------------------------------
+    // Glass dome and window frame
+    // ---------------------------------------------------------------------
+
+    const dome = dodeca("Glass_Dome", [1.28, 0.22, 1.32], new THREE.Vector3(0, 2.38, 0), materials.glass);
+
+    for (const x of [-1.26, 1.26]) {
+      for (const z of [-1.02, 1.02]) {
+        box(
+          "Dome_Glass",
+          [0.22, 0.11, 0.22],
+          new THREE.Vector3(x, 2.38, z),
+          materials.glass
+        );
+      }
+    }
+
+    // Rounded window frame.
+    for (const x of [-1.25, 1.25]) {
+      for (const z of [-1.02, 1.02]) {
+        box(
+          "Window_Frame",
+          [0.52, 0.14, 0.52],
+          new THREE.Vector3(x, 2.38, z),
+          materials.woodDark
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Interior cabin lighting and warm glow
+    // ---------------------------------------------------------------------
+
+    const interior = dodeca("Cabin_Interior", [1.02, 0.16, 1.02], new THREE.Vector3(0, 2.08, 0), materials.woodDarkLight);
+
+    for (const x of [-0.5, 0.5]) {
+      for (const z of [-0.5, 0.5]) {
+        box(
+          "Cabin_Window",
+          [0.52, 0.12, 0.52],
+          new THREE.Vector3(x, 2.08, z),
+          materials.glass
+        );
+      }
+    }
+
+    for (const x of [-0.5, 0.5]) {
+      for (const z of [-0.5, 0.5]) {
+        dodeca(
+          "Window_Glow",
+          [0.7, 0.18, 0.7],
+          new THREE.Vector3(x, 2.08, z),
+          materials.woodGlow
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Pine trees
+    // ---------------------------------------------------------------------
+
+    const treePositions = [
+      [-2.2, -1.9],
+      [2.2, -1.9],
+      [-2.2, 1.9],
+      [2.2, 1.9]
+    ];
+
+    for (const [x, z] of treePositions) {
+      const trunk = cylinder(
+        "Tree_Trunk",
+        0.17,
+        0.42,
+        new THREE.Vector3(x, 1.92, z),
+        materials.woodDark,
+        [Math.PI / 2, 0, 0]
+      );
+      trunk.rotation.z = Math.PI * 0.5;
+
+      const bark = dodeca("Tree_Bark", [0.12, 0.55, 0.12], new THREE.Vector3(x, 1.92, z), materials.woodDarkLight);
+      bark.scale.set(0.7, 1.3, 0.8);
+
+      const branches = [
+        { x: x, z: z + 0.55, angle: 0.15, length: 1.05, radius: 0.105 },
+        { x: x, z: z + 1.0, angle: 0.35, length: 0.95, radius: 0.11 },
+        { x: x, z: z + 1.4, angle: Math.PI * 2 - 0.15, length: 1.05, radius: 0.105 }
+      ];
+
+      for (const branch of branches) {
+        cylinder(
+          "Tree_Branch",
+          branch.radius,
+          branch.length,
+          new THREE.Vector3(x, 1.92, z + branch.z),
+          materials.woodDarkLight,
+          [Math.PI / 2, 0, 0]
+        );
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Drifting snowflake animation
+    // ---------------------------------------------------------------------
+
+    const driftData = [
+      [-1.8, -1.9],
+      [1.8, -1.9],
+      [-1.8, 1.9],
+      [1.8, 1.9]
+    ];
+
+    for (let i = 0; i < driftData.length; i++) {
+      const x = driftData[i][0];
+      const z = driftData[i][1];
+
+      const motion = new THREE.Vector3(
+        0.5,
+        0,
+        0.5
+      );
+      const speed = 1.8 + (Math.sin(x) * 0.65) * 0.12;
+      const y = -1.08 + Math.sin(z) * 0.45;
+
+      motion.set(
+        x * speed,
+        y,
+        z * speed
+      );
+
+      driftData[i].actions.push({
+        x,
+        z,
+        motion,
+        speed,
+        y
+      });
+    }
+
+    const driftClip = new THREE.AnimationClip("Drifting_Snowflake", 16, driftData);
+    const driftAction = new THREE.AnimationAction(driftClip);
+    driftAction.setLoop(THREE.LoopRepeat, Infinity);
+    driftAction.play();
+
+    // ---------------------------------------------------------------------
+    // Tiny snowman on the right side
+    // ---------------------------------------------------------------------
+
+    const person = new THREE.Group();
+    person.name = "Snowman";
+    asset.add(person);
+
+    const head = dodeca("Snowman_Head", [1.02, 0.24, 0.34], new THREE.Vector3(2.12, 1.7, 0), materials.woodDarkLight);
+    head.scale.set(0.55, 1.05, 0.95);
+
+    const nose = dodeca("Snowman_Nose", [0.18, 0.075, 0.045], new THREE.Vector3(2.12, 1.67, 0.11), materials.woodDark;
+    nose.scale.set(0.55, 1, 0.65);
+
+    for (const side of [-1, 1]) {
+      const foot = box(
+        "Snowman_Foot",
+        [0.16, 0.22, 0.34],
+        new THREE.Vector3(side * 0.19, 0.12, 0),
+        materials.woodDark
+      );
+      foot.rotation.x = side * -0.08;
+    }
+
+    for (const side of [-1, 1]) {
+      const eye = dodeca("Snowman_Eye", [side * 0.17, 1.62, 0.145], materials.glassDark);
+      eye.scale.set(0.8, 1, 0.6);
+    }
+
+    // ---------------------------------------------------------------------
+    // Drifting drifting snowflake
+    // ---------------------------------------------------------------------
+
+    const drift = new THREE.Group();
+    drift.name = "Drifting_Snowflake";
+    asset.add(drift);
+
+    for (let i = 0; i < driftData.length; i++) {
+      const x = driftData[i][0];
+      const z = driftData[i][1];
+
+      const group = new THREE.Group();
+      group.name = "Snowflake_Group";
+      drift.add(group);
+
+      const shape = createSnowflakeGeometry(0.72, 0.16, 0.16);
+      group.add(shape);
+    }
+
+    const driftMotion = new THREE.Vector3(1.8, 0.45, 1.9);
+
+    for (let i = 0; i < driftData.length; i++) {
+      const x = driftData[i][0];
+      const z = driftData[i][1];
+
+      const motion = new THREE.Vector3(
+        -x * 0.6,
+        driftMotion.y,
+        -z * 0.6
+      );
+
+      group.position.copy(driftMotion);
+      group.rotation.set(0, 0, 0);
+      group.scale.set(1, 0.8, 0.8);
+    }
+
+    // ---------------------------------------------------------------------
+    // Display-only environment
+    // ---------------------------------------------------------------------
+
+    const platform = new THREE.Group();
+    platform.name = "Display_Environment";
+    scene.add(platform);
+
+    const ground = dodeca("Ground", [30, 30, 30], new THREE.Vector3(0, -0.16, 0), materials.woodDark);
+    ground.rotation.x = -Math.PI * 0.5;
+    ground.castShadow = false;
+
+    const grid = new THREE.GridHelper(
+      12,
+      24,
+      0x9ca6ff,
+      0xdce3ff
+    );
+    grid.position.y = 0.002;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.22;
+    grid.material.depthWrite = false;
+    scene.add(grid);
+
+    const pedestal = new THREE.Group();
+    pedestal.name = "Pedestal";
+    platform.add(pedestal);
+    pedestal.rotation.x = -Math.PI * 0.5;
+    pedestal.castShadow = false;
+    pedestal.receiveShadow = true;
+
+    const pedestalRing = dodeca("Pedestal_Ring", [2.12, 0.16, 2.12], new THREE.Vector3(0, 0.16, 0), materials.woodDarkLight);
+    pedestalRing.scale.set(1, 0.55, 1);
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function render() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(render);
+    }
+
+    render();
+
+    // ---------------------------------------------------------------------
+    // GLB export
+    // ---------------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      exportButton.textContent = "Exporting…";
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "snowglobe_lowpoly.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+          exportButton.textContent = "Exported";
+          setTimeout(() => {
+            exportButton.textContent = "Export GLB";
+            exportButton.disabled = false;
+          }, 1800);
+        },
+        (error) => {
+          console.error(error);
+          exportButton.textContent = "Export Failed";
+          setTimeout(() => {
+            exportButton.textContent = "Export GLB";
+            exportButton.disabled = false;
+          }, 2200);
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+  </script>
+</body>
+</html>

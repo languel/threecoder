@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stone Lantern — A Whispering Fire</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --gold: #f3dfb9;
+      --cream: #e8d5c5;
+      --muted: rgba(225, 200, 180, 0.68);
+      --panel: rgba(10, 20, 19, 0.76);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #071417;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .hud {
+      position: fixed;
+      top: 18px;
+      left: 20px;
+      z-index: 2;
+      color: var(--gold);
+      pointer-events: none;
+      text-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
+    }
+
+    .title {
+      max-width: 360px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 24px;
+      height: 2px;
+      content: "";
+      background: var(--gold);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(27px, 4vw, 44px);
+      line-height: 0.94;
+      letter-spacing: -0.045em;
+    }
+
+    .subtitle {
+      max-width: 360px;
+      margin-top: 15px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+    }
+
+    .controls kbd {
+      padding: 4px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .controls span {
+      padding: 8px 12px;
+    }
+
+    #reset {
+      padding: 10px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+      color: var(--gold);
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      font: inherit;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+    }
+
+    #reset:hover {
+      border-color: rgba(243, 223, 185, 0.58);
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .hint {
+      position: fixed;
+      left: 20px;
+      bottom: 18px;
+      z-index: 2;
+      color: rgba(225, 200, 180, 0.68);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .hint span {
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    @media (max-width: 800px) {
+      .title {
+        max-width: calc(100vw - 40px);
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .hint {
+        left: 20px;
+        bottom: 18px;
+        max-width: calc(100vw - 40px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="hud">
+    <div class="title">
+      <div class="eyebrow">A lantern of the evening sky</div>
+      <h1>Stone Lantern</h1>
+      <div class="subtitle">Carved flame, drifting embers, and a quiet pulse of magic.</div>
+    </div>
+
+    <div class="controls">
+      <span>Drag to orbit · Scroll to zoom · Arrow keys to control the lantern</span>
+      <kbd>R</kbd> / <kbd>R</kbd> to reset
+    </div>
+
+    <div class="hint">Drag to look around · The lantern glows in the dark</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // ---------------------------------------------------------------------
+    // Renderer, camera, and procedural environment
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "A carved stone lantern surrounded by an animated swirling magical firefly"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x071417);
+    scene.fog = new THREE.Fog(0x071417, 11, 28);
+
+    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 50);
+    window.camera = camera;
+    const target = new THREE.Vector3(0, 4.5, 0.6);
+
+    // ---------------------------------------------------------------------
+    // Procedural stone textures and environment
+    // ---------------------------------------------------------------------
+
+    function noise(x, y) {
+      return Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+    }
+
+    function makeStoneTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        15,
+        256,
+        256,
+        190
+      );
+      gradient.addColorStop(0, "#beb8bc");
+      gradient.addColorStop(0.3, "#d9d1c7");
+      gradient.addColorStop(1, "#beb8bc");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(-32, -32, 64, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.5, 1.5);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+      gradient.addColorStop(0, "#1a3d3f");
+      gradient.addColorStop(0.5, "#e9e8d7");
+      gradient.addColorStop(1, "#1b1a1d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 950; i++) {
+        const x = noise() * 512;
+        const y = noise() * 512;
+        const amplitude = 0.5 + noise() * 2.4;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.012) * amplitude,
+          y + Math.cos(y * 0.013) * amplitude
+        );
+        ctx.strokeStyle = `rgba(255,255,255,${0.025 + noise() * 0.08})`;
+        ctx.lineWidth = 0.4 + noise() * 1.2;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(5, 5);
+
+      return texture;
+    }
+
+    const stoneTexture = makeStoneTexture();
+    const groundTexture = makeGroundTexture();
+
+    // ---------------------------------------------------------------------
+    // Procedural stone lantern
+    // ---------------------------------------------------------------------
+
+    function makeStoneGeometry() {
+      const shape = new THREE.Shape();
+
+      shape.moveTo(-2.2, 0.3);
+      shape.lineTo(4.1, 0.3);
+      shape.lineTo(4.05, -0.45);
+      shape.lineTo(-2.2, -0.45);
+      shape.lineTo(-4.05, -0.45);
+      shape.lineTo(-4.05, 0.45);
+      shape.lineTo(-2.2, 0.45);
+      shape.closePath();
+
+      return new THREE.ExtrudeGeometry(shape, {
+        depth: 0.34,
+        bevelEnabled: true,
+        bevelThickness: 0.11,
+        bevelSize: 0.11,
+        bevelSegments: 4
+      });
+    }
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      map: stoneTexture,
+      color: 0xffffff,
+      roughness: 0.91,
+      metalness: 0
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      map: stoneTexture,
+      color: 0x8f8d78,
+      roughness: 1
+    });
+
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd5b98a,
+      roughness: 0.88
+    });
+
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x67dfff,
+      emissive: 0x3b9d8d,
+      emissiveIntensity: 0.55,
+      metalness: 0.15,
+      roughness: 0.2
+    });
+
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc49a38,
+      emissive: 0xb76b3d,
+      emissiveIntensity: 1.25,
+      metalness: 0.25,
+      roughness: 0.35
+    });
+
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      map: groundTexture,
+      color: 0xffffff,
+      roughness: 0.96
+    });
+
+    // A dark background gives the lantern a natural, atmospheric setting.
+    const backdrop = new THREE.Mesh(
+      new THREE.CircleGeometry(8.5, 64, 4),
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 }
+        },
+        vertexShader: `
+          varying float vNoise;
+          uniform float uTime;
+
+          void main() {
+            vec3 p = position();
+            p.y += sin(p.x * 0.08 + uTime) * 0.025;
+            p.z += cos(p.x * 0.13 - uTime) * 0.012;
+            vNoise = p;
+
+            vec3 n = normalize(uv);
+            float d = distance(n, position()).
+
+            if (d < 0.18) {
+              float x = clamp(-1.0 * p.x / 8.5, -1, 1);
+              float z = clamp(-1.0 * p.z / 7.5, -1, 1);
+              float c = smoothstep(0.08, 0.12, d);
+              vec3 color = mix(note.color, n.a, c);
+
+              vec3 direction = normalize(position() - uv);
+              float height = mix(0.34, 0.72, c);
+
+              float h = smoothstep(-0.18, 0.22, direction.y);
+
+              color += direction.y * h * 0.55;
+              color *= 1.15;
+              return color;
+            }
+
+            vec3 vNoise = p;
+
+            float fbm = 0.0;
+            for (int i = 0; i < 3; i++) {
+              fbm += noise(fbm, p);
+            }
+
+            float n = smoothstep(-0.2, 0.2, vNoise);
+            float wobble = sin(n * 1.7) * 0.035;
+            color += wobble * 0.9;
+
+            return vec4(color, 1.0);
+          })
+        `,
+        fragmentShader: `
+          uniform float uTime;
+          varying float vNoise;
+
+          void main() {
+            vec3 p = position();
+            vec3 uv = uv;
+
+            float x = uv.x;
+            float z = uv.z;
+            float ripple = sin((x + 0.5) * 8.0 + uTime * 1.5);
+            float y = sin(-z * 8.0 - uTime * 3.0);
+
+            float distance = length(p.xz);
+
+            float base = mix(0.32, 0.12, distance / 7.2);
+            float glow = 0.34 + base * 0.62;
+
+            vec3 direction = normalize(p.xz);
+            float height = smoothstep(-0.18, 0.22, direction.y);
+            float n = smoothstep(0.02, 0.12, distance);
+
+            float h = mix(0.12, 0.38, n) * height;
+            float glowLight = mix(0.1, 0.9, h);
+
+            float flicker = pow((glowLight + 0.08) / 0.75, 2.5);
+            color = vec4(vec3(direction.x * 0.7 + 0.1, glowLight * 0.48, flicker), 1.0);
+
+            return color;
+          }
+        `)
+      })
+    );
+
+    const lantern = new THREE.Group();
+    scene.add(lantern);
+
+    // A dark solid form with a recessed wooden base and a carved stone bowl.
+    const bowlShape = new THREE.Shape();
+    bowlShape.moveTo(-2.25, 0.48);
+    bowlShape.lineTo(-2.12, -0.18);
+    bowlShape.bezierCurveTo(-1.88, 0.14, -1.28, 0.34, -0.72, 0.4);
+    bowlShape.bezierCurveTo(-0.72, 0.44, -0.55, 0.48);
+    bowlShape.lineTo(-0.22, 0.48);
+    bowlShape.lineTo(0, 0.48);
+    bowlShape.lineTo(0.22, 0.48);
+    bowlShape.lineTo(0.72, 0.44);
+    bowlShape.bezierCurveTo(1.28, 0.3, 1.58, 0.13, 1.42, 0);
+    bowlShape.closePath();
+
+    const bowl = new THREE.Mesh(bowlShape, stoneMaterial);
+    bowl.position.y = -0.29;
+    bowl.castShadow = true;
+    bowl.receiveShadow = true;
+    lantern.add(bowl);
+
+    // A narrow carved rim.
+    const rimShape = new THREE.Shape();
+    rimShape.moveTo(-1.78, 0.43);
+    rimShape.lineTo(-0.88, 0.48);
+    rimShape.lineTo(-0.38, 0.44);
+    rimShape.lineTo(-0.03, 0.34);
+    rimShape.lineTo(0.03, 0.34);
+    rimShape.lineTo(0.38, 0.44);
+    rimShape.lineTo(0.88, 0.48);
+    rimShape.lineTo(1.78, 0.43);
+    rimShape.closePath();
+
+    const rim = new THREE.Mesh(rimShape, stoneMaterial);
+    rim.position.y = -0.12;
+    rim.castShadow = true;
+    lantern.add(rim);
+
+    // Dark interior of the carved bowl.
+    const interior = new THREE.Mesh(
+      new THREE.ShapeGeometry(bowlShape, 96),
+      darkStoneMaterial
+    );
+    interior.position.y = -1.27;
+    interior.castShadow = true;
+    interior.receiveShadow = true;
+    lantern.add(interior);
+
+    // A small wooden handle and small carved pebble.
+    const handleShape = new THREE.Shape();
+    handleShape.moveTo(-0.2, 0.48);
+    handleShape.lineTo(0.2, 0.48);
+    handleShape.closePath();
+
+    const handle = new THREE.Mesh(handleShape, woodMaterial);
+    handle.position.set(-0.82, -0.49, 0.13);
+    lantern.add(handle);
+
+    const pebble = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 12, 8),
+      stoneMaterial
+    );
+    pebble.position.set(-1.05, -0.47, 0.13);
+    pebble.scale.set(0.75, 1, 1.25);
+    lantern.add(pebble);
+
+    // ---------------------------------------------------------------------
+    // Soft ambient lighting
+    // ---------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0xc9d8d2, 0x3d3b3c, 1.35));
+
+    const keyLight = new THREE.DirectionalLight(0xffedcf, 2.25);
+    keyLight.position.set(-4.5, 8.5, 6.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 8;
+    keyLight.shadow.camera.bottom = -4;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.shadow.normalBias = 0.025;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xd9efff, 1.15);
+    fillLight.position.set(5, 3, 4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd3a2, 1.4);
+    rimLight.position.set(-2, 6, -4);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Swirling magical firefly and ember particles
+    // ---------------------------------------------------------------------
+
+    const particleCount = 180;
+    const emitters = [];
+    const particlePositions = [];
+    const particleColors = [];
+    const particleSeeds = [];
+
+    function makeParticleGeometry() {
+      const shape = new THREE.Shape();
+      shape.moveTo(-0.12, 0);
+      shape.lineTo(0.08, 0);
+      shape.lineTo(0.13, 0.55);
+      shape.lineTo(-0.12, 0.9);
+      shape.lineTo(-0.1, 1.2);
+      shape.lineTo(0, 1.42);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.28,
+        bevelEnabled: true,
+        bevelThickness: 0.065,
+        bevelSize: 0.065,
+        bevelSegments: 4
+      });
+
+      geometry.rotateX(-Math.PI / 2);
+      return geometry;
+    }
+
+    const particleGeometry = makeParticleGeometry();
+
+    function addEmitter(x, y, z, scale = 1) {
+      emitters.push({ x, y, z, scale });
+      particlePositions.push(
+        -0.12, 0, 0, -0.18,
+        0.08, 0, 0, 0.02,
+        0.13, 0, 0.2, 1.04
+      );
+    }
+
+    function createEmitterTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 64;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 256, 0);
+      gradient.addColorStop(0, "#f8f2df");
+      gradient.addColorStop(0.5, "#d9d3c7");
+      gradient.addColorStop(1, "#e8d5c5");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    const emitters.forEach((emitter, index) => {
+      const group = new THREE.Group();
+      emitter.x = emitter.x;
+      emitter.z = emitter.z;
+
+      const particleMaterial = new THREE.MeshBasicMaterial({
+        map: createEmitterTexture(),
+        transparent: true,
+        opacity: index === 0 ? 0.88 : 0.72,
+        depthWrite: false
+      });
+
+      const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+      particle.position.y = 0.12;
+      particle.scale.setScalar(emitter.scale);
+      particle.receiveShadow = true;
+      group.add(particle);
+
+      scene.add(group);
+
+      // A soft, pulsing base of ember sparks.
+      const sparkGeometry = new THREE.SphereGeometry(1, 8, 6);
+      const sparkMaterial = new THREE.MeshBasicMaterial({
+        color: index === 0 ? "#e8d5c5" : "#b9e4df",
+        transparent: true,
+        opacity: index === 0 ? 0.18 : 0.12,
+        depthWrite: false
+      });
+
+      const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+      spark.position.set(
+        emitter.x + (index % 2) * 0.035,
+        0.14,
+        emitter.z + (index % 2) * 0.028
+      );
+      spark.scale.setScalar(emitter.scale);
+      spark.receiveShadow = true;
+      scene.add(spark);
+
+      // The core of the swirling firefly.
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 18, 12),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xd9cfb7,
+          emissive: 0xffd3a1,
+          emissiveIntensity: 2.4,
+          metalness: 0.08,
+          roughness: 0.3
+        })
+      );
+      core.position.y = 2.25;
+      core.scale.setScalar(emitter.scale);
+      core.castShadow = true;
+      core.receiveShadow = true;
+      scene.add(core);
+
+      // Floating sparks.
+      for (let i = 0; i < 7; i++) {
+        const spark = new THREE.Mesh(
+          sparkGeometry,
+          new THREE.MeshBasicMaterial({
+            color: index === 0 ? "#e8d5c5" : "#b9e4df",
+            transparent: true,
+            opacity: 0.38 + (i % 2) * 0.12,
+            depthWrite: false
+          })
+        );
+        spark.position.set(
+          emitter.x + (index % 2) * 0.025,
+          3.15,
+          emitter.z + (index % 2) * 0.03
+        );
+        spark.scale.setScalar(emitter.scale);
+        scene.add(spark);
+
+        // A small ember that rises and falls.
+        const ember = new THREE.Mesh(
+          new THREE.SphereGeometry(1, 8, 6),
+          new THREE.MeshBasicMaterial({
+            color: index === 0 ? "#e8d5c5" : "#b9e4df",
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false
+          })
+        );
+        ember.position.set(
+          emitter.x + (index % 2) * 0.025,
+          3.15 + Math.sin(index * 0.7) * 0.16,
+          emitter.z + (index % 2) * 0.03
+        );
+        scene.add(ember);
+      }
+
+      // A soft, slow drifting spiral around the lantern.
+      const spiral = new THREE.Group();
+      spiral.position.set(emitter.x, 3.35, emitter.z);
+
+      const particleMaterial = new THREE.MeshBasicMaterial({
+        color: index === 0 ? "#f5e2d6" : "#d8d3c7",
+        transparent: true,
+        opacity: 0.9
+      });
+
+      const particle = new THREE.Mesh(
+        makeParticleGeometry(),
+        particleMaterial
+      );
+      particle.position.y = 0.12;
+      particle.scale.setScalar(emitter.scale);
+      particle.receiveShadow = true;
+      spiral.add(particle);
+
+      scene.add(spiral);
+    });
+
+    // ---------------------------------------------------------------------
+    // Custom orbit controls, implemented without addons
+    // ---------------------------------------------------------------------
+
+    const orbit = {
+      target: new THREE.Vector3(0, 4.5, 0.6),
+      radius: 8.2,
+      theta: 0.72,
+      phi: 1.03
+    };
+
+    function updateCamera() {
+      camera.position.set(
+        target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+        target.y + orbit.radius * Math.cos(orbit.phi),
+        target.z + orbit.radius * Math.cos(orbit.theta)
+      );
+      camera.lookAt(target);
+    }
+
+    function resetCamera() {
+      orbit.target.set(0, 4.5, 0.6);
+      orbit.radius = 8.2;
+      orbit.theta = 0.72;
+      orbit.phi = 1.03;
+      updateCamera();
+    }
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetCamera();
+      }
+    });
+
+    window.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      orbit.radius = THREE.MathUtils.clamp(
+        orbit.radius * Math.exp(event.deltaY * 0.001),
+        4.2,
+        12
+      );
+      updateCamera();
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      const dx = event.deltaX;
+      const dy = event.deltaY;
+
+      orbit.theta -= dx * 0.006;
+      orbit.phi = THREE.MathUtils.clamp(
+        orbit.phi - dy * 0.005,
+        0.42,
+        1.43
+      );
+      updateCamera();
+    });
+
+    window.addEventListener("pointerup", () => {
+      updateCamera();
+    });
+
+    window.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      orbit.radius = THREE.MathUtils.clamp(
+        orbit.radius * Math.exp(event.deltaY * 0.001),
+        4.2,
+        12
+      );
+      updateCamera();
+    }, { passive: false });
+
+    window.addEventListener("dblclick", resetCamera);
+
+    // ---------------------------------------------------------------------
+    // Animation
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.elapsedTime;
+
+      emitters.forEach((emitter, index) => {
+        // The swirling firefly moves around the lantern.
+        emitter.z =
+          emitter.z + emitter.scale * (Math.sin(elapsed * 1.35 + index * 0.8) - Math.cos(elapsed * 1.2)) * 0.025;
+        emitter.x += emitter.x * (1 - emitter.scale * 0.9);
+
+        // Slow, irregular drift upward.
+        emitter.y += Math.sin(elapsed * 1.35 + index * 0.8) * 0.12;
+      });
+
+      core.rotation.z = Math.sin(elapsed * 1.7) * 0.009;
+
+      particles.forEach((particle, index) => {
+        const drift =
+          Math.sin(elapsed * 1.15 + index * 0.4) *
+          (index % 2) *
+          emitter.scale * 0.018;
+        particle.position.x += drift;
+        particle.position.y += emitter.scale * (1 - emitter.scale * 0.9);
+      });
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    renderer.setAnimation(animate);
+  </script>
+</body>
+</html>

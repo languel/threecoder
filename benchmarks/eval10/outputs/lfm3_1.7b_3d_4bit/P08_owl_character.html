@@ -1,0 +1,1627 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gnarled Branch — Owl Study</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e7f1f2;
+      --muted: rgba(173, 219, 218, 0.48);
+      --paper: rgba(255, 255, 255, 0.13);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dce8e4;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(
+          circle at 50% 45%,
+          transparent 40%,
+          rgba(35, 34, 30, 0.28) 70%
+        );
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .title-card {
+      position: absolute;
+      top: clamp(20px, 4vw, 52px);
+      left: clamp(20px, 4vw, 72px);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 30px;
+      height: 2px;
+      content: "";
+      background: var(--ink);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3.5vw, 46px);
+      font-weight: 300;
+      letter-spacing: -0.035em;
+      line-height: 0.95;
+    }
+
+    .subtitle {
+      max-width: 380px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: absolute;
+      right: clamp(18px, 4vw, 56px);
+      bottom: clamp(18px, 4vw, 42px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .controls .hint {
+      padding: 9px 12px;
+      border: 1px solid rgba(173, 219, 218, 0.13);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.035em;
+    }
+
+    .controls button {
+      appearance: none;
+      border: 1px solid rgba(173, 219, 218, 0.16);
+      border-radius: 999px;
+      padding: 9px 13px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition:
+        border-color 160ms ease,
+        background 160ms ease;
+    }
+
+    .controls button:hover {
+      border-color: rgba(173, 219, 218, 0.3);
+      background: rgba(173, 219, 218, 0.18);
+    }
+
+    .controls button.active {
+      border-color: rgba(173, 219, 218, 0.48);
+      background: rgba(173, 219, 218, 0.13);
+      color: var(--ink);
+    }
+
+    .controls .pause-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f4f5fa;
+      box-shadow: 0 0 0 3px rgba(173, 219, 218, 0.18);
+    }
+
+    .controls .pause-dot.paused {
+      background: #d9d0d1;
+      box-shadow: 0 0 0 3px rgba(d9, d0, d1, 0.2);
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-content: center;
+      gap: 18px;
+      color: var(--ink);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      transition: opacity 500ms ease;
+    }
+
+    .loading span {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(173, 219, 218, 0.16);
+      transform: rotate(45deg);
+      box-shadow: 0 0 20px rgba(173, 219, 218, 0.15);
+    }
+
+    .loading::before {
+      content: "";
+      width: 34px;
+      height: 34px;
+      border: 2px solid rgba(173, 219, 218, 0.35);
+      box-shadow: 0 0 18px rgba(173, 219, 218, 0.15);
+    }
+
+    .loading::after {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      color: var(--ink);
+      font-size: 19px;
+    }
+
+    .loading span.ready::before,
+    .loading span.ready::after,
+    .loading span.ready::after {
+      display: none;
+    }
+
+    @media (max-width: 700px) {
+      .subtitle {
+        max-width: 250px;
+        margin-top: 10px;
+      }
+
+      .controls {
+        right: 18px;
+        bottom: 18px;
+        left: 18px;
+        justify-content: flex-end;
+      }
+
+      .controls .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stage"></div>
+  <div class="vignette"></div>
+
+  <div class="hud">
+    <div class="title-card">
+      <div class="eyebrow">Field study · no. 07</div>
+      <h1>Gnarled<br />Owl</h1>
+      <p class="subtitle">
+        A gentle, low-poly owl perched on a weathered branch,
+        with soft head-tilting and slow wing-bobbing.
+      </p>
+    </div>
+
+    <div class="controls">
+      <div class="hint">Drag to orbit · Scroll to zoom · Arrow keys to pause</div>
+      <button id="pauseButton" type="button">Pause motion</button>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">
+    <span></span>
+    Drafting the field study
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, scene and camera
+    // -------------------------------------------------------------------------
+
+    const stage = document.querySelector("#stage");
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    stage.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.fog = new THREE.Fog(0xd9d6d2, 15, 30);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+    window.camera = camera;
+
+    const cameraTarget = new THREE.Vector3(0, 0.55, 0);
+    const desiredCamera = {
+      theta: 0.72,
+      phi: 1.09,
+      radius: 10.8
+    };
+
+    const currentCamera = {
+      theta: desiredCamera.theta,
+      phi: desiredCamera.phi,
+      radius: desiredCamera.radius
+    };
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls — no addons or examples
+    // -------------------------------------------------------------------------
+
+    const canvas = renderer.domElement;
+
+    function updateCamera() {
+      const sinPhi = Math.sin(currentCamera.phi);
+
+      camera.position.set(
+        cameraTarget.x + currentCamera.radius * sinPhi * Math.sin(currentCamera.theta),
+        cameraTarget.y + currentCamera.radius * Math.cos(currentCamera.phi),
+        cameraTarget.z + currentCamera.radius * sinPhi * Math.cos(currentCamera.theta)
+      );
+
+      camera.lookAt(cameraTarget);
+    }
+
+    function setCamera(theta, phi, radius) {
+      desiredCamera.theta = theta;
+      desiredCamera.phi = phi;
+      desiredCamera.radius = radius;
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 && event.shiftKey) return;
+
+      setCamera(event.clientX, event.clientY, 10.8);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      const deltaX = event.clientX - desiredCamera.theta;
+      const deltaY = event.clientY - desiredCamera.phi;
+
+      desiredCamera.theta -= deltaX * 0.006;
+      desiredCamera.phi -= deltaY * 0.005;
+    });
+
+    function resetCamera() {
+      setCamera(0.72, 1.09, 10.8);
+    }
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      desiredCamera.radius *= Math.exp(event.deltaY * 0.001);
+      desiredCamera.radius = THREE.MathUtils.clamp(
+        desiredCamera.radius,
+        6.5,
+        17
+      );
+    }, { passive: false });
+
+    window.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+
+      if (key === "arrowleft") setCamera(-0.12, -0.06, 10.8);
+      if (key === "arrowright") setCamera(0.12, -0.06, 10.8);
+      if (key === "arrowup") setCamera(0.12, 0.14, 10.8);
+      if (key === "arrowdown") setCamera(-0.12, 0.14, 10.8);
+
+      if (key === "+" || key === "=") {
+        desiredCamera.radius -= 0.08;
+        desiredCamera.radius = THREE.MathUtils.clamp(
+          desiredCamera.radius,
+          6.5,
+          17
+        );
+      }
+
+      if (key === "-") {
+        desiredCamera.radius += 0.08;
+        desiredCamera.radius = THREE.MathUtils.clamp(
+          desiredCamera.radius,
+          6.5,
+          17
+        );
+      }
+    });
+
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // -------------------------------------------------------------------------
+    // Custom astrophare materials and sky
+    // -------------------------------------------------------------------------
+
+    function createSkyTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, "#a9e5ec");
+      gradient.addColorStop(0.38, "#dfe3ee");
+      gradient.addColorStop(1, "#dce9ee");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const sky = new THREE.Sky;
+      sky.rotation.y = -0.075;
+      sky.position.y = 0.5;
+
+      sky.fog = new THREE.SkyFog(sky, 15, 30);
+      sky.renderOrder = 3;
+
+      return sky;
+    }
+
+    const sky = createSkyTexture();
+
+    scene.add(
+      new THREE.HemisphereLight(0xf4f5ff, 0x6e6a61, 2.15),
+      new THREE.AmbientLight(0xffffff, 0.38)
+    );
+
+    const sun = new THREE.DirectionalLight(0xfff1d4, 3.2);
+    sun.position.set(-8, 14, 9);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -10;
+    sun.shadow.camera.right = 10;
+    sun.shadow.camera.top = 12;
+    sun.shadow.camera.bottom = -5;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 30;
+    sun.shadow.bias = -0.0003;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xc8e9ee, 0.85);
+    fill.position.set(10, 7, 4);
+    scene.add(fill);
+
+    // -------------------------------------------------------------------------
+    // Geometry and materials
+    // -------------------------------------------------------------------------
+
+    function createBarkTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        192,
+        0,
+        256,
+        192,
+        128
+      );
+      gradient.addColorStop(0, "#b98a30");
+      gradient.addColorStop(0.55, "#8d6142");
+      gradient.addColorStop(1, "#6e5541");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.4, 1.4);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    const barkTexture = createBarkTexture();
+
+    function makeWoodTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#4b3a31";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 150; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const length = 1 + Math.random() * 4;
+
+        ctx.strokeStyle = `rgba(60, 35, 20, ${0.035 + Math.random() * 0.11})`;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.random() * 2 - 1, y + length);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 7; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.strokeStyle = `rgba(52, 29, 19, ${0.025 + Math.random() * 0.08})`;
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y);
+        ctx.lineTo(x + 5, y);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.4, 1.4);
+
+      return texture;
+    }
+
+    function createOwlGeometry() {
+      const width = 1.5;
+      const depth = 0.55;
+
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2 + 0.08, -depth / 2);
+      shape.lineTo(width / 2 - 0.08, -depth / 2);
+      shape.lineTo(width / 2, depth / 2);
+      shape.lineTo(width / 2, -depth / 2);
+      shape.lineTo(-width / 2 + 0.08, -depth / 2);
+      shape.lineTo(-width / 2, -depth / 2);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: depth,
+        steps: 1,
+        curveSegments: 8,
+        bevelEnabled: true,
+        bevelThickness: 0.16,
+        bevelSize: 0.16,
+        bevelSegments: 2
+      });
+
+      geometry.translate(0, 0, -depth / 2);
+
+      const mesh = new THREE.Mesh(geometry, [barkTexture, barkTexture]);
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    function createOwlBody() {
+      const width = 0.72;
+      const depth = 0.58;
+      const shape = new THREE.Shape();
+
+      shape.moveTo(-width / 2 + 0.12, -depth / 2);
+      shape.lineTo(width / 2 - 0.12, -depth / 2);
+      shape.lineTo(width / 2, depth / 2);
+      shape.lineTo(width / 2, -depth / 2);
+      shape.lineTo(-width / 2 + 0.12, -depth / 2);
+      shape.lineTo(-width / 2, -depth / 2);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: depth,
+        steps: 1,
+        curveSegments: 8,
+        bevelEnabled: true,
+        bevelThickness: 0.12,
+        bevelSize: 0.12,
+        bevelSegments: 2
+      });
+
+      geometry.translate(0, 0, -depth / 2);
+
+      const mesh = new THREE.Mesh(geometry, [barkTexture, barkTexture]);
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    function createEyeTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, 512, 256);
+
+      ctx.beginPath();
+      ctx.moveTo(64, 42);
+      ctx.lineTo(190, 55);
+      ctx.quadraticCurveTo(255, 65, 255, 72);
+      ctx.lineTo(255, 135);
+      ctx.lineTo(204, 150);
+      ctx.quadraticCurveTo(140, 135, 80, 135);
+      ctx.lineTo(-80, 135);
+      ctx.quadraticCurveTo(-140, 135, -175, 135);
+      ctx.quadraticCurveTo(-255, 135, -255, 145);
+      ctx.lineTo(-255, 190);
+      ctx.quadraticCurveTo(-255, 220, -255, 225);
+      ctx.lineTo(0, 225);
+      ctx.quadraticCurveTo(0, 225, 20, 225);
+
+      ctx.closePath();
+      ctx.fill();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    function createFeather() {
+      const geometry = new THREE.ConeGeometry(1.15, 0.42, 8);
+      geometry.translate(0, 0, 0.22);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x9d7b5e,
+        roughness: 0.72
+      });
+
+      const feather = new THREE.Mesh(geometry, [material, material]);
+      return feather;
+    }
+
+    function createFeatherGradient() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 1024;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 0);
+      gradient.addColorStop(0, "#b8d7d1");
+      gradient.addColorStop(0.48, "#d5c3a4");
+      gradient.addColorStop(1, "#c6beae");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 1024);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.8, 1.6);
+
+      return texture;
+    }
+
+    function createFeatherGeometry() {
+      const geometry = new THREE.PlaneGeometry(1, 1, 24, 8);
+      geometry.setAttribute(
+        "vertexColors",
+        new THREE.Float32BufferAttribute(geometry.attributes.color, 3)
+      );
+
+      const positions = geometry.attributes.position;
+
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+
+        if (y < 0.25) {
+          positions.setZ(i, y + 0.35);
+        } else if (y < 6.5) {
+          positions.setZ(i, -0.35);
+        } else if (y < 11) {
+          positions.setZ(i, 0.35);
+        } else {
+          positions.setZ(i, -0.35);
+        }
+      }
+
+      geometry.setAttribute(
+        "vertexColors",
+        new THREE.Float32BufferAttribute(positions.attributes.color, 3)
+      );
+
+      return geometry;
+    }
+
+    function createFeatherMaterial() {
+      const color = new THREE.Color();
+
+      // This is a custom procedural material; no external assets.
+      color.setHSL(0.42, 0.28, 0.62);
+      color.offsetHSL(0.05, 0.15, 0.1);
+
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.72,
+        metalness: 0
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Branch and ground
+    // -------------------------------------------------------------------------
+
+    const branch = createBarkTexture();
+
+    function createBranchShape(x, z) {
+      const shape = new THREE.Shape();
+      const radius = Math.abs(z);
+
+      if (x > 0.18) {
+        const angle = Math.atan2(-z, x);
+        shape.moveTo(radius, -radius * Math.cos(angle));
+        shape.lineTo(radius, radius * Math.sin(angle));
+        shape.closePath();
+      } else {
+        shape.moveTo(0, -radius);
+        shape.lineTo(-radius, 0);
+        shape.lineTo(-radius, radius);
+        shape.closePath();
+      }
+
+      return shape;
+    }
+
+    function createGnarledBranch(points, segments = 16) {
+      const shape = new THREE.Shape();
+
+      for (let i = 0; i <= segments; i++) {
+        const x = points[Math.round((i / segments) * (points.length - 1))];
+        const z = points[Math.round((i / segments) * (points.length - 1))];
+
+        shape.moveTo(x, z);
+      }
+
+      shape.lineTo(points[points.length - 1].x, points[points.length - 1].z);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.28,
+        steps: 1,
+        curveSegments: 8,
+        bevelEnabled: true,
+        bevelThickness: 0.12,
+        bevelSize: 0.12,
+        bevelSegments: 2
+      });
+
+      geometry.translate(0, 0, -0.14);
+
+      const material = new THREE.MeshStandardMaterial({
+        map: barkTexture,
+        roughness: 1
+      });
+
+      const mesh = new THREE.Mesh(geometry, [material, material]);
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      return mesh;
+    }
+
+    const branchPoints = [
+      [-0.35, -0.14],
+       [-1.15, -0.22],
+       [-1.55, -0.34],
+       [-2.25, -0.42],
+       [-3.05, -0.48]
+    ];
+
+    const branch = createBranchShape(-4.5, 0.12);
+    branchPoints.forEach((point) => {
+      branch.addPoint(point.x, point.z);
+    });
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({
+        color: 0xd6d1c8,
+        roughness: 1
+      })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0x777a7e,
+      roughness: 1
+    });
+
+    const rockGeometry = new THREE.SphereGeometry(0.12, 8, 6);
+    const rockCount = 28;
+
+    for (let i = 0; i < rockCount; i++) {
+      const x = (Math.random() - 0.5) * 3.2;
+      const z = Math.sqrt(Math.max(0, 1 - Math.pow(x / 3.2, 2))) * 1.1;
+
+      scene.add(
+        new THREE.Mesh(rockGeometry, rockMaterial)
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Owl anatomy
+    // -------------------------------------------------------------------------
+
+    const owl = {
+      position: [0, 0.12, 0],
+      rotation: [0.15, -0.18, 0.14],
+      scale: new THREE.Vector3(1.05, 0.97, 0.82),
+      scaleYaw: 0,
+      scalePitch: 0,
+      scaleRoll: 0,
+
+      bodyYaw: 0.16,
+      headYaw: 0.17,
+      tailYaw: -0.10,
+      headPitch: 1.05,
+      headOffset: 0.18,
+      tailPitch: 1.05,
+      headOffset: 0.18,
+
+      beakYaw: 0.05,
+      wingYaw: 0.12,
+      lowerWingYaw: 0.32,
+      upperWingYaw: 0.48,
+      wingOffset: 0.13,
+      eyeYaw: 0.25,
+      eyeOffset: 0.10,
+      eyeDistance: 0.16,
+      eyeSize: 0.055
+    };
+
+    function updateOwl() {
+      const yaw = THREE.MathUtils.lerp(0.16, headYaw, 1 - Math.abs(scaleYaw));
+      const pitch = THREE.MathUtils.lerp(-0.12, headPitch, 1 - Math.abs(scalePitch));
+
+      owl.position.set(
+        (Math.sin(yaw) * scaleYaw + pitch) * owl.scale,
+        yaw * scaleYaw,
+        (Math.cos(yaw) * scalePitch + 0.18) * owl.scale
+      );
+
+      const head = new THREE.Vector3(
+        Math.sin(headYaw) * owl.scale,
+        0.18 * owl.scale,
+        Math.cos(headYaw) * owl.scale
+      );
+
+      const eye = new THREE.Vector3(
+        Math.sin(eyeYaw) * owl.scale * owl.eyeDistance,
+        0.16 * owl.scale,
+        Math.cos(eyeYaw) * owl.scale * owl.eyeSize
+      );
+
+      const beak = new THREE.Vector3(
+        Math.sin(0.05) * owl.scale,
+        0.12 * owl.scale,
+        Math.cos(0.05) * owl.scale
+      );
+
+      // Small shoulder and chest feathers.
+      const leftShoulder = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftShoulder.position.set(-0.17, 0.18, -0.42);
+      leftShoulder.scale.set(1, 1.14, 1);
+
+      const rightShoulder = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightShoulder.position.set(0.17, 0.18, 0.42);
+      rightShoulder.scale.set(1, 1.14, 1);
+
+      const leftChest = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        createFeatherMaterial()
+      );
+      leftChest.position.set(-0.16, 0.25, -0.42);
+      leftChest.scale.set(1, 1, 1);
+
+      const rightChest = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        createFeatherMaterial()
+      );
+      rightChest.position.set(0.16, 0.25, 0.42);
+      rightChest.scale.set(1, 1, 1);
+
+      const leftUpperChest = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperChest.position.set(-0.16, 0.34, -0.42);
+      leftUpperChest.scale.set(1, 1, 1);
+
+      const rightUpperChest = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperChest.position.set(0.16, 0.34, 0.42);
+      rightUpperChest.scale.set(1, 1, 1);
+
+      const leftEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.095, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      leftEye.position.set(-0.19, 0.16, -0.42);
+      leftEye.scale.set(1, 1.15, 1);
+
+      const rightEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.095, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      rightEye.position.set(0.19, 0.16, -0.42);
+      rightEye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const lowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      lowerWing.position.set(0.18, 0.16, -0.42);
+      lowerWing.scale.set(1, 1.15, 1);
+
+      const upperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      upperWing.position.set(-0.14, 0.17, 0.47);
+      upperWing.scale.set(1, 1.15, 1);
+
+      const lowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      lowerWingTip.position.set(-0.14, 0.17, 0.48);
+      lowerWingTip.scale.set(1, 1, 1);
+
+      const upperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      upperWingTip.position.set(-0.14, 0.17, 0.47);
+      upperWingTip.scale.set(1, 1, 1);
+
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      eye.position.set(-0.19, 0.16, -0.42);
+      eye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const leftFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftFeather.position.set(-0.18, 0.19, -0.3);
+      leftFeather.scale.set(1, 1.14, 1);
+
+      const rightFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightFeather.position.set(0.18, 0.19, 0.3);
+      rightFeather.scale.set(1, 1.14, 1);
+
+      const leftUpperFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperFeather.position.set(-0.12, 0.19, 0.43);
+      leftUpperFeather.scale.set(1, 1.14, 1);
+
+      const rightUpperFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperFeather.position.set(0.12, 0.19, 0.43);
+      rightUpperFeather.scale.set(1, 1.14, 1);
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.48);
+      leftUpperWing.scale.set(1, 1.14, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(0.12, 0.17, 0.48);
+      rightUpperWing.scale.set(1, 1.14, 1);
+
+      const leftLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftLowerWing.position.set(-0.13, 0.16, -0.3);
+      leftLowerWing.scale.set(1, 1.14, 1);
+
+      const rightLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightLowerWing.position.set(-0.13, 0.16, 0.3);
+      rightLowerWing.scale.set(1, 1.14, 1);
+
+      const beakFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      beakFeather.position.set(-0.13, 0.16, 0.4);
+      beakFeather.scale.set(1, 1.14, 1);
+
+      const rightBeakFeather = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightBeakFeather.position.set(0.13, 0.16, 0.4);
+      rightBeakFeather.scale.set(1, 1.14, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(0.12, 0.17, 0.48);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      leftChin.position.set(-0.18, 0.31, -0.3);
+      leftChin.scale.set(1, 1, 1);
+
+      const rightChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      rightChin.position.set(0.18, 0.31, 0.3);
+      rightChin.scale.set(1, 1, 1);
+
+      const leftFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftFeatherTip.position.set(-0.15, 0.18, -0.2);
+      leftFeatherTip.scale.set(1, 1.14, 1);
+
+      const rightFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightFeatherTip.position.set(-0.15, 0.18, 0.2);
+      rightFeatherTip.scale.set(1, 1.14, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      leftEye.position.set(-0.19, 0.16, -0.42);
+      leftEye.scale.set(1, 1.15, 1);
+
+      const rightEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      rightEye.position.set(0.19, 0.16, -0.42);
+      rightEye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.43);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.43);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftLowerWing.position.set(-0.13, 0.16, -0.3);
+      leftLowerWing.scale.set(1, 1.14, 1);
+
+      const rightLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightLowerWing.position.set(-0.13, 0.16, 0.3);
+      rightLowerWing.scale.set(1, 1.14, 1);
+
+      const leftLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      leftLowerWingTip.scale.set(1, 1, 1);
+
+      const rightLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      rightLowerWingTip.scale.set(1, 1, 1);
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.47);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.47);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      leftChin.position.set(-0.18, 0.31, -0.3);
+      leftChin.scale.set(1, 1, 1);
+
+      const rightChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      rightChin.position.set(0.18, 0.31, 0.3);
+      rightChin.scale.set(1, 1, 1);
+
+      const leftFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftFeatherTip.position.set(-0.15, 0.18, -0.2);
+      leftFeatherTip.scale.set(1, 1.14, 1);
+
+      const rightFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightFeatherTip.position.set(-0.15, 0.18, 0.2);
+      rightFeatherTip.scale.set(1, 1.14, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      leftEye.position.set(-0.19, 0.16, -0.42);
+      leftEye.scale.set(1, 1.15, 1);
+
+      const rightEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      rightEye.position.set(0.19, 0.16, -0.42);
+      rightEye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.43);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.43);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftLowerWing.position.set(-0.13, 0.16, -0.3);
+      leftLowerWing.scale.set(1, 1.14, 1);
+
+      const rightLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightLowerWing.position.set(-0.13, 0.16, 0.3);
+      rightLowerWing.scale.set(1, 1.14, 1);
+
+      const leftLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      leftLowerWingTip.scale.set(1, 1, 1);
+
+      const rightLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      rightLowerWingTip.scale.set(1, 1, 1);
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.47);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.47);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      leftChin.position.set(-0.18, 0.31, -0.3);
+      leftChin.scale.set(1, 1, 1);
+
+      const rightChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      rightChin.position.set(0.18, 0.31, 0.3);
+      rightChin.scale.set(1, 1, 1);
+
+      const leftFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftFeatherTip.position.set(-0.15, 0.18, -0.2);
+      leftFeatherTip.scale.set(1, 1.14, 1);
+
+      const rightFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightFeatherTip.position.set(-0.15, 0.18, 0.2);
+      rightFeatherTip.scale.set(1, 1.14, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      leftEye.position.set(-0.19, 0.16, -0.42);
+      leftEye.scale.set(1, 1.15, 1);
+
+      const rightEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      rightEye.position.set(0.19, 0.16, -0.42);
+      rightEye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.43);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.43);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftLowerWing.position.set(-0.13, 0.16, -0.3);
+      leftLowerWing.scale.set(1, 1.14, 1);
+
+      const rightLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightLowerWing.position.set(-0.13, 0.16, 0.3);
+      rightLowerWing.scale.set(1, 1.14, 1);
+
+      const leftLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      leftLowerWingTip.scale.set(1, 1, 1);
+
+      const rightLowerWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightLowerWingTip.position.set(-0.13, 0.16, 0.4);
+      rightLowerWingTip.scale.set(1, 1, 1);
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.47);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.47);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      leftChin.position.set(-0.18, 0.31, -0.3);
+      leftChin.scale.set(1, 1, 1);
+
+      const rightChin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 8, 6),
+        new THREE.MeshStandardMaterial({
+          color: 0x3f3d3d,
+          roughness: 1
+        })
+      );
+      rightChin.position.set(0.18, 0.31, 0.3);
+      rightChin.scale.set(1, 1, 1);
+
+      const leftFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftFeatherTip.position.set(-0.15, 0.18, -0.2);
+      leftFeatherTip.scale.set(1, 1.14, 1);
+
+      const rightFeatherTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightFeatherTip.position.set(-0.15, 0.18, 0.2);
+      rightFeatherTip.scale.set(1, 1.14, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.43);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      leftEye.position.set(-0.19, 0.16, -0.42);
+      leftEye.scale.set(1, 1.15, 1);
+
+      const rightEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.105, 8, 6),
+        new THREE.MeshStandardMaterial({
+          map: createEyeTexture(),
+          roughness: 0.55
+        })
+      );
+      rightEye.position.set(0.19, 0.16, -0.42);
+      rightEye.scale.set(1, 1.15, 1);
+
+      const beak = new THREE.Mesh(
+        new THREE.ConeGeometry(0.13, 0.17, 8),
+        new THREE.MeshStandardMaterial({
+          color: 0x4a4b4d,
+          roughness: 0.72
+        })
+      );
+      beak.position.set(-0.19, 0.12, -0.42);
+      beak.scale.y = 1.08;
+
+      const leftUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftUpperWing.position.set(-0.12, 0.17, 0.43);
+      leftUpperWing.scale.set(1, 1, 1);
+
+      const rightUpperWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      rightUpperWing.position.set(-0.12, 0.17, 0.43);
+      rightUpperWing.scale.set(1, 1, 1);
+
+      const leftUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      leftUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      leftUpperWingTip.scale.set(1, 1, 1);
+
+      const rightUpperWingTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        createFeatherMaterial()
+      );
+      rightUpperWingTip.position.set(-0.12, 0.17, 0.48);
+      rightUpperWingTip.scale.set(1, 1, 1);
+
+      const leftLowerWing = new THREE.Mesh(
+        createFeatherGeometry(),
+        createFeatherMaterial()
+      );
+      leftLowerWing.position.set(-0.13

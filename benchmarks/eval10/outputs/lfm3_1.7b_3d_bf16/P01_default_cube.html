@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Studio Cube — Three.js</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --text: #f7fbff;
+      --muted: rgba(167, 183, 207, 0.68);
+      --glass: rgba(14, 19, 25, 0.58);
+      --line: rgba(167, 183, 207, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #070810;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(
+          circle at 50% 45%,
+          transparent 42%,
+          rgba(8, 15, 22, 0.18) 100%
+        );
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      color: var(--text);
+      text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .vignette {
+      background-image: none;
+    }
+
+    .title-block {
+      position: absolute;
+      top: clamp(22px, 4vw, 48px);
+      left: clamp(22px, 4vw, 52px);
+      max-width: 340px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 28px;
+      height: 2px;
+      content: "";
+      background: var(--accent);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(31px, 5vw, 54px);
+      font-weight: 400;
+      line-height: 0.95;
+      letter-spacing: -0.045em;
+    }
+
+    h1 span {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .subtitle {
+      max-width: 325px;
+      margin: 17px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .controls {
+      position: absolute;
+      top: clamp(22px, 4vw, 48px);
+      right: clamp(22px, 4vw, 52px);
+      display: flex;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--glass);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    button {
+      min-height: 34px;
+      padding: 0 16px;
+      border: 1px solid rgba(167, 183, 207, 0.18);
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        background 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(167, 183, 207, 0.45);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .hint {
+      position: absolute;
+      left: clamp(22px, 4vw, 52px);
+      bottom: clamp(22px, 4vw, 48px);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-content: center;
+      gap: 16px;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      transition: opacity 500ms ease;
+    }
+
+    .loading::after {
+      content: "";
+      position: absolute;
+      width: 28px;
+      height: 2px;
+      background: var(--accent);
+    }
+
+    @media (max-width: 700px) {
+      .title-block {
+        top: 22px;
+        left: 22px;
+        max-width: calc(100vw - 44px);
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .controls {
+        top: auto;
+        right: 22px;
+        bottom: 70px;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      button {
+        padding: 0 13px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="vignette"></div>
+
+  <header class="title-block">
+    <div class="eyebrow">Studio Lighting / 01</div>
+    <h1>Grey-orange cube</h1>
+    <p class="subtitle">
+      A clean, beveled geometric default under three-point studio light.
+    </p>
+  </header>
+
+  <div class="controls" aria-label="Camera controls">
+    <button id="orbitButton" type="button">Drag to orbit</button>
+    <button id="zoomButton" type="button">Zoom</button>
+    <button id="resetButton" type="button">Reset view</button>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Arrow keys rotate · R resets</div>
+
+  <div id="loading" class="loading">Preparing the studio</div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-point studio lighting with a beveled grey-orange cube"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x070810);
+    scene.fog = new THREE.FogExp2(0x070810, 0.032);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.05,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Deterministic procedural textures
+    // -------------------------------------------------------------------------
+
+    function mulberry32(seed) {
+      return function random() {
+        let t = seed += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    const random = mulberry32(73129);
+
+    function makeAmbientTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        128
+      );
+
+      gradient.addColorStop(0, "#8fa6a5");
+      gradient.addColorStop(0.45, "#687b7e");
+      gradient.addColorStop(1, "#3f3c4d");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.5, 1.5);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    var makeContactShadowTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#111520";
+      ctx.fillRect(0, 0, 512, 256);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#1d2526";
+      ctx.fillRect(0, 0, 512, 512);
+
+      let seed = 9147;
+      for (let i = 0; i < 18000; i++) {
+        const x = random() * 512;
+        const y = random() * 512;
+        const radius = 0.3 + random() * 1.2;
+
+        ctx.strokeStyle = `rgba(15, 27, 35, ${0.025 + random() * 0.075})`;
+        ctx.lineWidth = 0.4 + random() * 1.4;
+        ctx.beginPath();
+
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(8, 2.5);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    function makeGround() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        64
+      );
+
+      gradient.addColorStop(0, "#173a29");
+      gradient.addColorStop(0.5, "#1b3028");
+      gradient.addColorStop(1, "#090a0c");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    var makeGlowTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        128,
+        128,
+        0,
+        128,
+        128,
+        100
+      );
+
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,.78)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // Procedural studio environment
+    // -------------------------------------------------------------------------
+
+    function makeEnvironmentTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#10171a";
+      ctx.fillRect(0, 0, 512, 512);
+
+      const gradient = ctx.createLinearGradient(0, 0, 512, 0);
+      gradient.addColorStop(0, "rgba(255,255,255,0)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,.55)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 130; i++) {
+        const x = random() * 512;
+        const y = random() * 512;
+        const radius = 8 + random() * 30;
+
+        ctx.strokeStyle = `rgba(255,255,255,${0.025 + random() * 0.08})`;
+        ctx.lineWidth = 0.4 + random() * 1.2;
+        ctx.beginPath();
+
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    var makeContactShadowTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#111520";
+      ctx.fillRect(0, 0, 512, 256);
+
+      for (let i = 0; i < 13000; i++) {
+        const x = random() * 512;
+        const y = random() * 256;
+
+        ctx.strokeStyle = `rgba(255,255,255,${0.025 + random() * 0.08})`;
+        ctx.lineWidth = 0.4 + random() * 1.4;
+        ctx.beginPath();
+
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (random() - 0.5) * 2, y + (random() - 0.5) * 2);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    var makeGlowTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createRadialGradient(
+        128,
+        128,
+        0,
+        128,
+        128,
+        100
+      );
+
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,.78)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const bevelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x17171b,
+      map: makeGroundTexture(),
+      roughness: 0.72,
+      metalness: 0.02
+    });
+
+    const bodyMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x8f7d3c,
+      map: makeAmbientTexture(),
+      bumpMap: makeGlowTexture(),
+      bumpScale: 0.075,
+      roughness: 0.38,
+      metalness: 0.02,
+      clearcoat: 0.32,
+      clearcoatRoughness: 0.48
+    });
+
+    const edgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x202a2d,
+      map: makeGroundTexture(),
+      roughness: 0.76,
+      metalness: 0.02
+    });
+
+    const contactShadowMaterial = new THREE.MeshBasicMaterial({
+      map: makeContactShadowTexture(),
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+    const rimMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8f7d3c,
+      map: makeGlowTexture(),
+      roughness: 0.4,
+      metalness: 0.04
+    });
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addBox(w, h, d, x, y, z, material, parent = scene) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    function addCylinder(
+      radius,
+      height,
+      x,
+      y,
+      z,
+      material,
+      radialSegments = 48
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          radius,
+          radius,
+          height,
+          radialSegments
+        ),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      return mesh;
+    }
+
+    function addCone(
+      radius,
+      height,
+      x,
+      y,
+      z,
+      material,
+      radialSegments = 32
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, radialSegments),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+
+      return mesh;
+    }
+
+    function addBeam(a, b, width, depth, material, parent = scene) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(width, length, depth),
+        material
+      );
+
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    function addTube(points, radius, material, segments = 64) {
+      const curve = new THREE.CatmullRomCurve3(
+        points,
+        false,
+        "catmullrom",
+        0.45
+      );
+
+      const mesh = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, segments, radius, 10, false),
+        material
+      );
+
+      mesh.castShadow = true;
+      scene.add(mesh);
+
+      return { curve, mesh };
+    }
+
+    function addPoint(x, y, z, radius) {
+      const point = new THREE.Vector3(x, y, z);
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 12, 8),
+        edgeMaterial
+      );
+
+      sphere.position.set(point.x, point.y, point.z);
+      sphere.castShadow = true;
+      scene.add(sphere);
+
+      return sphere;
+    }
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(
+      0xffffff,
+      0x11171d,
+      1.15
+    );
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffefc8, 3.2);
+    keyLight.position.set(-4.5, 9, 6.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -7;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 22;
+    keyLight.shadow.bias = -0.00025;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x9fc8e3, 1.15);
+    fillLight.position.set(5, 4, 3);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.DirectionalLight(0xffd7a2, 1.45);
+    rimLight.position.set(-3, 5, -6);
+    scene.add(rimLight);
+
+    const contactLight = new THREE.PointLight(0xffb96c, 22, 18, 2);
+    contactLight.position.set(2, 4.5, 0.5);
+    scene.add(contactLight);
+
+    // -------------------------------------------------------------------------
+    // Studio ground
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshStandardMaterial({
+        map: makeGroundTexture(),
+        color: 0xffffff,
+        roughness: 0.93,
+        metalness: 0
+      })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.012;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // -------------------------------------------------------------------------
+    // Lighting fixtures and soft contact shadows
+    // -------------------------------------------------------------------------
+
+    const contactShadowTarget = new THREE.Vector3(2, 4.5, 0.5);
+
+    function addContactShadow() {
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(16, 16),
+        contactShadowMaterial
+      );
+
+      shadow.position.copy(contactLight.position);
+      shadow.position.z += 1.5;
+      shadow.receiveShadow = true;
+      scene.add(shadow);
+    }
+
+    addContactShadow();
+
+    // -------------------------------------------------------------------------
+    // The single cube: a clean beveled grey-orange default
+    // -------------------------------------------------------------------------
+
+    const CUBE_HALF = 3.65;
+    const BODY_RADIUS = 1.45;
+    const BEVEL = 0.42;
+    const EDGE_Z = 0.75;
+
+    const body = addBox(
+      6.4,
+      CUBE_HALF,
+      4.7,
+      0,
+      CUBE_HALF,
+      BEVEL
+    );
+
+    body.castShadow = true;
+    body.receiveShadow = true;
+
+    // A subtle edge around the upper three edges of the grey-orange body.
+    const edgeGeometry = new THREE.BufferGeometry();
+    edgeGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute([
+        -1.68, 3.35, 0.75,
+         1.68, 3.35, 0.75,
+        -1.68, -3.35, 0.75,
+         1.68, -3.35, 0.75
+      ], 3)
+    );
+
+    edgeGeometry.setIndex([
+      0, 2, 4,
+      0, 4, 3,
+      1, 4, 5,
+      1, 5, 3
+    ]);
+
+    const bodyEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+    bodyEdge.position.y = 3.35;
+    bodyEdge.castShadow = true;
+    body.add(bodyEdge);
+
+    // -------------------------------------------------------------------------
+    // Soft rim light
+    // -------------------------------------------------------------------------
+
+    const rimLightTarget = new THREE.Vector3(-0.8, 4.2, 1.8);
+    var rimLight = addPoint(
+      -0.35,
+      5.05,
+      0.65,
+      BEVEL
+    );
+    rimLight.castShadow = true;
+
+    // -------------------------------------------------------------------------
+    // Custom camera controls: orbit, zoom, keyboard, and reset
+    // -------------------------------------------------------------------------
+
+    const orbitButton = document.getElementById("orbitButton");
+    const zoomButton = document.getElementById("zoomButton");
+    const resetButton = document.getElementById("resetButton");
+
+    const orbitTarget = new THREE.Vector3(0, 4.2, 1.8);
+    let cameraYaw = 0.72;
+    let cameraPitch = 1.15;
+    let cameraDistance = window.innerWidth / window.innerHeight < 0.88 ? 10.5 : 8.5;
+
+    function updateCamera() {
+      const horizontalRadius =
+        cameraDistance * Math.cos(cameraPitch);
+
+      camera.position.set(
+        orbitTarget.x + horizontalRadius * Math.sin(cameraYaw),
+        orbitTarget.y + cameraDistance * Math.sin(cameraPitch),
+        orbitTarget.z + horizontalRadius * Math.cos(cameraYaw)
+      );
+
+      camera.lookAt(orbitTarget);
+    }
+
+    function resetView() {
+      cameraYaw = 0.72;
+      cameraPitch = 1.15;
+      cameraDistance = window.innerWidth / window.innerHeight < 0.88 ? 10.5 : 8.5;
+      updateCamera();
+    }
+
+    // -------------------------------------------------------------------------
+    // UI state
+    // -------------------------------------------------------------------------
+
+    const orbitButtonId = "orbitButton";
+    const zoomButtonId = "zoomButton";
+    const resetButtonId = "resetButton";
+
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+
+    function setDragMode() {
+      dragging = !dragging;
+      orbitButton.classList.toggle("dragging", dragging);
+    }
+
+    function updateUI() {
+      orbitButton.textContent = dragging ? "Stop orbit" : "Drag to orbit";
+      zoomButton.textContent = window.innerWidth / window.innerHeight < 0.88
+        ? "Zoom"
+        : "Reset view";
+
+      if (window.innerWidth < 700) {
+        orbitButton.classList.add("dragging");
+        zoomButton.classList.add("active");
+      } else {
+        orbitButton.classList.remove("dragging");
+        zoomButton.classList.remove("active");
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.fov = width < 700 ? 42 : 38;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+
+      if (!cameraDistance) {
+        cameraDistance = width < 700 ? 10.5 : 8.5;
+      }
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    let firstFrame = true;
+
+    renderer.setAnimationLoop(() => {
+      const damping = 0.085;
+
+      // camera animation loop
+
+      updateCamera();
+
+      renderer.render(scene, camera);
+
+      if (firstFrame) {
+        firstFrame = false;
+        requestAnimationFrame(() => {
+          document.getElementById("loading").style.opacity = "0";
+        });
+      }
+    });
+  </script>
+</body>
+</html>

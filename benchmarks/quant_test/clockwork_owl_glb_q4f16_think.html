@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clockwork Brass Owl</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --gold: #e7b568;
+      --amber: #ffc35a;
+      --panel: rgba(15, 19, 23, 0.82);
+      --border: rgba(231, 181, 104, 0.26);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 35%, #28313a 0%, #11171c 52%, #090c0f 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 10;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow:
+        0 16px 45px rgba(0, 0, 0, 0.32),
+        inset 0 1px rgba(255, 255, 255, 0.035);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    #info {
+      top: 22px;
+      left: 22px;
+      width: min(360px, calc(100vw - 44px));
+      padding: 18px 20px;
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: var(--amber);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: #f5ead2;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(24px, 4vw, 34px);
+      font-weight: 500;
+      line-height: 1.05;
+    }
+
+    #info p {
+      margin: 10px 0 0;
+      color: #aeb5ba;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 13px;
+    }
+
+    .tag {
+      padding: 5px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      color: #c9cdd0;
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    #actions {
+      right: 22px;
+      bottom: 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 9px;
+      padding: 0 17px;
+      color: #21160a;
+      background: linear-gradient(135deg, #ffe19a, #d99a38);
+      box-shadow:
+        0 6px 18px rgba(217, 154, 56, 0.22),
+        inset 0 1px rgba(255, 255, 255, 0.55);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 850;
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        filter 160ms ease,
+        opacity 160ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.55;
+    }
+
+    #replay {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      color: #e7b568;
+      background: rgba(255, 255, 255, 0.055);
+      box-shadow: none;
+      font-size: 21px;
+    }
+
+    #status {
+      position: fixed;
+      z-index: 12;
+      right: 24px;
+      top: 22px;
+      max-width: min(330px, calc(100vw - 44px));
+      padding: 10px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 9px;
+      color: #bdb8af;
+      background: rgba(12, 15, 18, 0.72);
+      font-size: 11px;
+      text-align: right;
+    }
+
+    #status.ready {
+      color: #d9e2df;
+    }
+
+    @media (max-width: 640px) {
+      #info {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+        padding: 14px 16px;
+      }
+
+      #info p {
+        display: none;
+      }
+
+      .tags {
+        margin-top: 9px;
+      }
+
+      #status {
+        display: none;
+      }
+
+      #actions {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <section id="info" class="panel">
+    <div class="eyebrow">Low-poly animated companion</div>
+    <h1>Clockwork Brass Owl</h1>
+    <p>
+      A layered copper-and-brass automaton with glowing amber eyes, articulated
+      wings, tail sway, head tilt, and exposed spinning clockwork gears.
+    </p>
+    <div class="tags">
+      <span class="tag">4 second loop</span>
+      <span class="tag">Wing flutter</span>
+      <span class="tag">Embedded GLB animation</span>
+    </div>
+  </section>
+
+  <div id="status">Building the automaton…</div>
+
+  <section id="actions" class="panel">
+    <button id="replay" title="Replay animation" aria-label="Replay animation">↻</button>
+    <button id="export" disabled>Export GLB</button>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+    import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+    const stage = document.querySelector("#stage");
+    const exportButton = document.querySelector("#export");
+    const replayButton = document.querySelector("#replay");
+    const statusLabel = document.querySelector("#status");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x11171c);
+    scene.fog = new THREE.Fog(0x11171c, 9, 19);
+
+    const camera = new THREE.PerspectiveCamera(
+      35,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(5.15, 3.65, 6.8);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    stage.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.05, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 4.4;
+    controls.maxDistance = 11;
+    controls.maxPolarAngle = Math.PI * 0.57;
+    controls.update();
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environment = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    scene.environment = environment.texture;
+    pmrem.dispose();
+
+    scene.add(new THREE.HemisphereLight(0xbdd8ef, 0x2a1b11, 1.65));
+
+    const keyLight = new THREE.DirectionalLight(0xffe6bd, 3.4);
+    keyLight.position.set(4.5, 7.5, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -2;
+    keyLight.shadow.bias = -0.0003;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x79bfff, 2.2);
+    rimLight.position.set(-5, 4, -4);
+    scene.add(rimLight);
+
+    const eyeLight = new THREE.PointLight(0xffa32c, 4.5, 3.2, 2);
+    eyeLight.position.set(0, 3.3, 1.15);
+    scene.add(eyeLight);
+
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(9, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x111619,
+        roughness: 0.92,
+        metalness: 0.04
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.015;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "ClockworkBrassOwl";
+    scene.add(assetRoot);
+
+    const materials = {
+      copper: new THREE.MeshStandardMaterial({
+        color: 0xb85d32,
+        metalness: 0.78,
+        roughness: 0.31,
+        flatShading: true,
+        side: THREE.DoubleSide
+      }),
+      copperDark: new THREE.MeshStandardMaterial({
+        color: 0x71371f,
+        metalness: 0.8,
+        roughness: 0.36,
+        flatShading: true,
+        side: THREE.DoubleSide
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0xd7a343,
+        metalness: 0.86,
+        roughness: 0.27,
+        flatShading: true
+      }),
+      brassLight: new THREE.MeshStandardMaterial({
+        color: 0xf0c567,
+        metalness: 0.82,
+        roughness: 0.24,
+        flatShading: true
+      }),
+      darkBrass: new THREE.MeshStandardMaterial({
+        color: 0x3b281b,
+        metalness: 0.76,
+        roughness: 0.4,
+        flatShading: true
+      }),
+      cavity: new THREE.MeshStandardMaterial({
+        color: 0x171311,
+        metalness: 0.52,
+        roughness: 0.64,
+        flatShading: true
+      }),
+      black: new THREE.MeshStandardMaterial({
+        color: 0x101010,
+        metalness: 0.35,
+        roughness: 0.52,
+        flatShading: true
+      }),
+      eye: new THREE.MeshStandardMaterial({
+        color: 0xffc35a,
+        emissive: 0xff7b13,
+        emissiveIntensity: 2.8,
+        metalness: 0.16,
+        roughness: 0.16,
+        flatShading: true
+      }),
+      eyeCore: new THREE.MeshStandardMaterial({
+        color: 0xfff4c2,
+        emissive: 0xffbd32,
+        emissiveIntensity: 4.2,
+        metalness: 0.05,
+        roughness: 0.1,
+        flatShading: true
+      })
+    };
+
+    const UP = new THREE.Vector3(0, 1, 0);
+
+    function addMesh(
+      geometry,
+      material,
+      parent,
+      position = [0, 0, 0],
+      scale = [1, 1, 1],
+      rotation = [0, 0, 0],
+      name = ""
+    ) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(...position);
+      mesh.scale.set(...scale);
+      mesh.rotation.set(...rotation);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      if (name) mesh.name = name;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function createGearGeometry(outerRadius, innerRadius, teeth, depth) {
+      const shape = new THREE.Shape();
+      const steps = teeth * 4;
+
+      for (let i = 0; i <= steps; i++) {
+        const radius =
+          i % 4 === 0 ? outerRadius : i % 4 === 1 || i % 4 === 2 ? outerRadius * 0.82 : innerRadius;
+        const angle = (i / steps) * Math.PI * 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (i === 0) shape.moveTo(x, y);
+        else shape.lineTo(x, y);
+      }
+
+      shape.closePath();
+
+      const hole = new THREE.Path();
+      hole.absarc(0, 0, Math.max(0.055, innerRadius * 0.42), 0, Math.PI * 2, true);
+      shape.holes.push(hole);
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth,
+        steps: 1,
+        curveSegments: 12,
+        bevelEnabled: true,
+        bevelSegments: 1,
+        bevelSize: Math.min(0.018, depth * 0.25),
+        bevelThickness: Math.min(0.014, depth * 0.2)
+      });
+
+      geometry.center();
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function createGear(
+      parent,
+      outerRadius,
+      innerRadius,
+      teeth,
+      depth,
+      material,
+      name = "ClockworkGear"
+    ) {
+      const pivot = new THREE.Group();
+      pivot.name = name + "_Pivot";
+      parent.add(pivot);
+
+      const gear = addMesh(
+        createGearGeometry(outerRadius, innerRadius, teeth, depth),
+        material,
+        pivot,
+        [0, 0, 0],
+        [1, 1, 1],
+        [0, 0, 0],
+        name
+      );
+
+      const hubRadius = Math.max(0.045, innerRadius * 0.38);
+      const hub = addMesh(
+        new THREE.CylinderGeometry(hubRadius, hubRadius, depth * 1.25, 10),
+        materials.brassLight,
+        pivot,
+        [0, 0, 0],
+        [1, 1, 1],
+        [Math.PI / 2, 0, 0],
+        name + "_Hub"
+      );
+
+      // Small decorative rivets around the hub.
+      const rivetCount = Math.max(4, Math.round(teeth / 2));
+      for (let i = 0; i < rivetCount; i++) {
+        const angle = (i / rivetCount) * Math.PI * 2;
+        addMesh(
+          new THREE.IcosahedronGeometry(0.025, 0),
+          materials.darkBrass,
+          pivot,
+          [Math.cos(angle) * hubRadius * 0.78, Math.sin(angle) * hubRadius * 0.78, depth * 0.56]
+        );
+      }
+
+      return pivot;
+    }
+
+    function createLeafGeometry(width = 1, length = 1) {
+      const positions = new Float32Array([
+        0, 0, 0,
+        -width * 0.5, length * 0.34, 0,
+        0, length, 0,
+        width * 0.5, length * 0.34, 0,
+        0, length * 0.38, length * 0.17,
+        0, length * 0.38, -length * 0.065
+      ]);
+
+      const indices = [
+        0, 1, 4,
+        1, 2, 4,
+        2, 3, 4,
+        3, 0, 4,
+        4, 1, 0,
+        4, 3, 1,
+        4, 0, 2,
+        4, 2, 3
+      ];
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    const featherGeometry = createLeafGeometry();
+
+    function addFeather(
+      parent,
+      material,
+      position,
+      direction,
+      length,
+      width,
+      name = "LayeredFeather"
+    ) {
+      const mesh = addMesh(
+        featherGeometry,
+        material,
+        parent,
+        position,
+        [width, length, 1],
+        [0, 0, 0],
+        name
+      );
+
+      const normalizedDirection = new THREE.Vector3(...direction).normalize();
+      mesh.quaternion.setFromUnitVectors(UP, normalizedDirection);
+      return mesh;
+    }
+
+    function buildOwl() {
+      const root = new THREE.Group();
+      root.name = "Owl_Root";
+      assetRoot.add(root);
+
+      // Torso and restrained belly.
+      const body = addMesh(
+        new THREE.IcosahedronGeometry(1, 1),
+        materials.copper,
+        root,
+        [0, 2.12, 0],
+        [0.73, 0.91, 0.59],
+        [0, 0, 0],
+        "Owl_Body"
+      );
+
+      addMesh(
+        new THREE.IcosahedronGeometry(1, 1),
+        materials.copperDark,
+        root,
+        [0, 1.78, 0.31],
+        [0.56, 0.52, 0.32],
+        [0, 0, 0],
+        "Owl_Belly"
+      );
+
+      addMesh(
+        new THREE.CylinderGeometry(0.3, 0.43, 0.38, 8),
+        materials.copperDark,
+        root,
+        [0, 3.02, 0.01]
+      );
+
+      // Layered chest feathers.
+      for (let i = 0; i < 8; i++) {
+        const a = -1.08 + (i / 7) * 2.16;
+        const rootPosition = new THREE.Vector3(
+          Math.sin(a) * 0.34,
+          2.82 - Math.cos(a) * 0.08,
+          0.61
+        );
+
+        addFeather(
+          root,
+          i % 2 === 0 ? materials.copper : materials.brass,
+          rootPosition.toArray(),
+          [Math.sin(a), -Math.cos(a), 0],
+          0.69 + (i % 3) * 0.055,
+          0.37,
+          `Owl_Chest_Feather_${i}`
+        );
+      }
+
+      // Side and lower feathers.
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 4; i++) {
+          addFeather(
+            root,
+            i % 2 === 0 ? materials.brass : materials.copper,
+            new THREE.Vector3(side * 0.56, 2.72 - i * 0.31, 0.12),
+            [side * 0.82, -0.42 - i * 0.055, 0],
+            0.77 - i * 0.035,
+            0.39,
+            `Owl_Side_Feather_${side}_${i}`
+          );
+        }
+
+        addFeather(
+          root,
+          materials.copperDark,
+          new THREE.Vector3(side * 0.29, 1.67, 0.08),
+          [side * 0.62, -0.84, 0],
+          0.78,
+          0.38,
+          `Owl_Lower_Feather_${side}`
+        );
+      }
+
+      // Tail feathers.
+      const tailPivot = new THREE.Group();
+      tailPivot.name = "Tail_Pivot";
+      tailPivot.position.set(0, 1.61, -0.4);
+      root.add(tailPivot);
+
+      for (let i = 0; i < 5; i++) {
+        const a = -1.0 + i * 0.5;
+        addFeather(
+          tailPivot,
+          i % 2 ? materials.brass : materials.copperDark,
+          new THREE.Vector3(Math.sin(a) * 0.15, 0, 0),
+          [Math.sin(a) * 0.38, -0.74, -0.64],
+          0.77,
+          0.35,
+          `Owl_Tail_Feather_${i}`
+        );
+      }
+
+      // Wings, each parented so their pivots can be animated.
+      const wingPivots = [];
+
+      for (const side of [-1, 1]) {
+        const pivot = new THREE.Group();
+        pivot.name = side < 0 ? "Wing_L_Pivot" : "Wing_R_Pivot";
+        pivot.position.set(side * 0.68, 2.52, -0.08);
+        root.add(pivot);
+        wingPivots.push(pivot);
+
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.37;
+          addFeather(
+            pivot,
+            i % 3 === 0 ? materials.brass : materials.copper,
+            new THREE.Vector3(
+              Math.sin(a) * 0.12,
+              -i * 0.075,
+              (i % 2) * 0.035
+            ),
+            [Math.sin(a) * 0.7, -0.94, 0],
+            0.72 + (i % 3) * 0.06,
+            0.4,
+            `Owl_Wing_Feather_${side}_${i}`
+          );
+        }
+
+        // Shorter coverts close to the shoulder.
+        for (let i = 0; i < 3; i++) {
+          addFeather(
+            pivot,
+            materials.copperDark,
+            new THREE.Vector3(side * 0.06, 0.16 - i * 0.12, 0.01),
+            [side * 0.65, -0.55, 0],
+            0.55,
+            0.31,
+            `Owl_Covert_${side}_${i}`
+          );
+        }
+      }
+
+      // Head and face.
+      const headPivot = new THREE.Group();
+      headPivot.name = "Head_Pivot";
+      headPivot.position.set(0, 3.3, 0.07);
+      root.add(headPivot);
+
+      addMesh(
+        new THREE.IcosahedronGeometry(1, 1),
+        materials.copper,
+        headPivot,
+        [0, 0, 0],
+        [0.62, 0.57, 0.55],
+        [0, 0, 0],
+        "Owl_Head"
+      );
+
+      for (const side of [-1, 1]) {
+        addMesh(
+          new THREE.IcosahedronGeometry(1, 1),
+          materials.copperDark,
+          headPivot,
+          [side * 0.245, 0.035, 0.47],
+          [0.19, 0.225, 0.085],
+          [0, 0, 0],
+          `Owl_Eye_Socket_${side}`
+        );
+
+        addMesh(
+          new THREE.IcosahedronGeometry(1, 1),
+          materials.eye,
+          headPivot,
+          [side * 0.245, 0.035, 0.565],
+          [0.14, 0.175, 0.075],
+          [0, 0, 0],
+          `Owl_Glowing_Eye_${side}`
+        );
+
+        addMesh(
+          new THREE.IcosahedronGeometry(0.036, 0),
+          materials.eyeCore,
+          headPivot,
+          [side * 0.245 - 0.035, 0.065, 0.638],
+          [1, 1, 0.6],
+          [0, 0, 0],
+          `Owl_Eye_Glint_${side}`
+        );
+      }
+
+      addMesh(
+        new THREE.ConeGeometry(0.16, 0.33, 5),
+        materials.brassLight,
+        headPivot,
+        [0, -0.11, 0.65],
+        [1, 1, 0.78],
+        [Math.PI / 2, 0, 0],
+        "Owl_Beak"
+      );
+
+      // Small forehead tufts.
+      for (let i = 0; i < 3; i++) {
+        addFeather(
+          headPivot,
+          materials.copperDark,
+          new THREE.Vector3((i - 1) * 0.12, 0.42, -0.01),
+          [(i - 1) * 0.2, 0.95, -0.15],
+          0.35,
+          0.2,
+          `Owl_Forehead_Tuft_${i}`
+        );
+      }
+
+      // Legs and feet.
+      for (const side of [-1, 1]) {
+        addMesh(
+          new THREE.CylinderGeometry(0.055, 0.075, 0.35, 7),
+          materials.brass,
+          root,
+          [side * 0.29, 1.18, 0.02]
+        );
+
+        addMesh(
+          new THREE.IcosahedronGeometry(0.12, 1),
+          materials.brassLight,
+          root,
+          [side * 0.29, 1.025, 0.09],
+          [1.2, 0.65, 1.35],
+          [0, 0, 0],
+          `Owl_Foot_${side}`
+        );
+      }
+
+      // Chest cavity.
+      addMesh(
+        new THREE.CylinderGeometry(0.49, 0.49, 0.1, 18),
+        materials.cavity,
+        root,
+        [0, 2.23, 0.625],
+        [1, 1, 1],
+        [Math.PI / 2, 0, 0],
+        "Owl_Chest_Cavity"
+      );
+
+      addMesh(
+        new THREE.TorusGeometry(0.49, 0.072, 7, 20),
+        materials.brass,
+        root,
+        [0, 2.23, 0.69],
+        [1, 1, 1],
+        [0, 0, 0],
+        "Owl_Chest_Ring"
+      );
+
+      // Exposed gear train.
+      const centralGear = createGear(
+        root,
+        0.43,
+        0.275,
+        18,
+        0.105,
+        materials.brassLight,
+        "Clockwork_Gear_Central"
+      );
+      centralGear.position.set(0, 2.23, 0.765);
+
+      const rightGear = createGear(
+        root,
+        0.265,
+        0.165,
+        12,
+        0.085,
+        materials.copper,
+        "Clockwork_Gear_Right"
+      );
+      rightGear.position.set(0.54, 2.2, 0.765);
+      rightGear.rotation.z = -0.18;
+
+      const leftGear = createGear(
+        root,
+        0.19,
+        0.12,
+        10,
+        0.075,
+        materials.brass,
+        "Clockwork_Gear_Left"
+      );
+      leftGear.position.set(-0.55, 2.51, 0.76);
+      leftGear.rotation.z = 0.22;
+
+      // Small decorative gear medallion on the pedestal.
+      const medallion = createGear(
+        root,
+        0.29,
+        0.18,
+        12,
+        0.065,
+        materials.copper,
+        "Pedestal_Gear_Medallion"
+      );
+      medallion.position.set(0, 0.57, 1.075);
+      medallion.scale.setScalar(0.7);
+
+      // Animation-friendly quaternion tracks.
+      const duration = 4;
+      const times = [0, 1, 2, 3, 4];
+
+      const tracks = [];
+
+      tracks.push(
+        new THREE.VectorKeyframeTrack(
+          "ClockworkBrassOwl.position",
+          times,
+          [
+            0, 0, 0,
+            0, 0.03, 0,
+            0, 0, 0,
+            0, -0.018, 0,
+            0, 0, 0
+          ]
+        )
+      );
+
+      function quaternionTrack(node, totalRotations, axis = "z") {
+        const values = [];
+        let previous = null;
+
+        for (let i = 0; i < times.length; i++) {
+          const amount = i / (times.length - 1);
+          const angle = totalRotations * amount;
+          const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+
+          // Keep neighboring quaternion values on the same interpolation hemisphere.
+          if (previous && quaternion.dot(previous) < 0) {
+            quaternion.set(
+              -quaternion.x,
+              -quaternion.y,
+              -quaternion.z,
+              -quaternion.w
+            );
+          }
+
+          values.push(
+            quaternion.x,
+            quaternion.y,
+            quaternion.z,
+            quaternion.w
+          );
+          previous = quaternion.clone();
+        }
+
+        return new THREE.QuaternionKeyframeTrack(
+          `${node.name}.quaternion`,
+          times,
+          values
+        );
+      }
+
+      tracks.push(
+        quaternionTrack(headPivot, 0.14, "x"),
+        quaternionTrack(headPivot, 0.055, "y"),
+        quaternionTrack(headPivot, -0.025, "z")
+      );
+
+      tracks.push(
+        quaternionTrack(wingPivots[0], 0.055, "x"),
+        quaternionTrack(wingPivots[0], 0.035, "z"),
+        quaternionTrack(wingPivots[0], -0.025, "z")
+      );
+
+      tracks.push(
+        quaternionTrack(wingPivots[1], -0.055, "x"),
+        quaternionTrack(wingPivots[1], -0.035, "z"),
+        quaternionTrack(wingPivots[1], 0.025, "z")
+      );
+
+      tracks.push(
+        quaternionTrack(tailPivot, 0.055, "z")
+      );
+
+      tracks.push(
+        quaternionTrack(centralGear, 1, "z"),
+        quaternionTrack(rightGear, -2, "z"),
+        quaternionTrack(leftGear, 2.4, "z"),
+        quaternionTrack(medallion, 0.5, "z")
+      );
+
+      const idleClip = new THREE.AnimationClip("Idle_Loop", duration, tracks);
+      idleClip.optimize();
+
+      const mixer = new THREE.AnimationMixer(assetRoot);
+      const idleAction = mixer.clipAction(idleClip);
+      idleAction.loop = THREE.LoopRepeat;
+      idleAction.play();
+
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = Math.min(clock.getDelta(), 0.05);
+        mixer.update(delta);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      function resize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      }
+
+      window.addEventListener("resize", resize);
+
+      replayButton.addEventListener("click", () => {
+        mixer.stopAllAction();
+        idleAction.reset().play();
+      });
+
+      exportButton.addEventListener("click", async () => {
+        exportButton.disabled = true;
+        exportButton.textContent = "Exporting…";
+        statusLabel.classList.remove("ready");
+        statusLabel.textContent = "Packing geometry and Idle_Loop animation…";
+
+        try {
+          assetRoot.updateMatrixWorld(true);
+
+          const exporter = new GLTFExporter();
+          const binary = await exporter.parseAsync(assetRoot, {
+            binary: true,
+            animations: [idleClip],
+            onlyVisible: true,
+            includeCustomExtensions: false,
+            maxTextureSize: 4096
+          });
+
+          const blob = new Blob([binary], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "clockwork_brass_owl.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+          const megabytes = (blob.size / 1024 / 1024).toFixed(2);
+          statusLabel.textContent = `GLB exported · ${megabytes} MB · Idle_Loop included`;
+          statusLabel.classList.add("ready");
+        } catch (error) {
+          console.error(error);
+          statusLabel.textContent = "Export failed. See the browser console for details.";
+          statusLabel.classList.remove("ready");
+        } finally {
+          exportButton.disabled = false;
+          exportButton.textContent = "Export GLB";
+        }
+      });
+
+      statusLabel.textContent = "Ready · Drag to orbit · Scroll to zoom";
+      statusLabel.classList.add("ready");
+      exportButton.disabled = false;
+    }
+  </script>
+</body>
+</html>

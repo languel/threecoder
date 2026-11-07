@@ -1,0 +1,72 @@
+[
+  {
+    "id": "P01_default_cube",
+    "level": 1,
+    "tier": "T1_primitive",
+    "title": "Default Studio Cube",
+    "prompt": "Build a complete standalone Three.js HTML scene of a clean beveled grey-orange studio cube centered at the origin under three-point lighting. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P02_gold_sphere",
+    "level": 2,
+    "tier": "T1_primitive",
+    "title": "Brushed Gold Sphere",
+    "prompt": "Build a complete standalone Three.js HTML scene of a reflective brushed-gold sphere resting on an architectural circular stone pedestal under soft studio illumination. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P03_cube_sphere_tetrahedron",
+    "level": 3,
+    "tier": "T1_primitive",
+    "title": "Geometric Primitive Triad",
+    "prompt": "Build a complete standalone Three.js HTML scene featuring a matte crimson cube, a glossy cobalt blue sphere, and a faceted emerald tetrahedron arranged side by side on an illuminated dark plinth. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P04_platonic_solids",
+    "level": 4,
+    "tier": "T2_geometry",
+    "title": "Five Platonic Solids",
+    "prompt": "Build a complete standalone Three.js HTML scene showing all five Platonic solids (tetrahedron, cube, octahedron, dodecahedron, and icosahedron) arranged in an orbital ring, each on its own pedestal with distinct metallic and gem materials. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P05_pine_tree",
+    "level": 5,
+    "tier": "T2_geometry",
+    "title": "Low-Poly Pine Tree",
+    "prompt": "Build a complete standalone Three.js HTML scene of a stylized low-poly evergreen pine tree with a tapered trunk, exposed roots, and tiered snow-dusted foliage branches on a mossy rocky mound. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P06_particle_system",
+    "level": 6,
+    "tier": "T2_geometry",
+    "title": "Firefly Lantern & Embers",
+    "prompt": "Build a complete standalone Three.js HTML scene of a carved stone garden lantern emitting floating glowing embers and an animated, pulsing firefly particle swarm in an atmospheric twilight environment. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P07_fox_character",
+    "level": 7,
+    "tier": "T3_character",
+    "title": "Stylized Low-Poly Fox",
+    "prompt": "Build a complete standalone Three.js HTML scene of an alert low-poly stylized red fox character with pointed ears, white chest tuft, and a sweeping tail positioned on a circular ground patch. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P08_owl_character",
+    "level": 8,
+    "tier": "T3_character",
+    "title": "Animated Low-Poly Owl",
+    "prompt": "Build a complete standalone Three.js HTML scene of a perched low-poly barn owl on a gnarled tree branch with gentle idle head-tilting and layered wing feathers in a mood-lit studio setting. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P09_human_character",
+    "level": 9,
+    "tier": "T3_character",
+    "title": "Stylized Human Explorer",
+    "prompt": "Build a complete standalone Three.js HTML scene of a stylized low-poly human adventurer character wearing an explorer tunic, boots, belt pouch, and backpack standing on terrain. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  },
+  {
+    "id": "P10_snowglobe",
+    "level": 10,
+    "tier": "T3_character",
+    "title": "Winter Cabin Snowglobe",
+    "prompt": "Build a complete standalone Three.js HTML scene of a winter snowglobe on a carved wooden base containing a cozy log cabin with warm glowing windows, miniature pine trees, and drifting snow particles inside the glass dome. The camera must be positioned so the whole scene is automatically framed and visible on initial load. Enable basic mouse/touch orbit navigation with minimal UI."
+  }
+]

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Cube Asset — Three.js</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #11191c;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 10;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 13px 15px;
+      color: #edf7ed;
+      background: rgba(16, 24, 35, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(10px);
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: #9ab9b8;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(21px, 3vw, 28px);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+    }
+
+    .description {
+      margin: 9px 0 0;
+      color: #aaa8b7;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      padding: 6px 9px;
+      color: #8ec7a4;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .export-wrap {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 10;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 8px;
+      color: #071019;
+      background: linear-gradient(135deg, #d9b37c, #c99a40);
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition:
+        transform 120ms ease,
+        filter 120ms ease,
+        opacity 120ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .hint {
+      position: fixed;
+      right: 18px;
+      bottom: 16px;
+      z-index: 10;
+      color: rgba(226, 233, 245, 0.72);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+
+    @media (max-width: 700px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        max-width: calc(100vw - 24px);
+        padding: 12px 14px;
+      }
+
+      .description {
+        margin-bottom: 9px;
+      }
+
+      .export-wrap {
+        top: auto;
+        right: 12px;
+        bottom: 12px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div class="panel">
+    <div class="eyebrow">Low-poly studio asset</div>
+    <h1>Grey-Orange Cube</h1>
+    <p class="description">
+      A clean studio cube with a beveled grey-orange shell, ambient lighting,
+      and directional studio illumination. The exported GLB contains only the asset.
+    </p>
+    <div class="tags">
+      <span class="tag">Static</span>
+      <span class="tag">PBR materials</span>
+      <span class="tag">Low-poly</span>
+      <span class="tag">GLB ready</span>
+    </div>
+  </div>
+
+  <div class="export-wrap">
+    <button id="exportButton" type="button">Export GLB</button>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const exportButton = document.getElementById("exportButton");
+    const exportLabel = exportButton.querySelector("span");
+
+    // ------------------------------------------------------------
+    // Renderer and camera
+    // ------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x11191c);
+    scene.fog = new THREE.FogExp2(0x11191c, 0.055);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.05, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 4;
+    controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    // ------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x9ab8bf, 0x11191c, 2.15));
+
+    const keyLight = new THREE.DirectionalLight(0xffe0b5, 3.0);
+    keyLight.position.set(4.5, 7.5, 6.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -5;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00025;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x9ab8b4, 1.15);
+    fillLight.position.set(-5, 3, -4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffb66a, 0.75);
+    rimLight.position.set(2, 4, -7);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------
+    // Cube geometry
+    // ------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "GreyOrangeCube";
+    asset.userData = {
+      assetType: "Low-poly studio environment object",
+      units: "meters",
+      material: "GreyOrangeBevel",
+      static: true,
+      animation: "None"
+    };
+    scene.add(asset);
+
+    function addBox(parent, name, size, position, material, bevel = 0.02) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    var addCylinder = function(
+      parent,
+      name,
+      radiusTop,
+      radiusBottom,
+      height,
+      position,
+      material,
+      segments = 12
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          radiusTop,
+          radiusBottom,
+          height,
+          segments,
+          1,
+          false
+        ),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    var addSphere = function(parent, name, radius, position, material) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 12, 8),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    var addCone = function(
+      parent,
+      name,
+      radius,
+      height,
+      position,
+      material,
+      segments = 6
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, segments),
+        material
+      );
+      mesh.name = name;
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    // ------------------------------------------------------------
+    // Preview-only presentation environment — excluded from GLB export
+    // ------------------------------------------------------------
+
+    var ground = new THREE.Group();
+    ground.name = "PreviewEnvironment";
+    scene.add(ground);
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x11191c,
+      roughness: 1,
+      metalness: 0
+    });
+
+    var ground = addBox(
+      ground,
+      "Procedural_Environment_Ground",
+      [100, 0.17, 100],
+      [0, -0.035, 0],
+      groundMaterial
+    );
+    ground.castShadow = false;
+
+    const platform = addBox(
+      ground,
+      "Preview_Platform",
+      [100, 0.24, 100],
+      [0, 0, 0],
+      new THREE.MeshStandardMaterial({
+        color: 0x11191c,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    platform.castShadow = false;
+
+    const shadowFloor = addBox(
+      ground,
+      "Shadow_Floor",
+      [100, 0.055, 100],
+      [0, -0.018, 0],
+      new THREE.MeshStandardMaterial({
+        color: 0x11191c,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    shadowFloor.castShadow = false;
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+
+    const materials = {
+      shell: new THREE.MeshStandardMaterial({
+        name: "GreyOrangeBevel",
+        color: 0x9b7d52,
+        roughness: 0.76,
+        metalness: 0.16,
+        flatShading: true
+      }),
+      shellLight: new THREE.MeshStandardMaterial({
+        name: "GreyOrangeBevelLight",
+        color: 0xa88d43,
+        roughness: 0.72,
+        metalness: 0.18,
+        flatShading: true
+      }),
+      bevel: new THREE.MeshStandardMaterial({
+        name: "Bevel_Edge",
+        color: 0xffffff,
+        roughness: 0.9,
+        metalness: 0.02,
+        flatShading: true
+      }),
+      innerShell: new THREE.MeshStandardMaterial({
+        name: "Inner_Core_Shell",
+        color: 0xb5b2a3,
+        roughness: 0.92,
+        metalness: 0.05,
+        flatShading: true
+      }),
+      innerLight: new THREE.MeshStandardMaterial({
+        name: "Inner_Core_Light",
+        color: 0xd9d1c3,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.7,
+        roughness: 0.35,
+        metalness: 0.25,
+        flatShading: true
+      }),
+      rim: new THREE.MeshStandardMaterial({
+        name: "Rim_Accent",
+        color: 0xffffff,
+        emissive: 0xffc97d,
+        emissiveIntensity: 0.5,
+        roughness: 0.45,
+        metalness: 0.45,
+        flatShading: true
+      }),
+      shadow: new THREE.MeshStandardMaterial({
+        name: "Shadow_Plane",
+        color: 0x11191c,
+        roughness: 1,
+        metalness: 0
+      })
+    };
+
+    // ------------------------------------------------------------
+    // Asset construction helpers
+    // ------------------------------------------------------------
+
+    const BOTTOM_Y = 0.02;
+    const topY = 1.28;
+
+    function addCube(
+      parent,
+      name,
+      size,
+      position,
+      material,
+      bevel = 0.025
+    ) {
+      return addBox(
+        parent,
+        name,
+        size,
+        position,
+        material,
+        bevel
+      );
+    }
+
+    function addBeveledBox(
+      parent,
+      name,
+      size,
+      position,
+      material,
+      bevel = 0.025
+    ) {
+      const safeBevel = Math.min(bevel, Math.min(size[0], size[1], size[2]) * 0.45);
+      return addBox(
+        parent,
+        name,
+        [safeBevel, size[1], safeBevel],
+        position,
+        material,
+        bevel
+      );
+    }
+
+    var addCylinder = function(
+      parent,
+      name,
+      radiusTop,
+      radiusBottom,
+      height,
+      position,
+      material,
+      radialSegments = 12
+    ) {
+      return addCylinder(
+        parent,
+        name,
+        radiusTop,
+        radiusBottom,
+        height,
+        position,
+        material,
+        radialSegments
+      );
+    }
+
+    var addSphere = function(
+      parent,
+      name,
+      radius,
+      position,
+      material,
+      segments = 10
+    ) {
+      return addCylinder(
+        parent,
+        name,
+        radius,
+        radius,
+        height,
+        position,
+        material,
+        segments
+      );
+    }
+
+    var addCone = function(
+      parent,
+      name,
+      radius,
+      height,
+      position,
+      material,
+      segments = 6
+    ) {
+      return addCylinder(
+        parent,
+        name,
+        radius,
+        radius,
+        height,
+        position,
+        material,
+        segments
+      );
+    }
+
+    // Main beveled shell and inner core.
+    addSphere(
+      asset,
+      "Shell_Shell",
+      1.05,
+      [0, 1.38, 0],
+      materials.shell
+    );
+
+    addCylinder(
+      asset,
+      "Shell_Bevel_Lower",
+      0.97,
+      1.02,
+      0.22,
+      [0, 1.38, 0],
+      materials.bevel
+    );
+
+    addSphere(
+      asset,
+      "Shell_Core",
+      0.95,
+      [0, 0.76, 0],
+      materials.innerShell
+    );
+
+    addCylinder(
+      asset,
+      "Inner_Light_Core",
+      0.86,
+      0.86,
+      0.12,
+      [0, 0.43, 0],
+      materials.innerLight
+    );
+
+    // Bottom and top face.
+    addBox(
+      asset,
+      "Shell_Bottom",
+      [1.05, 0.12, 1.06],
+      [0, 0.01, 0],
+      materials.shadow
+    );
+
+    addBox(
+      asset,
+      "Shell_Top",
+      [1.05, 0.12, 1.06],
+      [0, 1.38, 0],
+      materials.shadow
+    );
+
+    // ------------------------------------------------------------
+    // Side faces and front/rear edges
+    // ------------------------------------------------------------
+
+    const leftFace = addBox(
+      asset,
+      "Left_Cube_Face",
+      [0.12, 1.05, 1.02],
+      [-0.54, 1.38, 0],
+      materials.shellLight
+    );
+    leftFace.castShadow = false;
+
+    const rightFace = addBox(
+      asset,
+      "Right_Cube_Face",
+      [0.12, 1.05, 1.02],
+      [0.54, 1.38, 0],
+      materials.shellLight
+    );
+    rightFace.castShadow = false;
+
+    const topFace = addBox(
+      asset,
+      "Top_Cube_Face",
+      [1.08, 0.12, 1.02],
+      [0, 1.38, 0],
+      materials.shadow
+    );
+    topFace.castShadow = false;
+
+    const bottomFace = addBox(
+      asset,
+      "Bottom_Cube_Face",
+      [1.08, 0.12, 1.02],
+      [0, 0.01, 0],
+      materials.shadow
+    );
+    bottomFace.castShadow = false;
+
+    // ------------------------------------------------------------
+    // Front and rear beveled edges
+    // ------------------------------------------------------------
+
+    const frontBevel = addBox(
+      asset,
+      "Front_Cube_Bevel",
+      [1.02, 0.12, 0.12],
+      [0, 1.38, 0.51],
+      materials.bevel
+    );
+    frontBevel.castShadow = false;
+
+    const backBevel = addBox(
+      asset,
+      "Rear_Cube_Bevel",
+      [1.02, 0.12, 0.12],
+      [0, 1.38, -0.51],
+      materials.bevel
+    );
+    backBevel.castShadow = false;
+
+    // ------------------------------------------------------------
+    // Rendering loop and responsive resizing
+    // ------------------------------------------------------------
+
+    function render() {
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(render);
+    }
+
+    render();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ------------------------------------------------------------
+    // GLB export
+    // ------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      exportLabel.textContent = "Exporting…";
+
+      asset.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "grey_orange_cube.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.disabled = false;
+          exportLabel.textContent = "Export GLB";
+        },
+        (error) => {
+          console.error("GLB export failed:", error);
+          exportButton.disabled = false;
+          exportLabel.textContent = "Export Failed — See Console";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        }
+      );
+    });
+  </script>
+</body>
+</html>

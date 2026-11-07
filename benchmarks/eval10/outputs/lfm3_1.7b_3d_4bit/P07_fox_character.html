@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluffy Red Fox</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f2e7d9;
+      --muted: rgba(173, 225, 216, 0.68);
+      --paper: rgba(255, 255, 255, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #171a1d;
+      color: var(--ink);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .ui {
+      position: fixed;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .hud {
+      top: 24px;
+      left: 24px;
+      width: min(390px, calc(100vw - 48px));
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: var(--paper);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 13px;
+      color: #d1b78f;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 24px;
+      height: 2px;
+      content: "";
+      background: #e5d9a6;
+      box-shadow: 0 0 10px rgba(229, 217, 166, 0.48);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(31px, 4vw, 53px);
+      line-height: 0.92;
+      letter-spacing: -0.08em;
+    }
+
+    .description {
+      max-width: 330px;
+      margin: 15px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      top: 24px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      border-radius: 999px;
+      padding: 10px 15px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #f2e7d9;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+
+    button:hover,
+    button:focus-visible {
+      border-color: rgba(229, 217, 166, 0.38);
+      background: rgba(229, 217, 166, 0.12);
+      color: #e5d9a6;
+    }
+
+    .status {
+      position: fixed;
+      z-index: 2;
+      right: 24px;
+      bottom: 22px;
+      width: 230px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+    }
+
+    .status-label {
+      margin-bottom: 7px;
+      color: #edb99f;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .status-detail {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-detail i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #a66d2f;
+      box-shadow: 0 0 10px rgba(166, 103, 47, 0.5);
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 2;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      padding: 9px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f2e7d9;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
+    }
+
+    .hint::before {
+      content: "";
+      position: absolute;
+      top: 100%;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #d7b67f;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    @media (max-width: 700px) {
+      .hud {
+        top: 14px;
+        left: 14px;
+        width: calc(100vw - 28px);
+        padding: 16px;
+      }
+
+      .description {
+        display: none;
+      }
+
+      .controls {
+        top: 14px;
+        right: 14px;
+        flex-direction: column;
+      }
+
+      button {
+        padding: 10px 12px;
+        font-size: 10px;
+      }
+
+      .status {
+        right: 14px;
+        bottom: 14px;
+        width: calc(100vw - 28px);
+        max-width: 240px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="ui">
+    <section class="hud" aria-label="Scene information">
+      <div class="eyebrow">Stylized Forest Fox</div>
+      <h1>Fluffy<br><span>Red Fox</span></h1>
+      <p class="description">
+        A soft, low-poly character with a pointed muzzle, feathered chest,
+        and an oversized white-tipped tail.
+      </p>
+    </section>
+
+    <div class="controls" aria-label="Scene controls">
+      <button id="reset" type="button">Reset view</button>
+    </div>
+
+    <section class="status" aria-label="Character status">
+      <div class="status-label">Fluffy Red Fox</div>
+      <div class="status-detail"><i></i> Feathered chest, pointed ears, and a fluffy tail</div>
+    </section>
+
+    <div class="hint">Drag to orbit · Scroll to zoom</div>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene with a cute low-poly red fox"
+    );
+
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x171a1d);
+    scene.fog = new THREE.Fog(0x171a1d, 17, 31);
+
+    const camera = new THREE.PerspectiveCamera(
+      34,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural textures and materials
+    // -------------------------------------------------------------------------
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createLinearGradient(0, 0, 0, 512);
+
+      gradient.addColorStop(0.18, "#8d9b98");
+      gradient.addColorStop(0.5, "#6f7077");
+      gradient.addColorStop(0.72, "#4e493d");
+      gradient.addColorStop(1, "#252a28");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const random = (min, max) => min + (max - min) * Math.random();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
+      ctx.fillRect(0, 0, 100, 150);
+      ctx.fillRect(0, 450, 150, 100);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(7, 7);
+      texture.needsUpdate = true;
+
+      return texture;
+    }
+
+    var makeFurTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#e9d8c4";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 850; i++) {
+        const value = Math.floor(random(85, 115));
+        ctx.fillStyle = `rgba(${value},${value + 2},${value - 2},0.035)`;
+        ctx.fillRect(
+          random(-16, 16),
+          random(-3, 3),
+          1 + random(0.5, 1.5)
+        );
+      }
+
+      for (let i = 0; i < 35; i++) {
+        const value = Math.floor(random(70, 110));
+        ctx.fillStyle = `rgba(${value},${value},${value},0.28)`;
+        ctx.fillRect(
+          random(-5, 5),
+          random(-4, 4),
+          1 + random(0.5, 1.5)
+        );
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.5, 2.5);
+      texture.needsUpdate = true;
+
+      return texture;
+    }
+
+    const furMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      map: makeFurTexture(),
+      roughness: 0.92,
+      metalness: 0
+    });
+
+    const furDarkMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc9c6a5,
+      map: makeFurTexture(),
+      roughness: 0.88
+    });
+
+    const whiskerMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe3d2ca,
+      emissive: 0x3f2934,
+      emissiveMap: furDarkMaterial,
+      emissiveRoughness: 0.72,
+      side: THREE.DoubleSide
+    });
+
+    const pawMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd6d5c8,
+      roughness: 0.9
+    });
+
+    const pawTipMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf4f3df,
+      roughness: 0.85
+    });
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function roundedRectShape(width, height, radius) {
+      const x = -width / 2;
+      const y = -height / 2;
+      const r = Math.min(radius, width / 2, height / 2);
+      const shape = new THREE.Shape();
+
+      shape.moveTo(x + r, y);
+      shape.lineTo(x + width - r, y);
+      shape.quadraticCurveTo(
+        x + width,
+        y,
+        x + width,
+        y + r
+      );
+      shape.lineTo(x + width, y + height - r);
+      shape.quadraticCurveTo(
+        x + width,
+        y + height,
+        x + width - r,
+        y + height
+      );
+      shape.lineTo(x + r, y + height);
+      shape.quadraticCurveTo(
+        x,
+        y + height,
+        x,
+        y + height - r
+      );
+      shape.lineTo(x, y + r);
+      shape.quadraticCurveTo(x, y, x + r, y);
+
+      return shape;
+    }
+
+    function roundedRectGeometry(shape, depth) {
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth,
+        steps: 1,
+        bevelEnabled: false,
+        curveSegments: 24
+      });
+
+      geometry.translate(0, 0, -depth / 2);
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function makeBoxGeometry(size, depth, material) {
+      const shape = new THREE.BoxGeometry(size[0], size[1], size[2]);
+      shape.rotateX(-Math.PI / 2);
+      return new THREE.ExtrudeGeometry(shape, {
+        depth,
+        steps: 1,
+        bevelEnabled: false
+      });
+    }
+
+    function makeCylinderBetween(a, b, radius, material) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        1,
+        24,
+        1,
+        false
+      );
+
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, 0, -direction.x * (radius / 2));
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize(),
+        direction.clone().normalize()
+      );
+      mesh.castShadow = true;
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Ground and soft ambient light
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80),
+      new THREE.MeshStandardMaterial({
+        color: 0x29383d,
+        map: makeGroundTexture(),
+        roughness: 1,
+        metalness: 0
+      })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.055;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const hemisphere = new THREE.HemisphereLight(
+      0x9fc8d1,
+      0x3c3025,
+      1.65
+    );
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xfff4df, 3.2);
+    keyLight.position.set(3.5, 7, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -6;
+    keyLight.shadow.camera.right = 6;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 20;
+    keyLight.shadow.bias = -0.00015;
+    scene.add(keyLight);
+
+    var fillLight = new THREE.DirectionalLight(0x9fb3bd, 1.35);
+    fillLight.position.set(-4, 3, 4);
+    scene.add(fillLight);
+
+    var rimLight = new THREE.DirectionalLight(0xffd8dc, 1.05);
+    rimLight.position.set(-1, 2, -5);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Procedural bark texture and fur
+    // -------------------------------------------------------------------------
+
+    function makeBarkTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, 256, 256);
+
+      for (let i = 0; i < 150; i++) {
+        const x = random(-128, 128);
+        const y = random(128, 128);
+        const radius = 1 + Math.random() * 2.5;
+
+        ctx.beginPath();
+        ctx.ellipse(x, y, radius, radius * 0.72, 0, 0, true);
+        ctx.strokeStyle = "rgba(20,18,12,.48)";
+        ctx.lineWidth = 0.35 + Math.random() * 1.1;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 4);
+      texture.needsUpdate = true;
+
+      return texture;
+    }
+
+    var makeFurTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#e9d8c4";
+      ctx.fillRect(0, 0, 512, 512);
+
+      for (let i = 0; i < 850; i++) {
+        const value = Math.floor(random(85, 115));
+        ctx.fillStyle = `rgba(${value},${value + 2},${value - 2},0.035)`;
+        ctx.fillRect(
+          random(-16, 16),
+          random(-3, 3),
+          1 + random(0.5, 1.5)
+        );
+      }
+
+      for (let i = 0; i < 35; i++) {
+        const value = Math.floor(random(70, 110));
+        ctx.fillStyle = `rgba(${value},${value},${value},0.28)`;
+        ctx.fillRect(
+          random(-5, 5),
+          random(-4, 4),
+          1 + random(0.5, 1.5)
+        );
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2.5, 2.5);
+      texture.needsUpdate = true;
+
+      return texture;
+    }
+
+    function makeSkinTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.clearRect(0, 0, 512, 512);
+      ctx.fillStyle = "#e9d8c4";
+      ctx.beginPath();
+      ctx.arc(256, 256, 160, 0, Math.PI * 2, false);
+      ctx.lineTo(256, 128);
+      ctx.quadraticCurveTo(256, 64, 192, 64);
+      ctx.lineTo(192, 64);
+      ctx.quadraticCurveTo(128, 64, 85, 85);
+      ctx.lineTo(42, 85);
+      ctx.lineTo(-4, 85);
+      ctx.lineTo(-5, 55);
+      ctx.quadraticCurveTo(-9, 35, -13, 35);
+      ctx.lineTo(-24, 35);
+      ctx.quadraticCurveTo(-48, 35, -58, 35);
+      ctx.lineTo(-70, 42);
+      ctx.lineTo(-90, 41);
+      ctx.lineTo(-90, 40);
+      ctx.lineTo(-70, 50);
+      ctx.lineTo(-55, 52);
+      ctx.quadraticCurveTo(-20, 58, -15, 58);
+
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.12)";
+      ctx.font = "500 20px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("FUR", 0, 560, 80);
+
+      for (let i = 0; i < 30; i++) {
+        const x = random(-90, 90);
+        const y = random(-90, 90);
+        const radius = 1 + Math.random() * 2.5;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2, false);
+        ctx.strokeStyle = `rgba(224,224,224,.45)`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(4, 3);
+
+      return texture;
+    }
+
+    function createFoxGeometry(shape) {
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.9,
+        steps: 1,
+        bevelEnabled: true,
+        bevelThickness: 0.09,
+        bevelSize: 0.09,
+        bevelSegments: 5
+      });
+
+      geometry.translate(0, 0, -0.45);
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+
+    function makeFoxShape(shape) {
+      const geometry = createFoxGeometry(shape);
+      const positions = geometry.attributes.position;
+
+      for (let i = 0; i < positions.count; i++) {
+        positions.x[i] = Math.sin(i * 0.055 + shape.position.y) * 0.085;
+        positions.z[i] = Math.cos(i * 0.055 + shape.position.x) * 0.085;
+        positions.y[i] = (shape.position.y + shape.position.x) * 0.045;
+      }
+
+      const indices = geometry.attributes.index;
+
+      for (let i = 0; i < positions.count; i++) {
+        const a = i;
+        const b = (i + 1) % positions.count;
+        const c = (i + 2) % positions.count;
+        const d = (i + 3) % positions.count;
+
+        indices.set3(i, c, b);
+        indices.set3(a, b, d);
+        indices.set3(c, d, b);
+      }
+
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function makeFoxFace(shape, offset = 0.5) {
+      const geometry = createFoxGeometry(shape);
+      const positions = geometry.attributes.position;
+
+      for (let i = 0; i < positions.count; i++) {
+        const x = positions.x[i];
+        const y = positions.y[i];
+        const cx = x + offset;
+        const cy = y - offset;
+
+        positions.setXYZ(i, cx, cy, positions.z[i]);
+      }
+
+      const indices = geometry.attributes.index;
+
+      for (let i = 0; i < positions.count; i++) {
+        const a = i;
+        const b = (i + 1) % positions.count;
+        const c = (i + 2) % positions.count;
+        const d = (i + 3) % positions.count;
+
+        indices.set3(a, c, b);
+        indices.set3(c, b, d);
+      }
+
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // -------------------------------------------------------------------------
+    // Ground materials and rock formations
+    // -------------------------------------------------------------------------
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: makeGroundTexture(),
+      roughness: 1,
+      metalness: 0
+    });
+
+    const dirtMaterial = new THREE.MeshStandardMaterial({
+      color: 0x777b72,
+      map: makeFurTexture(),
+      roughness: 1
+    });
+
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb9a88d,
+      roughness: 1,
+      flatShading: true
+    });
+
+    function addRock(x, y, z, scale, rotationX = 0) {
+      const group = new THREE.Group();
+      group.position.set(x, y, z);
+      group.scale.set(scale[0], scale[1], scale[2]);
+      group.rotation.set(rotationX, Math.random() * Math.PI, Math.random() * Math.PI);
+
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(1, 0),
+        rockMaterial
+      );
+
+      rock.position.y = 0.42;
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      group.add(rock);
+      scene.add(group);
+
+      return group;
+    }
+
+    for (let i = 0; i < 17; i++) {
+      const x = -8 + Math.random() * 16;
+      const z = -7 + Math.random() * 14;
+
+      addRock(x, 0.22 + Math.random() * 0.12, z, [0.5, 0.85, 1.15]);
+    }
+
+    for (let i = 0; i < 11; i++) {
+      const x = -2.5 + Math.random() * 5.5;
+      const y = -3.5 + Math.random() * 4.5;
+      const z = -7 + Math.random() * 7;
+
+      addRock(x, y, z, [0.45, 0.65, 1.05]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Fox construction
+    // -------------------------------------------------------------------------
+
+    const fox = new THREE.Group();
+    scene.add(fox);
+
+    const bodyShape = [
+      [0, -0.2],
+      [-0.48, -0.08],
+      [0.48, -0.08],
+      [0, 0.18],
+      [0, 0.28],
+      [0, 0.42],
+      [-0.48, 0.42],
+      [0.48, 0.42],
+      [0, 0.56],
+      [0, 0.58],
+      [0, 0.62],
+      [0, 0.68],
+      [0, 0.8],
+      [-0.48, 0.8],
+      [0.48, 0.8],
+      [0, 0.88],
+      [0, 1.0],
+      [0, 1.12],
+      [-0.48, 1.12],
+      [0.48, 1.12],
+      [0, 1.2],
+      [0, 1.2]
+    ];
+
+    const upperBodyShape = [
+      [0, -0.08],
+      [-0.48, -0.13],
+      [0.48, -0.13],
+      [0, 0.18],
+      [0, 0.28],
+      [0, 0.38],
+      [-0.48, 0.38],
+      [0.48, 0.38],
+      [0, 0.48],
+      [0, 0.56],
+      [0, 0.68],
+      [0, 0.72],
+      [-0.48, 0.72],
+      [0.48, 0.72],
+      [0, 1.0]
+    ];
+
+    const lowerBodyShape = [
+      [0, -0.08],
+      [-0.48, -0.13],
+      [0.48, -0.13],
+      [0, 0.18],
+      [0, 0.28],
+      [0, 0.38],
+      [-0.48, 0.38],
+      [0.48, 0.38],
+      [0, 0.48],
+      [0, 0.56],
+      [0, 0.68],
+      [0, 1.12],
+      [-0.48, 1.12],
+      [0.48, 1.12],
+      [0, 1.2]
+    ];
+
+    const headShape = [
+      [0, -0.08],
+      [-0.48, -0.13],
+      [0.48, -0.13],
+      [0, 0.18],
+      [0, 0.28],
+      [0, 0.34],
+      [-0.48, 0.34],
+      [0.48, 0.34],
+      [0, 0.42],
+      [0, 0.48],
+      [0, 0.56],
+      [0, 0.62],
+      [0, 0.7],
+      [-0.48, 0.7],
+      [0.48, 0.7],
+      [0, 1.0]
+    ];
+
+    const earShape = [
+      [-0.13, -0.15],
+      [0, -0.14],
+      [0.13, -0.15]
+    ];
+
+    const tuftShape = [
+      [-0.16, 0.12],
+      [0, 0.12],
+      [0.16, 0.12]
+    ];
+
+    const tailShape = [
+      [-1.05, 0.02],
+      [-0.95, -0.48],
+      [-1.35, -1.18],
+      [-1.55, -2.14],
+      [-1.75, -2.42],
+      [-1.85, -2.52],
+      [-1.1, -2.72]
+    ];
+
+    // -------------------------------------------------------------------------
+    // Body, head, arms, and paws
+    // -------------------------------------------------------------------------
+
+    const body = new THREE.Mesh(
+      makeFoxShape(upperBodyShape),
+      furMaterial
+    );
+
+    body.position.y = 0.13;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    fox.add(body);
+
+    const head = new THREE.Mesh(
+      makeFoxFace(headShape, 0.5),
+      furDarkMaterial
+    );
+
+    head.position.set(0, 1.14, 0);
+    head.castShadow = true;
+    head.receiveShadow = true;
+    fox.add(head);
+
+    // Two pointed ears.
+    var earPositions = [
+      [-0.07, -0.08],
+      [0.07, -0.08]
+    ];
+
+    for (const position of earPositions) {
+      const ear = new THREE.Mesh(
+        roundedRectGeometry(earShape, 0.16),
+        furDarkMaterial
+      );
+
+      ear.position.set(position[0], 1.2, 0);
+      ear.castShadow = true;
+      ear.receiveShadow = true;
+      fox.add(ear);
+    }
+
+    // White chest tuft.
+    const tuft = new THREE.Mesh(
+      roundedRectGeometry(tuftShape, 0.16),
+      furDarkMaterial
+    );
+
+    tuft.position.set(0, 1.2, 0.18);
+    tuft.castShadow = true;
+    tuft.receiveShadow = true;
+    fox.add(tuft);
+
+    // Small whisker tufts on the upper side.
+    const whiskerPositions = [
+      [0.13, 0.32],
+      [-0.14, 0.32],
+      [0.13, -0.32],
+      [-0.14, -0.32]
+    ];
+
+    for (const position of whiskerPositions) {
+      const tuft = new THREE.Mesh(
+        roundedRectGeometry(whiskerShape, 0.055),
+        whiskerMaterial
+      );
+
+      tuft.position.set(position[0], 1.2, -0.16);
+      tuft.castShadow = true;
+      fox.add(tuft);
+    }
+
+    // Four paws.
+    const footPositions = [
+      [-0.15, 1.1],
+       [0.14, 1.1],
+       [-0.15, -1.1],
+       [0.14, -1.1]
+    ];
+
+    for (const foot of footPositions) {
+      const paw = new THREE.Mesh(
+        roundedRectGeometry(pawShape, 0.16),
+        pawMaterial
+      );
+
+      paw.position.set(foot[0], 0.88, 0);
+      paw.castShadow = true;
+      paw.receiveShadow = true;
+      fox.add(paw);
+
+      const pawTip = new THREE.Mesh(
+        roundedRectGeometry(pawTipShape, 0.16),
+        pawTipMaterial
+      );
+
+      pawTip.position.set(foot[0], 0.88, 0.25);
+      pawTip.castShadow = true;
+      fox.add(pawTip);
+    }
+
+    // -------------------------------------------------------------------------
+    // Fluffy tail and pointed ears
+    // -------------------------------------------------------------------------
+
+    var tail = new THREE.Mesh(
+      roundedRectGeometry(tailShape, 0.16),
+      furDarkMaterial
+    );
+
+    tail.position.set(0, 1.2, 0.18);
+    tail.castShadow = true;
+    tail.receiveShadow = true;
+    fox.add(tail);
+
+    var earPositions = [
+      [-0.08, 1.2],
+       [0.08, 1.2]
+    ];
+
+    for (const position of earPositions) {
+      const ear = new THREE.Mesh(
+        roundedRectGeometry(earShape, 0.16),
+        furDarkMaterial
+      );
+
+      ear.position.set(position[0], 1.2, 0);
+      ear.castShadow = true;
+      ear.receiveShadow = true;
+      fox.add(ear);
+    }
+
+    // -------------------------------------------------------------------------
+    // Soft animated tail wag
+    // -------------------------------------------------------------------------
+
+    const tailPivot = new THREE.Group();
+    tailPivot.position.set(0, 1.2, -1.05);
+    fox.add(tailPivot);
+
+    const tailMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf1f3df,
+      roughness: 0.9
+    });
+
+    var tail = new THREE.Mesh(
+      roundedRectGeometry(tailShape, 0.16),
+      tailMaterial
+    );
+
+    tail.castShadow = true;
+    tail.receiveShadow = true;
+
+    // A subtle, animated movement makes the tail wag naturally.
+    const wagPoints = [
+      [0, 0],
+      [1.35, -0.15],
+      [2.2, -0.8],
+      [3.05, -1.7],
+      [3.35, -2.2]
+    ];
+
+    tail.matrixWorld.setArithmeticArray(wagPoints);
+    tail.quaternion.setFromPoints([0, 0, 0], wagPoints);
+
+    tailPivot.rotation.z += Math.sin(tailPivot.rotation.x) * 0.07;
+    tailPivot.rotation.x += Math.sin(tailPivot.rotation.y) * 0.12;
+    tailPivot.rotation.y += Math.cos(tailPivot.rotation.x) * 0.08;
+
+    // -------------------------------------------------------------------------
+    // Studio lighting and soft ambient reflections
+    // -------------------------------------------------------------------------
+
+    var rimLight = new THREE.HemisphereLight(
+      0xffd6d1,
+      0x4a302e,
+      2.1
+    );
+    scene.add(rimLight);
+
+    var fillLight = new THREE.DirectionalLight(0x9fc8d1, 1.35);
+    fillLight.position.set(-3, 5, 3);
+    scene.add(fillLight);
+
+    const rimCatcher = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 24, 16),
+      new THREE.ShiningEmissiveMaterial({
+        color: 0xffd6d1,
+        emissive: 0xffd7c5,
+        emissiveIntensity: 2.4
+      })
+    );
+
+    rimCatcher.position.set(-3.5, 4.5, 0);
+    scene.add(rimCatcher);
+
+    // -------------------------------------------------------------------------
+    // Camera controls implemented directly in this HTML file
+    // -------------------------------------------------------------------------
+
+    const orbit = {
+      theta: 0.58,
+      phi: 1.12,
+      radius: 8.2,
+      target: new THREE.Vector3(0, -0.15, 0)
+    };
+
+    const defaultOrbit = { ...orbit };
+    let dragging = false;
+    let dragX = 0;
+    let dragY = 0;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function resetView() {
+      orbit.theta = defaultOrbit.theta;
+      orbit.phi = defaultOrbit.phi;
+      orbit.radius = defaultOrbit.radius;
+      orbit.target.set(0, -0.15, 0);
+    }
+
+    const canvas = renderer.domElement;
+
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      dragX = event.clientX;
+      dragY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - dragX;
+      const dy = event.clientY - dragY;
+
+      orbit.theta -= dx * 0.006;
+      orbit.phi = clamp(orbit.phi - dy * 0.004, 0.42, 1.48);
+      dragX = event.clientX;
+      dragY = event.clientY;
+    });
+
+    function endDrag(event) {
+      dragging = false;
+
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        orbit.radius = clamp(orbit.radius * Math.exp(event.deltaY * 0.001), 5, 13);
+      },
+      { passive: false }
+    );
+
+    canvas.addEventListener("dblclick", resetView);
+    document.getElementById("reset").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Animation
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      tailPivot.rotation.z += delta * 0.12;
+      tailPivot.rotation.x += delta * 2.5;
+
+      renderer.render(scene, camera);
+    }
+
+    renderer.setAnimation(animate);
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.fov = width < 1.5 ? 50 : 34;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+    animate();
+  </script>
+</body>
+</html>

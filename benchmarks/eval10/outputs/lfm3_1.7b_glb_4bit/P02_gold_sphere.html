@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brushed Gold Sphere</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dce3e1;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .info {
+      position: fixed;
+      inset: 0;
+      border: 1px solid rgba(220, 225, 217, 0.18);
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 12px 40px rgba(255, 255, 255, 0.12);
+    }
+
+    .info h1 {
+      margin: 0 0 8px;
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .info p {
+      margin: 0;
+      color: #5a5e58;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    #export-button {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      border: 1px solid #d9a56f;
+      border-radius: 8px;
+      padding: 12px 16px;
+      background: #d9a56f;
+      color: #f4d39b;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 750;
+      cursor: pointer;
+      box-shadow: 0 5px 18px rgba(201, 165, 122, 0.22);
+      transition:
+        background 150ms ease,
+        transform 150ms ease;
+    }
+
+    #export-button:hover {
+      background: #e9c58d;
+    }
+
+    #export-button:active {
+      transform: translateY(1px);
+    }
+
+    #export-button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #status {
+      min-height: 16px;
+      color: #5a5e58;
+      font-size: 11px;
+    }
+
+    @media (max-width: 650px) {
+      .info {
+        top: 10px;
+        right: 10px;
+      }
+
+      #export-button {
+        top: 12px;
+        right: 12px;
+      }
+
+      #status {
+        display: none;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <div class="info">
+    <h1>Low-Poly Asset</h1>
+    <p>Static brushed-gold sphere · Low-poly stone pedestal</p>
+  </div>
+
+  <button id="export-button" type="button">Export GLB</button>
+  <div id="status">Preparing asset…</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("export-button");
+    const status = document.getElementById("status");
+
+    // ---------------------------------------------------------------------
+    // Renderer and scene
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.fog = new THREE.Fog(0xdce3e1, 18, 36);
+
+    const asset = new THREE.Group();
+    asset.name = "Brushed_Gold_Sphere_Asset";
+    scene.add(asset);
+
+    // ---------------------------------------------------------------------
+    // Materials
+    // ---------------------------------------------------------------------
+
+    const material = (color, options = {}) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.78,
+        metalness: 0,
+        flatShading: true,
+        ...options
+      });
+
+    const materials = {
+      stone: material(0x9ca9b4),
+      stoneDark: material(0x6e704d),
+      stoneEdge: material(0x7d777a),
+      wood: material(0x9a5f36),
+      woodLight: material(0xb77e4f),
+      woodDark: material(0x754719),
+      stoneEdgeLight: material(0x8d7882),
+      stoneEdgeDark: material(0x5b5f42),
+      sand: material(0xc9c1c8),
+      ground: material(0xd8d7d3),
+      shadow: new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        roughness: 0.95,
+        metalness: 0,
+        side: THREE.DoubleSide
+      })
+    };
+
+    // ---------------------------------------------------------------------
+    // Geometry helpers
+    // ---------------------------------------------------------------------
+
+    function addMesh(mesh, geometry) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function cylinderZ(
+      parent,
+      radius,
+      length,
+      segments,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0]
+    ) {
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        length,
+        segments
+      );
+
+      return addMesh(parent, geometry, material);
+    }
+
+    function cylinderX(
+      parent,
+      radius,
+      length,
+      segments,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(parent, new THREE.CylinderGeometry(radius, radius, length, segments), material);
+    }
+
+    function cylinderY(
+      parent,
+      radius,
+      length,
+      segments,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0]
+    ) {
+      return addMesh(parent, new THREE.CylinderGeometry(radius, radius, length, segments), material);
+    }
+
+    function cylinderZBetween(
+      parent,
+      start,
+      end,
+      radius,
+      material,
+      radialSegments = 8
+    ) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        length,
+        radialSegments,
+        1,
+        false
+      );
+
+      return addMesh(parent, geometry, material);
+    }
+
+    var sphere = function(mesh, position, scale = 1) {
+      return addMesh(
+        mesh,
+        new THREE.SphereGeometry(1, 8, 6),
+        material(0xf4d39b)
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // Pedestal
+    // ---------------------------------------------------------------------
+
+    const pillar = cylinderZ(
+      asset,
+      0.46,
+      0.2,
+      10,
+      materials.stoneDark,
+      [0, 0.16, 0],
+      [Math.PI / 2, 0, 0]
+    );
+
+    // A small central stone ring makes the pedestal read as a built structure.
+    const ring = cylinderZ(
+      asset,
+      0.39,
+      0.16,
+      10,
+      materials.stoneEdge,
+      [0, 0.1, 0],
+      [Math.PI / 2, 0, 0]
+    );
+    ring.rotation.z = Math.PI / 2;
+
+    // Four raised stone blocks around the foot.
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI + Math.PI / 8;
+      const radius = 0.42;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+
+      cylinderZ(
+        asset,
+        0.34,
+        0.24,
+        10,
+        materials.stoneDark,
+        [x, 0.1, z],
+        [0, 0, 0]
+      );
+
+      // Raised inner edge.
+      const edgeY = -0.12;
+      cylinderZ(
+        asset,
+        0.38,
+        0.035,
+        10,
+        materials.stoneEdge,
+        [x, edgeY, z],
+        [0, 0, 0]
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // Ground and shadow
+    // ---------------------------------------------------------------------
+
+    const ground = addMesh(
+      asset,
+      new THREE.PlaneGeometry(30, 30),
+      materials.ground
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    ground.receiveShadow = true;
+
+    const groundRing = cylinderZ(
+      asset,
+      0.13,
+      0.18,
+      12,
+      materials.stoneEdgeDark,
+      [0, 0.025, -0.035],
+      [Math.PI / 2, 0, 0]
+    );
+    groundRing.rotation.x = Math.PI / 2;
+
+    // ---------------------------------------------------------------------
+    // Sphere
+    // ---------------------------------------------------------------------
+
+    var sphere = new THREE.Group();
+    asset.add(sphere);
+
+    addMesh(
+      sphere,
+      new THREE.IcosahedronGeometry(1),
+      materials.stone
+    );
+
+    // Raised stone edge.
+    const edge = new THREE.Mesh(
+      new THREE.TorusGeometry(0.44, 0.025, 6, 32),
+      materials.stoneEdge
+    );
+    sphere.add(edge);
+
+    // Alternating low-poly facets give the stone a faceted silhouette.
+    const facetColors = [
+      [0x9ca9b4, 0xb3a59e],
+      [0xf0b97d, 0xc6aef1],
+      [0xff9b62, 0xbd8d43],
+      [0x9fb07c, 0xbfd4a5]
+    ];
+
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2;
+      const x = Math.cos(angle) * 0.44;
+      const z = Math.sin(angle) * 0.44;
+
+      const radius = 1 - (z / 0.44) * 0.72;
+      const color = facetColors[i % facetColors.length];
+      const material = color.toFixed(3);
+
+      sphere.add(
+        new THREE.Mesh(
+          new THREE.BoxGeometry(0.34, 0.025, 0.34),
+          material
+        ),
+        [x, 0.22 + radius * 0.012, z]
+      );
+    }
+
+    // ---------------------------------------------------------------------
+    // Export GLB
+    // ---------------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing binary GLB…";
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "brushed_gold_sphere_asset.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB exported successfully";
+        },
+        (error) => {
+          console.error("GLB export failed:", error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed — see browser console";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

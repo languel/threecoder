@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carved Stone Lantern</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --cream: #f3e7c9;
+      --muted: #9b927d;
+      --gold: #e8b96a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #07080b;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #scene:active {
+      cursor: grabbing;
+    }
+
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 43%, transparent 35%, rgba(0, 0, 0, 0.28) 72%, rgba(0, 0, 0, 0.86) 100%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.35));
+    }
+
+    .title {
+      position: fixed;
+      top: clamp(22px, 4vw, 48px);
+      left: clamp(22px, 4vw, 54px);
+      z-index: 2;
+      pointer-events: none;
+      color: var(--cream);
+      text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9);
+    }
+
+    .title .eyebrow {
+      margin-bottom: 9px;
+      color: var(--gold);
+      font: 10px/1.2 Arial, sans-serif;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 48px);
+      font-weight: 400;
+      letter-spacing: 0.03em;
+    }
+
+    .title p {
+      max-width: 390px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font: 12px/1.6 Arial, sans-serif;
+      letter-spacing: 0.08em;
+    }
+
+    .hint {
+      position: fixed;
+      right: clamp(18px, 3vw, 38px);
+      bottom: clamp(18px, 3vw, 32px);
+      z-index: 2;
+      padding: 9px 13px;
+      border: 1px solid rgba(232, 185, 106, 0.22);
+      border-radius: 999px;
+      background: rgba(8, 9, 13, 0.48);
+      color: rgba(243, 231, 201, 0.64);
+      font: 10px/1 Arial, sans-serif;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .credit {
+      position: fixed;
+      left: clamp(22px, 4vw, 54px);
+      bottom: clamp(20px, 3vw, 32px);
+      z-index: 2;
+      color: rgba(243, 231, 201, 0.38);
+      font: 10px/1 Arial, sans-serif;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    @media (max-width: 640px) {
+      .title p {
+        max-width: 270px;
+      }
+
+      .credit {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="Interactive 3D stone lantern scene"></canvas>
+  <div class="vignette"></div>
+
+  <header class="title">
+    <div class="eyebrow">A luminous woodland study</div>
+    <h1>The Whispering Lantern</h1>
+    <p>Drag to orbit · Scroll to explore · Watch the embers rise</p>
+  </header>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+  <div class="credit">Procedural Three.js scene</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const canvas = document.querySelector("#scene");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x07080b);
+    scene.fog = new THREE.FogExp2(0x07080b, 0.055);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // ---------------------------------------------------------------------
+    // Materials
+    // ---------------------------------------------------------------------
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x595a55,
+      roughness: 0.92,
+      metalness: 0.02
+    });
+
+    const darkStoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x242725,
+      roughness: 0.98,
+      metalness: 0.01
+    });
+
+    const carvedMaterial = new THREE.MeshStandardMaterial({
+      color: 0x30322f,
+      roughness: 0.95
+    });
+
+    const recessMaterial = new THREE.MeshStandardMaterial({
+      color: 0x080908,
+      roughness: 1,
+      emissive: 0x170c04,
+      emissiveIntensity: 0.25
+    });
+
+    const glowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffc36b,
+      emissive: 0xff7a20,
+      emissiveIntensity: 4.2,
+      roughness: 0.45
+    });
+
+    const emberMaterial = new THREE.PointsMaterial({
+      color: 0xff8b2e,
+      size: 0.085,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true
+    });
+
+    const fireflyMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffe1a0,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    // ---------------------------------------------------------------------
+    // Lighting
+    // ---------------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0x7887a8, 0x14100c, 0.62));
+
+    const coolFill = new THREE.DirectionalLight(0x7389b3, 1.25);
+    coolFill.position.set(-4, 6, 4);
+    scene.add(coolFill);
+
+    const warmBounce = new THREE.PointLight(0xff7a28, 8, 7, 2);
+    warmBounce.position.set(0, 3.25, 1.2);
+    scene.add(warmBounce);
+
+    const rimLight = new THREE.SpotLight(0x7ea6ff, 28, 14, Math.PI / 5, 0.6, 1.5);
+    rimLight.position.set(-3.5, 5, -4);
+    rimLight.target.position.set(0, 2, 0);
+    scene.add(rimLight, rimLight.target);
+
+    // ---------------------------------------------------------------------
+    // Lantern construction
+    // ---------------------------------------------------------------------
+
+    const lantern = new THREE.Group();
+    lantern.rotation.y = -0.18;
+    scene.add(lantern);
+
+    function mesh(geometry, material, position, parent = lantern) {
+      const object = new THREE.Mesh(geometry, material);
+      object.position.copy(position);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    // Lower stepped plinth.
+    mesh(
+      new THREE.BoxGeometry(2.75, 0.34, 2.75),
+      stoneMaterial,
+      new THREE.Vector3(0, 0.17, 0)
+    );
+
+    mesh(
+      new THREE.BoxGeometry(2.46, 0.25, 2.46),
+      darkStoneMaterial,
+      new THREE.Vector3(0, 0.39, 0)
+    );
+
+    // Broad pedestal.
+    mesh(
+      new THREE.CylinderGeometry(1.2, 1.48, 0.75, 8),
+      stoneMaterial,
+      new THREE.Vector3(0, 0.82, 0)
+    );
+
+    mesh(
+      new THREE.CylinderGeometry(1.34, 1.25, 0.16, 8),
+      darkStoneMaterial,
+      new THREE.Vector3(0, 1.19, 0)
+    );
+
+    // Central post.
+    mesh(
+      new THREE.BoxGeometry(0.72, 1.65, 0.72),
+      stoneMaterial,
+      new THREE.Vector3(0, 2.08, 0)
+    );
+
+    // Carved bands around the post.
+    for (const y of [1.48, 2.66]) {
+      mesh(
+        new THREE.BoxGeometry(0.93, 0.13, 0.93),
+        carvedMaterial,
+        new THREE.Vector3(0, y, 0)
+      );
+
+      for (const side of [-1, 1]) {
+        const groove = mesh(
+          new THREE.TorusGeometry(0.43, 0.025, 6, 24),
+          carvedMaterial,
+          new THREE.Vector3(0, y, side * 0.47)
+        );
+        groove.rotation.x = Math.PI / 2;
+      }
+    }
+
+    // Chalice-shaped upper chamber.
+    mesh(
+      new THREE.CylinderGeometry(1.28, 0.95, 0.92, 8),
+      stoneMaterial,
+      new THREE.Vector3(0, 3.42, 0)
+    );
+
+    mesh(
+      new THREE.CylinderGeometry(1.34, 1.28, 0.12, 8),
+      darkStoneMaterial,
+      new THREE.Vector3(0, 3.91, 0)
+    );
+
+    // Four recessed glowing panels and their carved frames.
+    const panelGeometry = new THREE.PlaneGeometry(0.84, 0.62);
+    const frameGeometry = new THREE.BoxGeometry(0.94, 0.72, 0.12);
+
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const side = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+      const normal = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
+
+      const recess = mesh(
+        panelGeometry,
+        recessMaterial,
+        side.clone().multiplyScalar(1.29).setY(3.42)
+      );
+      recess.rotation.y = -angle;
+      recess.castShadow = false;
+
+      const glow = mesh(
+        panelGeometry,
+        glowMaterial,
+        side.clone().multiplyScalar(1.305).setY(3.42)
+      );
+      glow.rotation.y = -angle;
+      glow.castShadow = false;
+
+      const frame = mesh(
+        frameGeometry,
+        carvedMaterial,
+        side.clone().multiplyScalar(1.39).setY(3.42)
+      );
+      frame.rotation.y = -angle;
+
+      // Raised corner details.
+      for (const sy of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const corner = mesh(
+            new THREE.BoxGeometry(0.12, 0.12, 0.14),
+            carvedMaterial,
+            side.clone()
+              .multiplyScalar(1.44)
+              .addScaledVector(normal, sy * 0.31)
+              .addScaledVector(side, sz * 0.31)
+              .setY(3.42)
+          );
+          corner.rotation.y = -angle;
+        }
+      }
+
+      // A carved leaf-like motif on each panel.
+      const motifPoints = [
+        new THREE.Vector3(0, 0.24, 0),
+        new THREE.Vector3(-0.18, 0.08, 0.025),
+        new THREE.Vector3(-0.22, -0.12, 0.04),
+        new THREE.Vector3(-0.08, -0.28, 0.045),
+        new THREE.Vector3(0.08, -0.28, 0.045),
+        new THREE.Vector3(0.22, -0.12, 0.04),
+        new THREE.Vector3(0.18, 0.08, 0.025),
+        new THREE.Vector3(0, 0.24, 0)
+      ];
+
+      const motifCurve = new THREE.CatmullRomCurve3(motifPoints);
+      const motif = mesh(
+        new THREE.TubeGeometry(motifCurve, 28, 0.025, 6, false),
+        carvedMaterial,
+        new THREE.Vector3()
+      );
+      motif.position.copy(side.clone().multiplyScalar(1.43)).setY(3.42);
+      motif.rotation.y = -angle;
+    }
+
+    // Roof: four-sided stone hip roof.
+    const roof = mesh(
+      new THREE.ConeGeometry(1.9, 0.7, 4),
+      stoneMaterial,
+      new THREE.Vector3(0, 4.56, 0)
+    );
+    roof.rotation.y = Math.PI / 4;
+
+    mesh(
+      new THREE.CylinderGeometry(0.22, 0.31, 0.28, 8),
+      darkStoneMaterial,
+      new THREE.Vector3(0, 5.02, 0)
+    );
+
+    const finial = mesh(
+      new THREE.SphereGeometry(0.13, 16, 12),
+      carvedMaterial,
+      new THREE.Vector3(0, 5.27, 0)
+    );
+
+    // Small carved roof ridges.
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const ridge = mesh(
+        new THREE.BoxGeometry(0.07, 0.05, 1.65),
+        carvedMaterial,
+        new THREE.Vector3(Math.sin(angle) * 1.45, 4.92, Math.cos(angle) * 1.45)
+      );
+      ridge.rotation.y = -angle;
+    }
+
+    // ---------------------------------------------------------------------
+    // Firefly
+    // ---------------------------------------------------------------------
+
+    const firefly = new THREE.Group();
+    scene.add(firefly);
+
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 20, 14),
+      fireflyMaterial
+    );
+    firefly.add(core);
+
+    // A soft procedural glow texture, generated entirely in this file.
+    const glowCanvas = document.createElement("canvas");
+    glowCanvas.width = 128;
+    glowCanvas.height = 128;
+    const glowContext = glowCanvas.getContext("2d");
+    const gradient = glowContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, "rgba(255,239,176,1)");
+    gradient.addColorStop(0.12, "rgba(255,180,75,0.75)");
+    gradient.addColorStop(0.42, "rgba(255,115,35,0.18)");
+    gradient.addColorStop(1, "rgba(255,90,20,0)");
+    glowContext.fillStyle = gradient;
+    glowContext.fillRect(0, 0, 128, 128);
+
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+    glowTexture.colorSpace = THREE.SRGBColorSpace;
+
+    const halo = new THREE.Mesh(
+      new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: 0xff9d45,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })),
+      new THREE.SpriteMaterial({
+        map: glowTexture,
+        color: 0xff9d45,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    halo.scale.set(1.8, 1.8, 1);
+    firefly.add(halo);
+
+    // ---------------------------------------------------------------------
+    // Ember particle system
+    // ---------------------------------------------------------------------
+
+    const emberCount = 260;
+    const emberPositions = new Float32Array(emberCount * 3);
+    const emberSpeeds = new Float32Array(emberCount);
+    const emberPhases = new Float32Array(emberCount);
+    const emberOrigins = new Float32Array(emberCount * 3);
+
+    for (let i = 0; i < emberCount; i++) {
+      const offset = i * 3;
+      const originAngle = Math.random() * Math.PI * 2;
+      const originRadius = 0.45 + Math.random() * 1.25;
+
+      emberOrigins[offset] = Math.cos(originAngle) * originRadius;
+      emberOrigins[offset + 1] = 2.45 + Math.random() * 1.65;
+      emberOrigins[offset + 2] = Math.sin(originAngle) * originRadius;
+
+      emberSpeeds[i] = 0.13 + Math.random() * 0.35;
+      emberPhases[i] = Math.random() * Math.PI * 2;
+    }
+
+    const emberGeometry = new THREE.BufferGeometry();
+    emberGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(emberPositions, 3)
+    );
+
+    const embers = new THREE.Points(emberGeometry, emberMaterial);
+    scene.add(embers);
+
+    // ---------------------------------------------------------------------
+    // Ground and surrounding stones
+    // ---------------------------------------------------------------------
+
+    const ground = mesh(
+      new THREE.CircleGeometry(10, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x11130f,
+        roughness: 1
+      }),
+      new THREE.Vector3(0, -0.025, 0)
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.castShadow = false;
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x34332b,
+      roughness: 1
+    });
+
+    for (let i = 0; i < 18; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 2.5 + Math.random() * 6;
+      const size = 0.12 + Math.random() * 0.38;
+
+      const rock = mesh(
+        new THREE.DodecahedronGeometry(size, 0),
+        groundMaterial,
+        new THREE.Vector3(
+          Math.cos(angle) * radius,
+          size * 0.45,
+          Math.sin(angle) * radius
+        )
+      );
+      rock.scale.set(1.4, 0.65, 1);
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+    }
+
+    // A subtle ring of moss around the base.
+    const mossMaterial = new THREE.MeshStandardMaterial({
+      color: 0x24331f,
+      roughness: 1
+    });
+
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2;
+      const moss = mesh(
+        new THREE.SphereGeometry(0.13 + Math.random() * 0.16, 8, 5),
+        mossMaterial,
+        new THREE.Vector3(
+          Math.cos(angle) * 1.43,
+          0.28,
+          Math.sin(angle) * 1.43
+        )
+      );
+      moss.scale.set(1.8, 0.35, 1);
+      moss.castShadow = false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Direct camera controls — no external controls addon
+    // ---------------------------------------------------------------------
+
+    const controls = {
+      target: new THREE.Vector3(0, 2.65, 0),
+      theta: 0.72,
+      phi: 1.22,
+      radius: 7.3,
+      desiredTheta: 0.72,
+      desiredPhi: 1.22,
+      desiredRadius: 7.3,
+      dragging: false,
+      previousX: 0,
+      previousY: 0
+    };
+
+    function updateCamera() {
+      const smoothing = 0.085;
+
+      controls.theta +=
+        (controls.desiredTheta - controls.theta) * smoothing;
+      controls.phi +=
+        (controls.desiredPhi - controls.phi) * smoothing;
+      controls.radius +=
+        (controls.desiredRadius - controls.radius) * smoothing;
+
+      const sinPhi = Math.sin(controls.phi);
+      camera.position.set(
+        controls.target.x + controls.radius * sinPhi * Math.sin(controls.theta),
+        controls.target.y + controls.radius * Math.cos(controls.phi),
+        controls.target.z + controls.radius * sinPhi * Math.cos(controls.theta)
+      );
+
+      camera.lookAt(controls.target);
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      controls.dragging = true;
+      controls.previousX = event.clientX;
+      controls.previousY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!controls.dragging) return;
+
+      const deltaX = event.clientX - controls.previousX;
+      const deltaY = event.clientY - controls.previousY;
+
+      controls.previousX = event.clientX;
+      controls.previousY = event.clientY;
+
+      controls.desiredTheta -= deltaX * 0.006;
+      controls.desiredPhi = THREE.MathUtils.clamp(
+        controls.desiredPhi - deltaY * 0.005,
+        0.48,
+        1.52
+      );
+    });
+
+    function endDrag(event) {
+      controls.dragging = false;
+      if (event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        controls.desiredRadius = THREE.MathUtils.clamp(
+          controls.desiredRadius + event.deltaY * 0.006,
+          4.1,
+          11
+        );
+      },
+      { passive: false }
+    );
+
+    // ---------------------------------------------------------------------
+    // Animation
+    // ---------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+
+      // Gentle lantern breathing.
+      warmBounce.intensity = 7.2 + Math.sin(elapsed * 1.8) * 0.55;
+      glowMaterial.emissiveIntensity =
+        4.0 + Math.sin(elapsed * 2.1) * 0.35;
+
+      // Firefly drifts in a slow looping spiral.
+      const fireflyTime = elapsed * 0.72;
+      const spiral = fireflyTime * 0.38;
+
+      firefly.position.set(
+        Math.cos(spiral) * (1.65 + Math.sin(elapsed * 0.4) * 0.35),
+        1.1 + spiral * 0.72,
+        Math.sin(spiral) * (1.65 + Math.sin(elapsed * 0.4) * 0.35)
+      );
+
+      firefly.rotation.y = -spiral;
+      halo.scale.setScalar(1.55 + Math.sin(elapsed * 2.2) * 0.25);
+      halo.material.opacity = 0.58 + Math.sin(elapsed * 2.2) * 0.16;
+
+      // Ember field: each particle rises, loops, and drifts around the lantern.
+      const positions = emberGeometry.attributes.position.array;
+
+      for (let i = 0; i < emberCount; i++) {
+        const offset = i * 3;
+        const phase = emberPhases[i];
+
+        positions[offset] =
+          emberOrigins[offset] +
+          Math.sin(elapsed * 0.55 + phase) * 0.18;
+
+        positions[offset + 1] =
+          emberOrigins[offset + 1] +
+          emberSpeeds[i] * elapsed +
+          Math.sin(elapsed * 0.8 + phase) * 0.08;
+
+        positions[offset + 2] =
+          emberOrigins[offset + 2] +
+          Math.cos(elapsed * 0.55 + phase) * 0.18;
+      }
+
+      emberGeometry.attributes.position.needsUpdate = true;
+
+      emberMaterial.opacity =
+        0.68 + Math.sin(elapsed * 2.4) * 0.18;
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    updateCamera();
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carved Stone Lantern</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #071019;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: linear-gradient(135deg, rgba(18, 27, 39, 0.88), transparent 55%);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(16px);
+    }
+
+    .info {
+      top: 24px;
+      left: 24px;
+      max-width: min(320px, calc(100vw - 48px));
+      padding: 17px 19px;
+      border-radius: 14px;
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin-bottom: 7px;
+      color: #c8d2b3;
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 28px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #b9a99d;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      padding: 5px 7px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.055);
+      color: #d8d2c7;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .actions {
+      right: 24px;
+      bottom: 22px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 9px;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, #9b6c2d, #a66b0d);
+      color: #071019;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(108, 102, 44, 0.22);
+      transition:
+        transform 140ms ease,
+        filter 140ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    #status {
+      max-width: 340px;
+      color: #c8d2b3;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .hint {
+      position: fixed;
+      right: 24px;
+      bottom: 22px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: #b9a99d;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 600px) {
+      .info {
+        top: 14px;
+        left: 14px;
+        max-width: none;
+        padding: 13px 15px;
+      }
+
+      .actions {
+        right: 14px;
+        bottom: 14px;
+      }
+
+      #status {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <section class="panel info">
+    <p class="eyebrow">Low-poly asset</p>
+    <h1>Carved Stone Lantern</h1>
+    <p class="subtitle">
+      A weathered stone lantern with a central carved wooden frame, a
+      animated swirling magical firefly, and an animated ember particle system.
+    </p>
+
+    <div class="tags">
+      <span class="tag">Animated Asset</span>
+      <span class="tag">Low Poly</span>
+      <span class="tag">Game Ready</span>
+      <span class="tag">GLB</span>
+    </div>
+  </section>
+
+  <div class="panel actions">
+    <button id="exportButton" type="button">Export GLB</button>
+    <div id="status">Static asset · drag to orbit · scroll to zoom</div>
+  </div>
+
+  <div class="hint">Right-drag to pan · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x071019);
+    scene.fog = new THREE.Fog(0x071019, 13, 18);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.05,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(5.8, 4.2, 7.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 3.1, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 4.2;
+    controls.maxDistance = 16;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0x9b3c1d, 0x071019, 1.35);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffe2b7, 3.4);
+    keyLight.position.set(4.5, 8, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 7;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.bias = -0.00015;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x4b9dff, 2.2);
+    rimLight.position.set(-5, 4, -4);
+    scene.add(rimLight);
+
+    const warmFill = new THREE.PointLight(0xff8a1b, 18, 10, 2);
+    warmFill.position.set(0, 3.2, -2);
+    scene.add(warmFill);
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1e3024,
+      roughness: 0.94,
+      metalness: 0.02,
+      flatShading: true
+    });
+
+    const stoneDarkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x0c2d36,
+      roughness: 1.0,
+      metalness: 0.0,
+      flatShading: true
+    });
+
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8a5f29,
+      roughness: 0.88,
+      metalness: 0.08,
+      flatShading: true
+    });
+
+    const woodDarkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4e3b20,
+      roughness: 1.0,
+      metalness: 0.0,
+      flatShading: true
+    });
+
+    const stoneEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x171b2f,
+      roughness: 1.0,
+      metalness: 0.0,
+      flatShading: true
+    });
+
+    const goldMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc99a3d,
+      roughness: 0.65,
+      metalness: 0.72,
+      flatShading: true
+    });
+
+    const fireflyMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff9b1f,
+      emissive: 0xff7b00,
+      emissiveIntensity: 3.2,
+      roughness: 0.55,
+      metalness: 0.18
+    });
+
+    const fireflyRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfff3d8,
+      emissive: 0xff7b00,
+      emissiveIntensity: 2.1,
+      roughness: 0.42,
+      metalness: 0.35
+    });
+
+    const emberParticleMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff8a1d,
+      emissive: 0xff7b00,
+      emissiveIntensity: 4.5,
+      roughness: 0.2,
+      metalness: 0.05
+    });
+
+    // -------------------------------------------------------------------------
+    // Exportable asset root
+    // -------------------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "CarvedStoneLantern";
+    scene.add(asset);
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addCube(
+      parent,
+      material,
+      position,
+      size,
+      rotation,
+      scale = [1, 1, 1],
+      name = ""
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
+      mesh.scale.set(scale[0], scale[1], scale[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(
+      parent,
+      material,
+      position,
+      radius,
+      height,
+      segments = 8,
+      name = ""
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, height, segments),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(0, 0, 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addTorus(
+      parent,
+      material,
+      radius,
+      position,
+      rotation,
+      name = ""
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, 0.025, 4, 12),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(0, rotation, 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCone(
+      parent,
+      material,
+      position,
+      radius,
+      height,
+      segments = 6,
+      name = ""
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, segments),
+        material
+      );
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.rotation.set(Math.PI / 2, 0, 0);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addBeam(
+      parent,
+      material,
+      position,
+      start,
+      end,
+      radius = 0.018
+    ) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      if (length < 0.0001) return null;
+
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, length, 8),
+        material
+      );
+
+      beam.position.copy(start).add(end).multiplyScalar(0.5);
+      beam.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      beam.castShadow = true;
+      parent.add(beam);
+      return beam;
+    }
+
+    function addCylinderBetween(
+      parent,
+      material,
+      start,
+      end,
+      radius = 0.018
+    ) {
+      return addBeam(parent, material, start, end, radius);
+    }
+
+    // -------------------------------------------------------------------------
+    // Stone base and supports
+    // -------------------------------------------------------------------------
+
+    const baseX = 2.8;
+    const baseZ = 1.65;
+
+    const baseStone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.82, 0.82, 0.32, 12),
+      stoneMaterial
+    );
+    baseStone.position.set(0, -0.08, -0.02);
+    asset.add(baseStone);
+
+    for (const side of [-1, 1]) {
+      addCylinder(
+        asset,
+        stoneDarkMaterial,
+        new THREE.Vector3(side * baseX, -0.08, -0.03),
+        0.16,
+        0.16,
+        12
+      );
+    }
+
+    addCylinder(
+      asset,
+      stoneEdgeMaterial,
+      new THREE.Vector3(side * baseX, 0.19, -0.02),
+      0.115,
+      0.105,
+      10
+    );
+
+    // -------------------------------------------------------------------------
+    // Carved stone frame and front face
+    // -------------------------------------------------------------------------
+
+    addCylinder(
+      asset,
+      stoneMaterial,
+      new THREE.Vector3(side * baseX, 0.39, -0.05),
+      0.23,
+      0.24,
+      12
+    );
+
+    for (const z of [-0.52, 0.52]) {
+      addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(side * baseX, 0.39, z),
+        0.185,
+        0.15,
+        12
+      );
+    }
+
+    // Vertical stone slats.
+    for (let i = 0; i < 9; i++) {
+      addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(side * baseX, 0.39 + 0.026 * i / 8, -0.03),
+        0.155,
+        0.155,
+        12
+      );
+    }
+
+    // Upper and lower stones.
+    addCylinder(
+      asset,
+      stoneMaterial,
+      new THREE.Vector3(side * baseX, 1.02, -0.05),
+      0.16,
+      0.16,
+      10
+    );
+    addCylinder(
+      asset,
+      stoneMaterial,
+      new THREE.Vector3(side * baseX, 1.62, -0.05),
+      0.155,
+      0.15,
+      10
+    );
+
+    // Front cap.
+    addCylinder(
+      asset,
+      stoneMaterial,
+      new THREE.Vector3(side * baseX, 2.22, -0.02),
+      0.16,
+      0.16,
+      12
+    );
+
+    const frontStone = addCylinder(
+      asset,
+      stoneEdgeMaterial,
+      new THREE.Vector3(side * baseX, 1.95, -0.01),
+      0.115,
+      0.105,
+      10
+    );
+    frontStone.name = side < 0 ? "Negative" : "Positive";
+
+    // Lower stones.
+    for (const x of [-1.15, 1.15]) {
+      addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(x, 0.39, -0.02),
+        0.16,
+        0.16,
+        10
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Carved stone frame around the lantern
+    // -------------------------------------------------------------------------
+
+    function createFrameGeometry(side) {
+      const shape = new THREE.Shape();
+      shape.moveTo(-0.48, -0.52);
+      shape.lineTo(0.48, -0.52);
+      shape.lineTo(0.48, 0.52);
+      shape.lineTo(-0.48, 0.52);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.28,
+        bevelEnabled: false,
+        curveSegments: 1,
+        steps: 1
+      });
+
+      return geometry;
+    }
+
+    for (const side of [-1, 1]) {
+      addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(side * baseX, 0.39, -0.02),
+        0.19,
+        0.18,
+        12
+      );
+
+      // Side rails.
+      for (const x of [-0.48, 0.48]) {
+        addCylinder(
+          asset,
+          stoneMaterial,
+          new THREE.Vector3(side * x, 0.39, -0.02),
+          0.115,
+          0.115,
+          10
+        );
+      }
+
+      // Front cap.
+      addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(side * baseX, 2.22, -0.02),
+        0.15,
+        0.14,
+        12
+      );
+
+      // Side panels and guespers.
+      const sidePanel = addCylinder(
+        asset,
+        stoneMaterial,
+        new THREE.Vector3(side * baseX, 1.05, -0.03),
+        0.13,
+        0.09,
+        10
+      );
+      sidePanel.name = side < 0 ? "Negative" : "Positive";
+
+      for (const x of [-0.48, 0.48]) {
+        addCylinder(
+          asset,
+          stoneMaterial,
+          new THREE.Vector3(side * x, 1.05, -0.02),
+          0.115,
+          0.09,
+          10
+        );
+      }
+
+      // Front band.
+      addCylinder(
+        asset,
+        stoneEdgeMaterial,
+        new THREE.Vector3(side * baseX, 2.22, -0.02),
+        0.13,
+        0.08,
+        10
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Swirling animated firefly
+    // -------------------------------------------------------------------------
+
+    const animationTimes = [0, 1.5, 3, 4.5];
+    const animationTracks = [];
+
+    function createFireflyGeometry() {
+      const positions = [];
+      const colors = [];
+      const indices = [];
+
+      for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * Math.PI * 2;
+        const radius = 0.47 + (i % 12) * 0.025;
+        const z = -0.03 + (i % 4) * 0.16;
+
+        positions.push(
+          Math.cos(angle) * radius,
+          1.22 + (i % 3) * 0.015,
+          z
+        );
+
+        const color = new THREE.Color();
+        const fireflyY = 1.35 + (i % 4) * 0.025;
+
+        if (color.scheme === "RGB") {
+          const hue = Math.sin(angle) * 0.22 + 0.8;
+          const saturation = 0.55 + (i % 3) * 0.12;
+          const brightness = 1.15 + (i % 2) * 0.25;
+
+          color.setHSL(hue, saturation, brightness);
+        } else if (color.scheme === "RGB", false) {
+          const hue = Math.sin(angle) * 0.18 + 0.6;
+          const saturation = 0.8 + (i % 3) * 0.2;
+          const brightness = 1.05 + (i % 2) * 0.22;
+          color.setHSL(hue, saturation, brightness);
+        }
+
+        colors.push(color.toArray());
+      }
+
+      for (let i = 0; i < 24; i++) {
+        const a = i / 24;
+        const b = (i + 1) / 24;
+        const c = (i + 2) / 24;
+        const d = (i + 3) / 24;
+
+        indices.push(0, a, b);
+        indices.push(b, c, d);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(colors, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    function createFireflyRing(side) {
+      const ring = new THREE.Mesh(
+        createFireflyGeometry(),
+        fireflyMaterial
+      );
+      ring.rotation.z = Math.PI / 2;
+      ring.position.set(side * baseX, 1.35, -0.02);
+      ring.name = side < 0 ? "Negative" : "Positive";
+      asset.add(ring);
+
+      const rimRing = addCylinder(
+        asset,
+        fireflyRingMaterial,
+        new THREE.Vector3(side * baseX, 1.35, -0.01),
+        0.125,
+        0.12,
+        12
+      );
+      rimRing.name = side < 0 ? "Negative" : "Positive";
+    }
+
+    createFireflyGeometry();
+    createFireflyRing(-1);
+    createFireflyRing(1);
+
+    // -------------------------------------------------------------------------
+    // Animated firefly animation
+    // -------------------------------------------------------------------------
+
+    const animationClip = new THREE.AnimationClip(
+      "Firefly",
+      4.5,
+      animationTimes,
+      THREE.VectorKeyframesTrack("Pivot.position", animationTimes, positions)
+    );
+
+    const fireflyClip = new THREE.AnimationClip(
+      "SpinningFirefly",
+      4.5,
+      animationTimes,
+      THREE.VectorKeyframesTrack("Pivot.rotation", animationTimes, [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(Math.PI / 2, 0, 0),
+        new THREE.Vector3(Math.PI * 2, 0, 0),
+        new THREE.Vector3(Math.PI * 2.5, 0, 0),
+        new THREE.Vector3(Math.PI * 2.8, 0, 0)
+      ])
+    );
+
+    const fireflyAction = new THREE.AnimationAction(animationClip);
+    scene.add(fireflyAction);
+
+    // -------------------------------------------------------------------------
+    // Ember particle system
+    // -------------------------------------------------------------------------
+
+    function addEmber(side) {
+      const group = new THREE.Group();
+      group.name = side < 0 ? "Negative" : "Positive";
+      asset.add(group);
+
+      addCylinder(
+        group,
+        goldMaterial,
+        new THREE.Vector3(side * baseX, 2.22, -0.02),
+        0.095,
+        0.09,
+        10
+      );
+
+      // Torus rings give the ember a tangible magical halo.
+      for (let i = 0; i < 6; i++) {
+        addTorus(
+          group,
+          fireflyRingMaterial,
+          0.105,
+          new THREE.Vector3(side * baseX, 2.22 + (i % 3) * 0.1, -0.02),
+          Math.PI / 6
+        );
+      }
+
+      // Central spark.
+      addCone(
+        group,
+        fireflyMaterial,
+        new THREE.Vector3(side * baseX, 2.35, -0.03),
+        0.065,
+        0.12,
+        5
+      );
+
+      // Secondary ember rings behind the central spark.
+      for (let ring = 1; ring < 4; ring++) {
+        addCylinder(
+          group,
+          goldMaterial,
+          new THREE.Vector3(side * baseX, 2.09 + ring * 0.13, -0.02),
+          0.07,
+          0.085,
+          10
+        );
+      }
+
+      // Rune-like sparkle.
+      for (let i = 0; i < 18; i++) {
+        const angle = (i / 18) * Math.PI * 2;
+        addCone(
+          group,
+          fireflyRingMaterial,
+          new THREE.Vector3(
+            side * baseX,
+            2.08 + (i % 4) * 0.1,
+            -0.02 + (i % 7) * 0.15
+          ),
+          0.04,
+          0.09,
+          5
+        );
+      }
+
+      // Ember core.
+      addCylinder(
+        group,
+        goldMaterial,
+        new THREE.Vector3(side * baseX, 2.08, -0.02),
+        0.075,
+        0.12,
+        6
+      );
+
+      // Central rune.
+      const rune = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.055, 0.045),
+        fireflyRingMaterial
+      );
+      rune.position.set(side * baseX, 2.08, -0.02);
+      rune.rotation.z = -Math.PI / 4;
+      group.add(rune);
+    }
+
+    createFireflyGeometry();
+    createFireflyRing(-1);
+    createFireflyRing(1);
+
+    // -------------------------------------------------------------------------
+    // GLB export
+    // -------------------------------------------------------------------------
+
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      asset.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "carved_stone_lantern.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB exported successfully";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false
+        }
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

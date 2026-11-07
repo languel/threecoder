@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beveled Grey-Orange Cube</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 42%, #f2eee8 0%, #d7d2ca 55%, #a9a59d 100%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .hint {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      padding: 9px 14px;
+      border: 1px solid rgba(60, 52, 42, 0.12);
+      border-radius: 999px;
+      color: rgba(55, 48, 38, 0.65);
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(8px);
+      font: 12px/1.2 system-ui, sans-serif;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      user-select: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    document.body.appendChild(renderer.domElement);
+
+    // The only object in the scene: a centered, beveled grey-orange cube.
+    const cubeGeometry = new THREE.ExtrudeGeometry(
+      new THREE.Shape().moveTo(-0.7, -0.7).lineTo(0.7, -0.7)
+        .lineTo(0.7, 0.7).lineTo(-0.7, 0.7).closePath(),
+      {
+        depth: 1.0,
+        bevelEnabled: true,
+        bevelSegments: 5,
+        steps: 1,
+        bevelSize: 0.12,
+        bevelThickness: 0.12,
+        curveSegments: 1
+      }
+    );
+
+    // Center the geometry after extrusion and convert it to a cubic dimension.
+    cubeGeometry.translate(0, 0, -0.5);
+    cubeGeometry.computeBoundingBox();
+    cubeGeometry.computeBoundingSphere();
+
+    const cube = new THREE.Mesh(
+      cubeGeometry,
+      new THREE.MeshPhysicalMaterial({
+        color: 0xa8633f,
+        metalness: 0.16,
+        roughness: 0.42,
+        clearcoat: 0.18,
+        clearcoatRoughness: 0.5,
+        envMapIntensity: 0.75
+      })
+    );
+
+    cube.position.set(0, 0, 0);
+    scene.add(cube);
+
+    // Three-point studio lighting.
+    const hemisphere = new THREE.HemisphereLight(0xfff7eb, 0x645d55, 1.25);
+    scene.add(hemisphere);
+
+    const key = new THREE.SpotLight(
+      0xfff1dc,
+      90,
+      30,
+      Math.PI / 5,
+      0.65,
+      1.4
+    );
+    key.position.set(4.5, 6.5, 5.5);
+    key.target.position.set(0, 0, 0);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.near = 0.5;
+    key.shadow.camera.far = 18;
+    key.shadow.bias = -0.00015;
+    key.shadow.normalBias = 0.025;
+    scene.add(key, key.target);
+
+    const fill = new THREE.PointLight(0xbdd7e8, 34, 18, 2);
+    fill.position.set(-4, 2.4, 3.5);
+    scene.add(fill);
+
+    const rim = new THREE.PointLight(0xffc18a, 42, 16, 2);
+    rim.position.set(1.5, 3.2, -4.5);
+    scene.add(rim);
+
+    // Camera controls implemented directly without external addons.
+    let azimuth = Math.PI * 0.25;
+    let polar = Math.PI * 0.38;
+    let distance = 4.1;
+    const target = new THREE.Vector3(0, 0, 0);
+
+    function updateCamera() {
+      const sinPolar = Math.sin(polar);
+
+      camera.position.set(
+        target.x + distance * sinPolar * Math.sin(azimuth),
+        target.y + distance * Math.cos(polar),
+        target.z + distance * sinPolar * Math.cos(azimuth)
+      );
+
+      camera.lookAt(target);
+    }
+
+    const canvas = renderer.domElement;
+
+    canvas.addEventListener("pointerdown", (event) => {
+      canvas.setPointerCapture(event.pointerId);
+      dragging = true;
+      lastX = event.clientX;
+      lastY = event.clientY;
+    });
+
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      azimuth -= dx * 0.006;
+      polar = THREE.MathUtils.clamp(polar + dy * 0.005, 0.18, Math.PI - 0.18);
+      updateCamera();
+    });
+
+    function endDrag(event) {
+      dragging = false;
+      if (event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        distance = THREE.MathUtils.clamp(
+          distance + event.deltaY * 0.003,
+          2.4,
+          8
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    window.addEventListener("resize", () => {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    updateCamera();
+
+    renderer.setAnimationLoop(() => {
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

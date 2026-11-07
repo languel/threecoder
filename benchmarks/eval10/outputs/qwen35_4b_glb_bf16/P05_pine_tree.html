@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Snow-Dusted Pine</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dce7e3;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #viewport {
+      width: 100%;
+      height: 100%;
+    }
+
+    #panel {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 10;
+      width: min(310px, calc(100vw - 36px));
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 14px;
+      color: #18352a;
+      background: rgba(247, 251, 249, 0.82);
+      box-shadow: 0 12px 35px rgba(29, 56, 45, 0.16);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: 18px;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 13px;
+      color: #547064;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 9px;
+      color: white;
+      background: #28624a;
+      box-shadow: 0 5px 14px rgba(31, 81, 57, 0.22);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    button:hover {
+      background: #1e513b;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 9px;
+      color: #4d6c5e;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .hint {
+      position: fixed;
+      right: 18px;
+      bottom: 16px;
+      z-index: 10;
+      padding: 7px 10px;
+      border-radius: 8px;
+      color: rgba(29, 59, 47, 0.7);
+      background: rgba(247, 251, 249, 0.68);
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 560px) {
+      #panel {
+        top: 10px;
+        left: 10px;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <div id="panel">
+    <h1>Snow-Dusted Pine</h1>
+    <p>
+      A stylized low-poly conifer with a faceted bark trunk, radial roots,
+      mossy stone, and four layered frost-covered foliage cones.
+    </p>
+    <button id="exportButton" type="button">Export GLB</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    // ------------------------------------------------------------------
+    // Renderer, camera, and controls
+    // ------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xdce7e3);
+    scene.fog = new THREE.Fog(0xdce7e3, 12, 27);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(7.2, 5.3, 8.4);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.25, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 5;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const hemiLight = new THREE.HemisphereLight(0xe9f6ff, 0x5b6047, 2.15);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff5df, 3.2);
+    keyLight.position.set(-5, 9, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 9;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xb9dcff, 1.15);
+    rimLight.position.set(6, 5, -7);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------------
+    // Exportable asset root
+    // ------------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "Snow_Dusted_Pine";
+    scene.add(asset);
+
+    const palette = {
+      bark: new THREE.Color(0x5a3828),
+      barkDark: new THREE.Color(0x3c281f),
+      barkLight: new THREE.Color(0x795039),
+      root: new THREE.Color(0x513426),
+      moss: new THREE.Color(0x566d38),
+      mossLight: new THREE.Color(0x718348),
+      rock: new THREE.Color(0x68706a),
+      rockDark: new THREE.Color(0x4c5551),
+      pineDark: new THREE.Color(0x173e2b),
+      pineMid: new THREE.Color(0x28583a),
+      pineLight: new THREE.Color(0x47764a),
+      snow: new THREE.Color(0xe4eee8),
+      snowShade: new THREE.Color(0xc5d9d1),
+      snowBlue: new THREE.Color(0xaec8c5)
+    };
+
+    // ------------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------------
+
+    const materials = {
+      bark: new THREE.MeshStandardMaterial({
+        color: palette.bark,
+        roughness: 0.96,
+        metalness: 0,
+        flatShading: true
+      }),
+      barkDark: new THREE.MeshStandardMaterial({
+        color: palette.barkDark,
+        roughness: 1,
+        flatShading: true
+      }),
+      barkLight: new THREE.MeshStandardMaterial({
+        color: palette.barkLight,
+        roughness: 0.94,
+        flatShading: true
+      }),
+      root: new THREE.MeshStandardMaterial({
+        color: palette.root,
+        roughness: 1,
+        flatShading: true
+      }),
+      moss: new THREE.MeshStandardMaterial({
+        color: palette.moss,
+        roughness: 1,
+        flatShading: true
+      }),
+      mossLight: new THREE.MeshStandardMaterial({
+        color: palette.mossLight,
+        roughness: 1,
+        flatShading: true
+      }),
+      rock: new THREE.MeshStandardMaterial({
+        color: palette.rock,
+        roughness: 0.98,
+        flatShading: true
+      }),
+      rockDark: new THREE.MeshStandardMaterial({
+        color: palette.rockDark,
+        roughness: 1,
+        flatShading: true
+      }),
+      pineDark: new THREE.MeshStandardMaterial({
+        color: palette.pineDark,
+        roughness: 0.96,
+        flatShading: true
+      }),
+      pineMid: new THREE.MeshStandardMaterial({
+        color: palette.pineMid,
+        roughness: 0.94,
+        flatShading: true
+      }),
+      pineLight: new THREE.MeshStandardMaterial({
+        color: palette.pineLight,
+        roughness: 0.9,
+        flatShading: true
+      }),
+      snow: new THREE.MeshStandardMaterial({
+        color: palette.snow,
+        roughness: 0.92,
+        flatShading: true
+      }),
+      snowShade: new THREE.MeshStandardMaterial({
+        color: palette.snowShade,
+        roughness: 0.96,
+        flatShading: true
+      }),
+      snowBlue: new THREE.MeshStandardMaterial({
+        color: palette.snowBlue,
+        roughness: 0.96,
+        flatShading: true
+      })
+    };
+
+    // ------------------------------------------------------------------
+    // Geometry helpers
+    // ------------------------------------------------------------------
+
+    function mesh(geometry, material, name, castShadow = true) {
+      const object = new THREE.Mesh(geometry, material);
+      object.name = name;
+      object.castShadow = castShadow;
+      object.receiveShadow = true;
+      asset.add(object);
+      return object;
+    }
+
+    // Creates an irregular, tapering low-poly trunk.
+    function createTrunkGeometry() {
+      const rings = [
+        { y: 0.00, r: 0.48, x: 0.00, z: 0.02 },
+        { y: 0.72, r: 0.40, x: 0.04, z: 0.00 },
+        { y: 1.55, r: 0.31, x: 0.10, z: -0.03 },
+        { y: 2.35, r: 0.235, x: 0.16, z: -0.02 },
+        { y: 3.08, r: 0.16, x: 0.22, z: 0.01 },
+        { y: 3.62, r: 0.095, x: 0.27, z: 0.02 }
+      ];
+
+      const sides = 8;
+      const positions = [];
+      const colors = [];
+      const indices = [];
+
+      rings.forEach((ring, ringIndex) => {
+        for (let i = 0; i < sides; i++) {
+          const angle = (i / sides) * Math.PI * 2;
+          const irregularity = 1 + Math.sin(angle * 3 + ringIndex * 1.7) * 0.075;
+          const radius = ring.r * irregularity;
+
+          positions.push(
+            ring.x + Math.cos(angle) * radius,
+            ring.y,
+            ring.z + Math.sin(angle) * radius
+          );
+
+          const color = ringIndex < 2
+            ? palette.barkDark.clone().lerp(palette.bark, 0.35)
+            : palette.bark.clone().lerp(palette.barkLight, ringIndex / 4);
+
+          colors.push(color.r, color.g, color.b);
+        }
+      });
+
+      for (let ring = 0; ring < rings.length - 1; ring++) {
+        for (let i = 0; i < sides; i++) {
+          const next = (i + 1) % sides;
+          const a = ring * sides + i;
+          const b = ring * sides + next;
+          const c = (ring + 1) * sides + next;
+          const d = (ring + 1) * sides + i;
+
+          indices.push(a, b, d, b, c, d);
+        }
+      }
+
+      const top = positions.length / 3;
+      positions.push(rings[rings.length - 1].x, rings[rings.length - 1].y + 0.08, rings[rings.length - 1].z);
+      colors.push(0.105, 0.075, 0.052);
+
+      const last = (rings.length - 1) * sides;
+      for (let i = 0; i < sides; i++) {
+        const next = (i + 1) % sides;
+        indices.push(last + i, last + next, top);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(colors, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // Creates a tapered, slightly irregular root extending from the trunk.
+    function createRootGeometry(startAngle, length, height, bend) {
+      const points = [
+        new THREE.Vector3(0, 0.13, 0),
+        new THREE.Vector3(
+          Math.cos(startAngle) * length * 0.18,
+          height * 0.72,
+          Math.sin(startAngle) * length * 0.18
+        ),
+        new THREE.Vector3(
+          Math.cos(startAngle) * length * 0.48,
+          height * 0.43,
+          Math.sin(startAngle) * length * 0.48
+        ),
+        new THREE.Vector3(
+          Math.cos(startAngle) * length,
+          height * 0.12,
+          Math.sin(startAngle) * length
+        )
+      ];
+
+      const radii = [0.17, 0.135, 0.09, 0.035];
+      const sides = 6;
+      const positions = [];
+      const indices = [];
+
+      points.forEach((point, index) => {
+        for (let i = 0; i < sides; i++) {
+          const angle = (i / sides) * Math.PI * 2;
+          const offset = new THREE.Vector3(
+            Math.cos(angle) * radii[index],
+            0,
+            Math.sin(angle) * radii[index]
+          );
+          positions.push(point.x + offset.x, point.y, point.z + offset.z);
+        }
+      });
+
+      for (let i = 0; i < sides; i++) {
+        const next = (i + 1) % sides;
+        indices.push(i, next, sides + next, i, sides + next, sides + i);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // Creates a faceted pine foliage cone with an uneven, angular silhouette.
+    function createPineConeGeometry({
+      radius,
+      height,
+      segments = 10,
+      phase = 0,
+      irregularity = 0.07
+    }) {
+      const positions = [];
+      const indices = [];
+      const rings = [
+        { y: 0, r: radius },
+        { y: height * 0.48, r: radius * 0.79 },
+        { y: height * 0.82, r: radius * 0.43 },
+        { y: height, r: 0 }
+      ];
+
+      for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
+        const ring = rings[ringIndex];
+        const ringRadius = ring.r * (1 + irregularity * Math.sin(phase + ringIndex * 2.1));
+
+        for (let i = 0; i < segments; i++) {
+          const angle = (i / segments) * Math.PI * 2 + phase;
+          const offset = new THREE.Vector3(
+            Math.cos(angle) * ringRadius,
+            ring.y + (ringIndex === rings.length - 1
+              ? (i % 2 === 0 ? 0.025 : -0.018)
+              : 0),
+            Math.sin(angle) * ringRadius
+          );
+          positions.push(offset.x, offset.y, offset.z);
+        }
+      }
+
+      for (let ring = 0; ring < rings.length - 1; ring++) {
+        for (let i = 0; i < segments; i++) {
+          const next = (i + 1) % segments;
+          const a = ring * segments + i;
+          const b = ring * segments + next;
+          const c = (ring + 1) * segments + next;
+          const d = (ring + 1) * segments + i;
+          indices.push(a, b, d, b, c, d);
+        }
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // ------------------------------------------------------------------
+    // Mossy rock patch
+    // ------------------------------------------------------------------
+
+    const groundGeometry = new THREE.CylinderGeometry(
+      2.75,
+      3.25,
+      0.48,
+      14,
+      2,
+      false
+    );
+
+    const groundPosition = groundGeometry.attributes.position;
+    const groundColors = [];
+
+    for (let i = 0; i < groundPosition.count; i++) {
+      const x = groundPosition.getX(i);
+      const z = groundPosition.getZ(i);
+      const edge = 1 - Math.min(1, Math.hypot(x, z) / 2.9);
+      const color = palette.moss.clone().lerp(palette.mossLight, edge * 0.7);
+      groundColors.push(color.r, color.g, color.b);
+    }
+
+    groundGeometry.setAttribute(
+      "color",
+      new THREE.Float32BufferAttribute(groundColors, 3)
+    );
+    groundGeometry.computeVertexNormals();
+
+    const ground = mesh(
+      groundGeometry,
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 1,
+        flatShading: true
+      }),
+      "Mossy_Rock_Patch"
+    );
+    ground.position.y = -0.24;
+
+    // Individual faceted stones around and beneath the tree.
+    const rockData = [
+      [-2.05, -0.02, 0.72, 0.48, 0.65, 0.35, 0.1],
+      [2.05, -0.03, 0.65, 0.42, 0.59, 0.34, -0.2],
+      [-1.45, -0.18, -1.65, 0.55, 0.43, 0.48, 0.4],
+      [1.50, -0.19, -1.55, 0.62, 0.46, 0.52, -0.3],
+      [0.15, -0.38, 1.75, 0.75, 0.35, 0.58, 0.2],
+      [-0.35, -0.40, -1.95, 0.68, 0.33, 0.55, -0.4],
+      [2.35, -0.20, -0.75, 0.38, 0.31, 0.42, 0.5],
+      [-2.45, -0.21, -0.85, 0.36, 0.29, 0.39, -0.3]
+    ];
+
+    rockData.forEach((data, index) => {
+      const [x, y, z, sx, sy, sz, rotation] = data;
+      const geometry = new THREE.DodecahedronGeometry(1, 0);
+      const rock = mesh(
+        geometry,
+        index % 3 === 0 ? materials.rockDark : materials.rock,
+        `Stone_${index + 1}`
+      );
+      rock.position.set(x, y, z);
+      rock.scale.set(sx, sy, sz);
+      rock.rotation.set(rotation * 0.25, rotation, rotation * 0.17);
+    });
+
+    // ------------------------------------------------------------------
+    // Exposed roots
+    // ------------------------------------------------------------------
+
+    const rootData = [
+      { angle: 0.15, length: 1.95, height: 0.48, bend: 0.22 },
+      { angle: 1.12, length: 1.65, height: 0.40, bend: -0.18 },
+      { angle: 2.38, length: 1.85, height: 0.52, bend: 0.16 },
+      { angle: 3.72, length: 1.55, height: 0.38, bend: -0.24 },
+      { angle: 5.05, length: 1.72, height: 0.46, bend: 0.12 }
+    ];
+
+    rootData.forEach((data, index) => {
+      const geometry = createRootGeometry(
+        data.angle,
+        data.length,
+        data.height,
+        data.bend
+      );
+      mesh(
+        geometry,
+        materials.root,
+        `Exposed_Root_${index + 1}`
+      );
+    });
+
+    // Small roots emerging from beneath the trunk.
+    [0.85, 2.7, 4.55, 5.7].forEach((angle, index) => {
+      const geometry = createRootGeometry(
+        angle,
+        0.9 + (index % 2) * 0.22,
+        0.27,
+        index % 2 === 0 ? 0.14 : -0.12
+      );
+      mesh(
+        geometry,
+        materials.root,
+        `Small_Root_${index + 1}`
+      );
+    });
+
+    // ------------------------------------------------------------------
+    // Tapered trunk
+    // ------------------------------------------------------------------
+
+    mesh(
+      createTrunkGeometry(),
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.97,
+        metalness: 0,
+        flatShading: true
+      }),
+      "Tapered_Bark_Trunk"
+    );
+
+    // A few bark ridges add definition while retaining a low-poly silhouette.
+    const ridgeGeometry = new THREE.CylinderGeometry(
+      0.035,
+      0.055,
+      2.6,
+      5,
+      1,
+      false
+    );
+
+    [
+      [-0.28, 0.05, 0.95, -0.12],
+      [0.27, 0.03, -0.9, 0.14],
+      [-0.12, -0.04, -1.0, -0.08]
+    ].forEach((data, index) => {
+      const ridge = mesh(
+        ridgeGeometry,
+        materials.barkLight,
+        `Bark_Ridge_${index + 1}`
+      );
+      ridge.position.set(data[0], data[1] + 1.35, data[2]);
+      ridge.rotation.z = data[3];
+      ridge.rotation.y = index * 0.8;
+    });
+
+    // ------------------------------------------------------------------
+    // Foliage: four stacked, snow-dusted cones
+    // ------------------------------------------------------------------
+
+    const foliageData = [
+      { y: 1.12, radius: 1.55, height: 1.75, segments: 11, phase: 0.12 },
+      { y: 2.02, radius: 1.30, height: 1.62, segments: 10, phase: 0.36 },
+      { y: 2.83, radius: 0.98, height: 1.48, segments: 9, phase: 0.62 },
+      { y: 3.48, radius: 0.61, height: 1.25, segments: 8, phase: 0.88 }
+    ];
+
+    foliageData.forEach((data, index) => {
+      const geometry = createPineConeGeometry({
+        radius: data.radius,
+        height: data.height,
+        segments: data.segments,
+        phase: data.phase,
+        irregularity: 0.075 + (index % 2) * 0.018
+      });
+
+      const foliageMaterial = index < 2
+        ? materials.pineMid
+        : index === 3
+          ? materials.pineLight
+          : materials.pineDark;
+
+      const foliage = mesh(
+        geometry,
+        foliageMaterial,
+        `Foliage_Cone_${index + 1}`
+      );
+      foliage.position.y = data.y;
+
+      // Snow cap on each cone.
+      const snowGeometry = createPineConeGeometry({
+        radius: data.radius * 0.72,
+        height: data.height * 0.43,
+        segments: data.segments,
+        phase: data.phase + 0.25,
+        irregularity: 0.055
+      });
+
+      const snow = mesh(
+        snowGeometry,
+        materials.snow,
+        `Snow_Cap_${index + 1}`
+      );
+      snow.position.y = data.y + data.height * 0.37;
+
+      // A subtle blue shadow beneath the snow gives the caps depth.
+      const undersideGeometry = createPineConeGeometry({
+        radius: data.radius * 0.79,
+        height: data.height * 0.25,
+        segments: data.segments,
+        phase: data.phase + 0.1,
+        irregularity: 0.065
+      });
+
+      const underside = mesh(
+        undersideGeometry,
+        materials.snowBlue,
+        `Snow_Underside_${index + 1}`
+      );
+      underside.position.y = data.y + data.height * 0.28;
+      underside.scale.y = 0.55;
+    });
+
+    // ------------------------------------------------------------------
+    // Small snow clumps and pine needle details
+    // ------------------------------------------------------------------
+
+    const snowClumpGeometry = new THREE.IcosahedronGeometry(0.14, 0);
+
+    [
+      [-1.72, 0.82, 0.85],
+      [1.63, 0.79, 0.92],
+      [-0.95, 1.45, -1.15],
+      [1.02, 1.43, -1.18],
+      [-2.05, 1.25, -0.42],
+      [2.08, 1.20, -0.38]
+    ].forEach((position, index) => {
+      const clump = mesh(
+        snowClumpGeometry,
+        materials.snow,
+        `Snow_Clump_${index + 1}`
+      );
+      clump.position.set(...position);
+      clump.scale.set(1.0 + (index % 2) * 0.35, 0.65, 0.85);
+    });
+
+    // ------------------------------------------------------------------
+    // Presentation-only ground and atmosphere
+    // ------------------------------------------------------------------
+
+    const presentationGround = new THREE.Mesh(
+      new THREE.CircleGeometry(18, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0xb9c8b7,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    presentationGround.rotation.x = -Math.PI / 2;
+    presentationGround.position.y = -0.49;
+    presentationGround.receiveShadow = true;
+    scene.add(presentationGround);
+
+    // ------------------------------------------------------------------
+    // Animation loop
+    // ------------------------------------------------------------------
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ------------------------------------------------------------------
+    // GLB export
+    // ------------------------------------------------------------------
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      try {
+        const exporter = new GLTFExporter();
+        const result = await exporter.parseAsync(asset, {
+          binary: true,
+          onlyVisible: true,
+          truncateDrawRange: true,
+          maxTextureSize: 4096
+        });
+
+        const blob = new Blob([result], {
+          type: "model/gltf-binary"
+        });
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "snow_dusted_pine.glb";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 1000);
+
+        status.textContent = `Exported ${(blob.size / 1024).toFixed(1)} KB`;
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Export failed. See browser console.";
+      } finally {
+        exportButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

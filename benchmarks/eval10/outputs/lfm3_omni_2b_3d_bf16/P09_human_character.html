@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Adventurer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --cream: #f6eee8;
+      --muted: rgba(244, 246, 238, 0.72);
+      --gold: #d7a85c;
+      --ink: #e5edf1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #242a2b;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      touch-action: none;
+    }
+
+    .hud {
+      position: fixed;
+      top: clamp(22px, 4vw, 48px);
+      left: clamp(22px, 4vw, 52px);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .title-card {
+      max-width: 320px;
+    }
+
+    .eyebrow {
+      margin-bottom: 12px;
+      color: var(--gold);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 48px);
+      line-height: 1.02;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      position: fixed;
+      right: clamp(18px, 3vw, 38px);
+      bottom: clamp(18px, 3vw, 34px);
+      z-index: 2;
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(244, 246, 238, 0.14);
+      border-radius: 999px;
+      padding: 10px 15px;
+      color: var(--ink);
+      background: rgba(24, 27, 26, 0.68);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
+    }
+
+    button:hover {
+      border-color: rgba(244, 246, 238, 0.48);
+      background: rgba(28, 31, 32, 0.84);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        max-width: calc(100vw - 24px);
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .controls {
+        right: 18px;
+        bottom: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <section class="title-card" aria-label="Scene title">
+      <div class="eyebrow">Field Study · No. 07</div>
+      <h1>Low-Poly<br />Adventurer</h1>
+      <p class="subtitle">
+        A restrained, stylized human figure wearing a tunic, boots,
+        belt pouch, scarf, and leather backpack.
+      </p>
+    </section>
+
+    <div class="controls" aria-label="Scene controls">
+      <button id="reset-view" type="button">Reset view</button>
+      <button id="play-pause" type="button">Pause breathing</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional low-poly human adventurer"
+    );
+    renderer.domElement.tabIndex = 0;
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x242a2b);
+    scene.fog = new THREE.Fog(0x242a2b, 11, 24);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Procedural textures
+    // -------------------------------------------------------------------------
+
+    function makeConcreteTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const image = ctx.createImageData(canvas.width, canvas.height);
+
+      for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const index = (y * canvas.width + x) * 4;
+          const noise = (Math.random() - 0.5) * 65;
+
+          image.data[index] = 115 + noise;
+          image.data[index + 1] = 88 + noise;
+          image.data[index + 2] = 35 + noise;
+          image.data[index + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(image, 0, 0);
+
+      for (let i = 0; i < 350; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+
+        const radius = 0.3 + Math.random() * 1.4;
+        ctx.beginPath();
+
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.sin(y * 0.12) * (2 + Math.random() * 2),
+          y + Math.cos(y * 0.08) * (1.5 + Math.random() * 2)
+        );
+
+        ctx.strokeStyle = `rgba(25, 29, 27, ${0.035 + Math.random() * 0.07})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(3, 3);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    var makeWoodTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      for (let y = 0; y < 256; y += 16) {
+        ctx.fillStyle = "rgba(54, 32, 18, 0.38)";
+        ctx.fillRect(0, y, 256, 16);
+
+        const wave = Math.sin(y * 0.025) * (1.5 + Math.random() * 2);
+        ctx.strokeStyle = `rgba(65, 30, 14, ${0.12 + Math.random() * 0.22})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.4;
+        ctx.beginPath();
+
+        for (let x = 0; x <= 256; x += 16) {
+          const waveX = x + wave;
+          if (x === 0) ctx.moveTo(waveX, y + 1);
+          else ctx.lineTo(waveX, y);
+        }
+
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 18; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+
+        ctx.strokeStyle = `rgba(45, 20, 9, ${0.025 + Math.random() * 0.09})`;
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 18, y + 3);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 1);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    const concreteTexture = makeConcreteTexture();
+    const woodTexture = makeWoodTexture();
+
+    const materials = {
+      tunic: new THREE.MeshStandardMaterial({
+        map: concreteTexture,
+        color: 0xffffff,
+        roughness: 0.88
+      }),
+      fabric: new THREE.MeshStandardMaterial({
+        color: 0xf1f3e9,
+        roughness: 0.76,
+        metalness: 0.05
+      }),
+      leather: new THREE.MeshStandardMaterial({
+        map: woodTexture,
+        color: 0xffffff,
+        roughness: 0.78
+      }),
+      boot: new THREE.MeshStandardMaterial({
+        color: 0x171e1c,
+        roughness: 0.88
+      }),
+      belt: new THREE.MeshStandardMaterial({
+        color: 0x252b2d,
+        roughness: 0.82
+      }),
+      scarf: new THREE.MeshStandardMaterial({
+        color: 0x3a1f18,
+        roughness: 0.9
+      }),
+      skin: new THREE.MeshStandardMaterial({
+        color: 0xe5e4d5,
+        roughness: 0.68,
+        metalness: 0.02
+      }),
+      eye: new THREE.MeshBasicMaterial({
+        color: 0x220b20,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false
+      }),
+      eyeLight: new THREE.MeshBasicMaterial({
+        color: 0x7bb6a4,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false
+      }),
+      lightBelly: new THREE.MeshStandardMaterial({
+        color: 0xc5b39f,
+        emissive: 0x8c3d15,
+        emissiveIntensity: 0.45,
+        roughness: 0.6
+      })
+    };
+
+    // -------------------------------------------------------------------------
+    // Ground and atmosphere
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 60),
+      new THREE.MeshStandardMaterial({
+        color: 0x202a2c,
+        roughness: 0.95,
+        metalness: 0
+      })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.65;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(42, 32, 18),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          topColor: { value: new THREE.Color(0x9ec8c7) },
+          horizonColor: { value: new THREE.Color(0x4e556f) }
+        },
+        vertexShader: `
+          varying vec3 vDirection;
+
+          void main() {
+            vDirection = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 horizonColor;
+          varying vec3 vDirection;
+
+          void main() {
+            float height = normalize(vDirection).y;
+
+            vec3 color = mix(horizonColor, topColor, smoothstep(-0.22, 0.58, height));
+            color += dot(normalize(vDirection), vec3(0.0, 1.0, 0.0)) * 0.28;
+
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `,
+        transparent: true,
+        depthWrite: false
+      })
+    );
+
+    sky.position.set(0, 4.5, 0);
+    sky.renderOrder = -1000;
+    scene.add(sky);
+
+    // -------------------------------------------------------------------------
+    // Procedural lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(
+      0xffffff,
+      0x292a2d,
+      1.65
+    );
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffedcf, 3.5);
+    sun.position.set(-4.5, 9, 7.5);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -7;
+    sun.shadow.camera.right = 7;
+    sun.shadow.camera.top = 7;
+    sun.shadow.camera.bottom = -2;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 20;
+    sun.shadow.bias = -0.0003;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xb9dce7, 1.15);
+    fill.position.set(6, 4, -5);
+    scene.add(fill);
+
+    // -------------------------------------------------------------------------
+    // Human geometry helpers
+    // -------------------------------------------------------------------------
+
+    function makeSkinTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+
+      for (let y = 0; y < 512; y += 12) {
+        const wave = Math.sin(y * 0.018) * (1.3 + Math.random() * 3);
+
+        ctx.fillStyle = "rgba(244, 244, 245, 0.96)";
+        ctx.fillRect(0, y, 512, 12);
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.035 + Math.random() * 0.11})`;
+        ctx.lineWidth = 0.45 + Math.random() * 1.25;
+
+        for (let x = 0; x <= 512; x += 12) {
+          const waveX = x + wave;
+          ctx.beginPath();
+          ctx.moveTo(waveX, y + 2);
+          ctx.lineTo(waveX, y - 2);
+          ctx.stroke();
+        }
+      }
+
+      for (let i = 0; i < 750; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+          x + Math.random() * 18 - 9,
+          y + Math.random() * 3 - 1.5
+        );
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    var makeWoodTexture = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      for (let y = 0; y < 256; y += 16) {
+        ctx.fillStyle = "rgba(45, 26, 14, 0.38)";
+        ctx.fillRect(0, y, 256, 16);
+
+        const wave = Math.sin(y * 0.025) * (1.5 + Math.random() * 2);
+        ctx.strokeStyle = "rgba(65, 30, 14, 0.16)";
+        ctx.lineWidth = 0.5 + Math.random() * 1.4;
+        ctx.beginPath();
+
+        for (let x = 0; x <= 256; x += 16) {
+          const waveX = x + wave;
+          if (x === 0) ctx.moveTo(waveX, y + 1);
+          else ctx.lineTo(waveX, y);
+        }
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 18; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+
+        ctx.strokeStyle = "rgba(45, 20, 9, 0.14)";
+        ctx.lineWidth = 0.4 + Math.random() * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 18, y + 3);
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 1);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    const tunicMaterials = [
+      new THREE.MeshStandardMaterial({
+        map: concreteTexture,
+        color: 0xe5e3d4,
+        roughness: 0.88
+      }),
+      new THREE.MeshStandardMaterial({
+        map: concreteTexture,
+        color: 0xffffff,
+        roughness: 0.9
+      })
+    ];
+
+    const tunicFabricMaterials = [
+      new THREE.MeshStandardMaterial({
+        color: 0xf4f1e7,
+        roughness: 0.76,
+        metalness: 0.05
+      }),
+      new THREE.MeshStandardMaterial({
+        color: 0xe8e3d9,
+        roughness: 0.78
+      })
+    ];
+
+    const leatherMaterials = [
+      new THREE.MeshStandardMaterial({
+        map: woodTexture,
+        color: 0xc6a77b,
+        roughness: 0.82
+      }),
+      new THREE.MeshStandardMaterial({
+        map: woodTexture,
+        color: 0xb96f60,
+        roughness: 0.84
+      })
+    ];
+
+    const scarfMaterials = [
+      new THREE.MeshStandardMaterial({
+        color: 0x292a2b,
+        roughness: 0.9
+      }),
+      new THREE.MeshStandardMaterial({
+        color: 0xd8d1c6,
+        roughness: 0.95
+      })
+    ];
+
+    const bootMaterials = [
+      new THREE.MeshStandardMaterial({
+        color: 0x171e1c,
+        roughness: 0.88
+      }),
+      new THREE.MeshStandardMaterial({
+        color: 0x252b2d,
+        roughness: 0.82
+      })
+    ];
+
+    const beltMaterials = [
+      new THREE.MeshStandardMaterial({
+        color: 0x252b2d,
+        roughness: 0.8
+      }),
+      new THREE.MeshStandardMaterial({
+        color: 0x292a2b,
+        roughness: 0.9
+      })
+    ];
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    function addMesh(geometry, material, parent = scene) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function cylinderZ(
+      radius,
+      height,
+      material,
+      x,
+      y,
+      z,
+      radialSegments = 10
+    ) {
+      const mesh = addMesh(
+        new THREE.CylinderGeometry(
+          radius,
+          radius,
+          height,
+          radialSegments,
+          1,
+          true
+        ),
+        material,
+        scene
+      );
+
+      mesh.rotation.x = Math.PI / 2;
+      return mesh;
+    }
+
+    function torusX(radius, tube, material, x, y, z, radialSegments = 16) {
+      const mesh = addMesh(
+        new THREE.TorusGeometry(radius, tube, 8, radialSegments),
+        material,
+        scene
+      );
+
+      mesh.position.set(x, y, z);
+      return mesh;
+    }
+
+    function cylinderBetween(a, b, radius, material, parent = scene) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+
+      const mesh = addMesh(
+        new THREE.CylinderGeometry(
+          radius,
+          radius,
+          length,
+          10
+        ),
+        material,
+        parent
+      );
+
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      return mesh;
+    }
+
+    function makeBeltCurve(points) {
+      const pts = points.map(p => Array.isArray(p) ? new THREE.Vector3(p[0], p[1], p[2] || 0) : p);
+      return new THREE.CatmullRomCurve3(pts, false, "centripetal");
+    }
+
+    function makeHairTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        256,
+        0,
+        256,
+        256,
+        255
+      );
+
+      gradient.addColorStop(0, "rgba(255,255,255,1)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function makeGroundHighlightTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      for (let i = 0; i < 6000; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+
+        ctx.fillStyle = `rgba(255,255,255,${0.035 + Math.random() * 0.09})`;
+        ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    // -------------------------------------------------------------------------
+    // Tunic
+    // -------------------------------------------------------------------------
+
+    function createTunicGeometry(width, height, depth) {
+      const shape = new THREE.Shape();
+
+      shape.moveTo(-width / 2, -height / 2);
+      shape.lineTo(width / 2, -height / 2);
+      shape.lineTo(width / 2, height / 2);
+      shape.quadraticCurveTo(width / 2, height, width / 2 - 0.12, height);
+      shape.lineTo(-width / 2, height);
+      shape.quadraticCurveTo(-width / 2, height, -width / 2 + 0.12, height);
+      shape.lineTo(-width / 2, -height);
+      shape.quadraticCurveTo(-width / 2, -height, -width / 2 + 0.12, -height);
+      shape.closePath();
+
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth,
+        steps: 1,
+        bevelEnabled: true,
+        bevelThickness: 0.08,
+        bevelSize: 0.08,
+        bevelSegments: 3,
+        curveSegments: 24
+      });
+
+      geometry.translate(0, 0, -depth / 2);
+      geometry.computeVertexNormals();
+
+      return geometry;
+    }
+
+    const tunic = addMesh(
+      createTunicGeometry(5.2, 2.8, 1.15),
+      tunicMaterials[0]
+    );
+    tunic.position.y = 1.18;
+
+    const tunicFabric = addMesh(
+      createTunicGeometry(4.75, 2.65, 0.95),
+      tunicFabricMaterials[0]
+    );
+    tunicFabric.position.set(0, 2.35, -0.62);
+
+    // -------------------------------------------------------------------------
+    // Boots and boots
+    // -------------------------------------------------------------------------
+
+    const footGeometry = new THREE.SphereGeometry(0.29, 18, 12);
+    const heelGeometry = new THREE.ConeGeometry(0.075, 0.32, 16);
+    const laceGeometry = new THREE.TorusGeometry(0.09, 0.037, 8, 20);
+
+    function createBoot(x) {
+      const boot = addMesh(footGeometry, bootMaterials[1]);
+      boot.position.set(x, 0.42, -0.2);
+      boot.castShadow = true;
+
+      const heel = addMesh(heelGeometry, bootMaterials[0]);
+      heel.position.set(x, 0.12, -0.25);
+      heel.castShadow = true;
+
+      for (const direction of [-1, 1]) {
+        const lace = addMesh(laceGeometry, bootMaterials[0]);
+        lace.position.set(x + direction * 0.12, 0.48, -0.18);
+        lace.rotation.z = Math.PI / 2;
+      }
+
+      cylinderZ(0.11, 0.55, materials.boot, x, 0.13, -0.18, 12);
+      cylinderZ(0.11, 0.55, materials.boot, x, 0.13, 0.18, 12);
+
+      const lacingCurve = makeHairTexture();
+      const lace = addMesh(
+        new THREE.TubeGeometry(makeBeltCurve([
+          [x - 0.08, 0.58],
+          [x + 0.08, 0.58]
+        ]), 16, 0.02, 6, false),
+        materials.belt
+      );
+      lace.castShadow = true;
+      lace.renderOrder = 4;
+    }
+
+    createBoot(-1.18);
+    createBoot(1.18);
+
+    // -------------------------------------------------------------------------
+    // Belt pouch and leather backpack
+    // -------------------------------------------------------------------------
+
+    const pouchGeometry = new THREE.CylinderGeometry(
+      0.34,
+      0.42,
+      0.72,
+      32,
+      1,
+      true
+    );
+    pouchGeometry.rotateX(Math.PI / 2);
+
+    const pouch = addMesh(pouchGeometry, beltMaterials[0]);
+    pouch.position.set(0, 0.55, -0.25);
+    pouch.castShadow = true;
+
+    const pouchBottom = addMesh(
+      new THREE.CylinderGeometry(0.35, 0.35, 0.12, 32),
+      materials.belt
+    );
+    pouchBottom.position.set(0, 0.24, -0.25);
+    pouchBottom.castShadow = true;
+
+    const pouchSide = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 1.02, 32),
+      beltMaterials[1]
+    );
+    pouchSide.position.set(0, 0.58, -0.25);
+    pouchSide.castShadow = true;
+
+    const backpack = addMesh(
+      new THREE.CylinderGeometry(1.15, 1.3, 0.62, 48, 1, true),
+      beltMaterials[1]
+    );
+    backpack.position.set(0, 0.28, -0.25);
+    backpack.castShadow = true;
+
+    // -------------------------------------------------------------------------
+    // Scarf hanging from the tunic neck
+    // -------------------------------------------------------------------------
+
+    const scarfPoints = [
+      new THREE.Vector3(-0.13, 2.12, -0.22),
+      new THREE.Vector3(0.11, 2.08, -0.22),
+      new THREE.Vector3(0.17, 1.95, -0.23),
+      new THREE.Vector3(-0.16, 1.85, -0.24),
+      new THREE.Vector3(-0.18, 2.04, -0.25)
+    ];
+
+    const scarfCurve = makeHairTexture();
+    const scarf = addMesh(
+      new THREE.TubeGeometry(makeBeltCurve(scarfPoints), 64, 0.035, false),
+      scarfMaterials[0]
+    );
+    scarf.renderOrder = 6;
+    scarf.castShadow = true;
+
+    const scarfLight = addMesh(
+      new THREE.SphereGeometry(0.025, 16, 10),
+      materials.eyeLight,
+      scene
+    );
+    scarfLight.position.set(0.12, 2.1, -0.18);
+
+    // -------------------------------------------------------------------------
+    // Lightweight clothing and accessories
+    // -------------------------------------------------------------------------
+
+    const beltBuckle = addMesh(
+      new THREE.CylinderGeometry(0.055, 0.065, 0.06, 14),
+      materials.belt
+    );
+    beltBuckle.position.set(0, 1.65, -0.25);
+
+    const scarfLightBelly = addMesh(
+      new THREE.CircleGeometry(0.095, 24),
+      materials.lightBelly,
+      scene
+    );
+    scarfLightBelly.position.set(0.12, 2.1, -0.18);
+
+    const goldLinkMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb98a42,
+      roughness: 0.3,
+      metalness: 0.8
+    });
+
+    const goldRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc8a17d,
+      roughness: 0.2,
+      metalness: 0.85
+    });
+
+    const hairMaterial = makeHairTexture();
+    const hairCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -1.65, -0.42),
+      new THREE.Vector3(0, 2.5, -0.42),
+      new THREE.Vector3(0, 2.55, -0.45)
+    ]);
+
+    const hair = addMesh(
+      new THREE.TubeGeometry(hairCurve, 32, 0.045, 10, false),
+      hairMaterial
+    );
+    hair.renderOrder = 7;
+
+    const necklace = addMesh(
+      new THREE.CylinderGeometry(0.105, 0.12, 0.13, 14),
+      materials.gold
+    );
+    necklace.position.set(0.35, 2.3, -0.25);
+
+    const beltRing = addMesh(
+      new THREE.TorusGeometry(0.095, 0.035, 8, 24),
+      goldRingMaterial
+    );
+    beltRing.rotation.x = Math.PI / 2;
+    beltRing.position.set(0, 1.65, -0.25);
+
+    const goldLink = addMesh(
+      new THREE.CylinderGeometry(0.055, 0.07, 1, 12),
+      goldLinkMaterial,
+      scene
+    );
+    goldLink.position.set(-0.18, 2.15, -0.25);
+
+    // -------------------------------------------------------------------------
+    // Lightweight clothing details
+    // -------------------------------------------------------------------------
+
+    const beltLinkPoints = [
+      new THREE.Vector3(-0.08, 1.65, -0.22),
+      new THREE.Vector3(0.08, 1.65, -0.22)
+    ];
+
+    const beltCurve = makeBeltCurve(beltLinkPoints);
+    const beltLink = addMesh(
+      new THREE.TubeGeometry(beltCurve, 18, 0.025, 10, false),
+      materials.belt
+    );
+    beltLink.renderOrder = 8;
+
+    const shirtEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe9e1d5,
+      roughness: 0.72
+    });
+
+    const shirtEdge = addMesh(
+      new THREE.BoxGeometry(0.48, 0.12, 0.055),
+      shirtEdgeMaterial,
+      scene
+    );
+    shirtEdge.position.set(0, 2.05, -0.205);
+
+    // -------------------------------------------------------------------------
+    // Custom camera controls: orbit and zoom
+    // -------------------------------------------------------------------------
+
+    const controls = {
+      target: new THREE.Vector3(0, 1.35, -0.25),
+      radius: 8.5,
+      minRadius: 4.2,
+      maxRadius: 14,
+      yaw: 0.78,
+      pitch: 0.48
+    };
+
+    function updateCamera() {
+      const horizontal = Math.sin(controls.pitch) * controls.radius;
+      camera.position.set(
+        controls.target.x + horizontal * Math.sin(controls.yaw),
+        controls.target.y + Math.cos(controls.pitch) * controls.radius,
+        controls.target.z + horizontal * Math.cos(controls.yaw)
+      );
+      camera.lookAt(controls.target);
+    }
+
+    function resetView() {
+      controls.target.set(0, 1.35, -0.25);
+      controls.radius = 8.5;
+      controls.yaw = 0.78;
+      controls.pitch = 0.48;
+      updateCamera();
+    }
+
+    document.getElementById("reset-view").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Animation and breathing
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+    let paused = false;
+    let playButton = document.getElementById("play-pause");
+
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+
+      if (!paused) {
+        const inhale = Math.sin(elapsed * 1.35) * 0.006;
+        const exhale = Math.sin(elapsed * 3.2 + 1.8) * 0.003;
+
+        tunic.position.y += inhale - exhale;
+        tunic.position.x += Math.sin(elapsed * 0.72) * 0.0015;
+        tunic.position.z += Math.cos(elapsed * 0.55) * 0.0012;
+
+        scarf.position.y += 1.65 * inhale;
+        scarf.position.x += Math.sin(elapsed * 0.48) * 0.008;
+      }
+
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    playButton.addEventListener("click", () => {
+      paused = !paused;
+      playButton.textContent = paused ? "Resume breathing" : "Pause breathing";
+    });
+
+    resetView();
+    playButton.addEventListener("click", () => {
+      paused = !paused;
+      playButton.textContent = paused ? "Resume breathing" : "Pause breathing";
+    });
+
+    updateCamera();
+    renderer.setAnimationLoop(animate);
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

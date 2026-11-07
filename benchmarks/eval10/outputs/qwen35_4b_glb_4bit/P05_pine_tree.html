@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Evergreen Pine</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #101820;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 10;
+      width: min(340px, calc(100vw - 36px));
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 14px;
+      color: #edf4f7;
+      background: rgba(15, 24, 31, 0.78);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #aebdc5;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 9px;
+      color: #102019;
+      background: #a9d8b2;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    button:hover {
+      background: #c0e8c8;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .hint {
+      margin-top: 10px;
+      color: #81969f;
+      font-size: 11px;
+    }
+
+    #status {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      padding: 10px 13px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9px;
+      color: #d7e5e9;
+      background: rgba(15, 24, 31, 0.75);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    #status.visible {
+      opacity: 1;
+    }
+
+    @media (max-width: 520px) {
+      .panel {
+        top: 10px;
+        left: 10px;
+        width: calc(100vw - 20px);
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Stylized Low-Poly Evergreen</h1>
+    <p>
+      A static, game-ready pine with faceted bark, exposed roots, moss,
+      rocks, and four stacked snow-dusted foliage cones.
+    </p>
+    <button id="exportButton" type="button">Export GLB</button>
+    <div class="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+  </section>
+
+  <div id="status"></div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    // ------------------------------------------------------------
+    // Renderer, camera, and presentation controls
+    // ------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x111b22);
+    scene.fog = new THREE.Fog(0x111b22, 13, 28);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(7.4, 5.2, 8.6);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.55, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 4.5;
+    controls.maxDistance = 17;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    // ------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0xb9d9e8, 0x30251b, 1.55));
+
+    const keyLight = new THREE.DirectionalLight(0xfff0d1, 3.1);
+    keyLight.position.set(-5, 9, 6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -7;
+    keyLight.shadow.camera.right = 7;
+    keyLight.shadow.camera.top = 8;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x8fc7ff, 1.25);
+    rimLight.position.set(6, 5, -7);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------
+    // Exportable asset root. Presentation lights and ground remain outside it.
+    // ------------------------------------------------------------
+
+    const assetRoot = new THREE.Group();
+    assetRoot.name = "Stylized_LowPoly_Evergreen_Pine";
+    scene.add(assetRoot);
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+
+    const barkMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      vertexColors: true,
+      roughness: 0.94,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const rootMaterial = new THREE.MeshStandardMaterial({
+      color: 0x59412f,
+      roughness: 0.98,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const cutWoodMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9b7046,
+      roughness: 0.92,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const darkWoodMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3b2d22,
+      roughness: 1,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const foliageMaterial = new THREE.MeshStandardMaterial({
+      color: 0x184f37,
+      roughness: 0.96,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const snowMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe8f1ed,
+      roughness: 0.92,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const mossMaterial = new THREE.MeshStandardMaterial({
+      color: 0x526b38,
+      roughness: 1,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0x626863,
+      roughness: 0.96,
+      metalness: 0,
+      flatShading: true
+    });
+
+    const rockDarkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x424b47,
+      roughness: 1,
+      metalness: 0,
+      flatShading: true
+    });
+
+    // ------------------------------------------------------------
+    // Custom faceted trunk with uneven radial rings and bark colors
+    // ------------------------------------------------------------
+
+    function createTaperedTrunk() {
+      const ringData = [
+        { y: -2.25, radius: 0.66 },
+        { y: -1.55, radius: 0.54 },
+        { y: -0.65, radius: 0.43 },
+        { y: 0.30, radius: 0.34 },
+        { y: 1.15, radius: 0.285 },
+        { y: 1.90, radius: 0.225 },
+        { y: 2.35, radius: 0.145 }
+      ];
+
+      const sides = 8;
+      const positions = [];
+      const colors = [];
+      const indices = [];
+
+      const baseColor = new THREE.Color([
+        0.24, 0.14, 0.075,
+        0.29, 0.17, 0.095,
+        0.23, 0.13, 0.07,
+        0.28, 0.16, 0.09,
+        0.22, 0.12, 0.065,
+        0.26, 0.15, 0.075
+      ]);
+
+      for (let ring = 0; ring < ringData.length; ring++) {
+        const data = ringData[ring];
+
+        for (let side = 0; side < sides; side++) {
+          const angle = (side / sides) * Math.PI * 2 + ring * 0.045;
+          const irregularity =
+            1 +
+            Math.sin(side * 2.37 + ring * 0.81) * 0.055 +
+            Math.cos(side * 1.13 - ring * 0.38) * 0.035;
+
+          const radius = data.radius * irregularity;
+
+          positions.push(
+            Math.cos(angle) * radius,
+            data.y + (ring % 2 === 0 ? 0.015 : -0.01),
+            Math.sin(angle) * radius
+          );
+
+          const color = baseColor.clone();
+          color.offsetHSL(
+            Math.sin(side + ring) * 0.012,
+            Math.sin(side * 1.7) * 0.035,
+            Math.sin(side * 2.9 + ring) * 0.025
+          );
+          colors.push(color.r, color.g, color.b);
+        }
+      }
+
+      for (let ring = 0; ring < ringData.length - 1; ring++) {
+        for (let side = 0; side < sides; side++) {
+          const nextSide = (side + 1) % sides;
+          const a = ring * sides + side;
+          const b = ring * sides + nextSide;
+          const c = (ring + 1) * sides + nextSide;
+          const d = (ring + 1) * sides + side;
+
+          indices.push(a, b, d, b, c, d);
+        }
+      }
+
+      // Top and bottom caps.
+      const topCenter = positions.length / 3;
+      positions.push(0.02, 2.37, 0);
+      colors.push(0.19, 0.105, 0.05);
+
+      const bottomCenter = positions.length / 3;
+      positions.push(-0.02, -2.28, 0);
+      colors.push(0.17, 0.09, 0.045);
+
+      const lastRing = (ringData.length - 1) * sides;
+      for (let side = 0; side < sides; side++) {
+        const nextSide = (side + 1) % sides;
+        indices.push(topCenter, lastRing + nextSide, lastRing + side);
+        indices.push(bottomCenter, side, nextSide);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(colors, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      const faceted = geometry.toNonIndexed();
+      faceted.computeVertexNormals();
+      geometry.dispose();
+
+      return faceted;
+    }
+
+    const trunk = new THREE.Mesh(createTaperedTrunk(), barkMaterial);
+    trunk.name = "Faceted_Bark_Trunk";
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    assetRoot.add(trunk);
+
+    // ------------------------------------------------------------
+    // Branch stubs
+    // ------------------------------------------------------------
+
+    function createBranchStub(name, x, y, z, rotation, scale) {
+      const geometry = new THREE.CylinderGeometry(
+        0.10 * scale,
+        0.18 * scale,
+        0.72 * scale,
+        7,
+        1,
+        false
+      );
+
+      const mesh = new THREE.Mesh(geometry, darkWoodMaterial);
+      mesh.name = name;
+      mesh.position.set(x, y, z);
+      mesh.rotation.z = rotation;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      assetRoot.add(mesh);
+
+      const endGeometry = new THREE.CircleGeometry(
+        0.10 * scale,
+        7
+      );
+      const end = new THREE.Mesh(endGeometry, cutWoodMaterial);
+      end.name = `${name}_Cut_End`;
+      end.position.copy(mesh.position);
+      end.position.x += Math.sin(rotation) * 0.36 * scale;
+      end.position.y += 0.36 * scale;
+      end.rotation.y = rotation;
+      end.castShadow = true;
+      assetRoot.add(end);
+
+      return mesh;
+    }
+
+    createBranchStub("Broken_Branch_Left", -0.43, 1.25, 0.05, 1.05, 1.0);
+    createBranchStub("Broken_Branch_Right", 0.42, 1.72, -0.08, -1.0, 0.85);
+    createBranchStub("Broken_Branch_Back", 0.05, 2.05, -0.42, -0.2, 0.65);
+
+    // ------------------------------------------------------------
+    // Exposed roots: tapered, slightly irregular low-poly cylinders
+    // ------------------------------------------------------------
+
+    function createRoot(name, angle, length, width, y, droop) {
+      const positions = [];
+      const indices = [];
+
+      const ringData = [
+        { y: y, radius: width },
+        { y: y - 0.16, radius: width * 0.72 },
+        { y: y - 0.38, radius: width * 0.43 },
+        { y: y - 0.56, radius: width * 0.16 }
+      ];
+
+      const sides = 6;
+
+      for (let ring = 0; ring < ringData.length; ring++) {
+        const data = ringData[ring];
+        const irregularity = 1 + Math.sin(angle + ring * 2.1) * 0.08;
+
+        for (let side = 0; side < sides; side++) {
+          const offset = (side / sides) * Math.PI * 2;
+          const radius = data.radius * irregularity;
+
+          positions.push(
+            Math.cos(angle + offset) * radius,
+            data.y,
+            Math.sin(angle + offset) * radius
+          );
+        }
+      }
+
+      for (let ring = 0; ring < ringData.length - 1; ring++) {
+        for (let side = 0; side < sides; side++) {
+          const nextSide = (side + 1) % sides;
+          const a = ring * sides + side;
+          const b = ring * sides + nextSide;
+          const c = (ring + 1) * sides + nextSide;
+          const d = (ring + 1) * sides + side;
+          indices.push(a, b, d, b, c, d);
+        }
+      }
+
+      const bottomCenter = positions.length / 3;
+      positions.push(
+        Math.cos(angle) * ringData[ringData.length - 1].radius,
+        ringData[ringData.length - 1].y - 0.05,
+        Math.sin(angle) * ringData[ringData.length - 1].radius
+      );
+
+      const lastRing = (ringData.length - 1) * sides;
+      for (let side = 0; side < sides; side++) {
+        const nextSide = (side + 1) % sides;
+        indices.push(bottomCenter, lastRing + nextSide, lastRing + side);
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+
+      const mesh = new THREE.Mesh(geometry, rootMaterial);
+      mesh.name = name;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      assetRoot.add(mesh);
+
+      return mesh;
+    }
+
+    const rootAngles = [0.1, 0.72, 1.36, 2.05, 2.7, 3.35, 4.0, 4.75, 5.45];
+    const rootLengths = [0.95, 1.18, 0.88, 1.22, 0.95, 1.1, 0.85, 1.2, 0.9];
+    const rootWidths = [0.25, 0.31, 0.23, 0.29, 0.22, 0.27, 0.2, 0.26, 0.2];
+
+    for (let i = 0; i < rootAngles.length; i++) {
+      createRoot(
+        `Exposed_Root_${i + 1}`,
+        rootAngles[i],
+        rootLengths[i],
+        rootWidths[i],
+        -0.02 + (i % 3) * 0.025,
+        -0.34 - (i % 2) * 0.08
+      );
+    }
+
+    // ------------------------------------------------------------
+    // Mossy rock patch
+    // ------------------------------------------------------------
+
+    function createRockPatch() {
+      const rockBase = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.65, 1),
+        rockMaterial
+      );
+      rockBase.name = "Mossy_Rock_Base";
+      rockBase.scale.set(1.35, 0.42, 1.05);
+      rockBase.position.y = -2.38;
+      rockBase.rotation.y = 0.2;
+      rockBase.castShadow = true;
+      rockBase.receiveShadow = true;
+      assetRoot.add(rockBase);
+
+      // Irregular moss cushions.
+      const mossGeometry = new THREE.IcosahedronGeometry(0.38, 0);
+      const mossLocations = [
+        [-1.05, -2.15, 0.35, 0.95],
+        [-0.55, -2.10, 0.82, 0.8],
+        [0.35, -2.11, 0.72, 0.9],
+        [0.95, -2.13, 0.2, 0.75],
+        [-0.95, -2.13, -0.4, 0.7],
+        [0.15, -2.12, -0.78, 0.8],
+        [0.55, -2.10, 0.35, 0.65],
+        [-0.25, -2.09, 0.55, 0.6]
+      ];
+
+      mossLocations.forEach((data, index) => {
+        const moss = new THREE.Mesh(mossGeometry, mossMaterial);
+        moss.name = `Moss_Cushion_${index + 1}`;
+        moss.position.set(data[0], data[1], data[2]);
+        moss.scale.set(data[3], data[3] * 0.55, data[3] * 0.8);
+        moss.rotation.set(index * 0.31, index * 0.57, index * 0.19);
+        moss.castShadow = true;
+        moss.receiveShadow = true;
+        assetRoot.add(moss);
+      });
+
+      // Small angular stones.
+      const pebbleGeometry = new THREE.DodecahedronGeometry(0.16, 0);
+      const pebbleData = [
+        [-1.35, -2.02, 0.65, 0.8],
+        [-0.75, -2.01, -0.9, 0.65],
+        [0.35, -2.02, -1.05, 0.7],
+        [1.25, -2.02, 0.55, 0.58],
+        [1.45, -2.01, -0.35, 0.48],
+        [-0.15, -2.01, 1.1, 0.52]
+      ];
+
+      pebbleData.forEach((data, index) => {
+        const pebble = new THREE.Mesh(
+          pebbleGeometry,
+          index % 2 === 0 ? rockDarkMaterial : rockMaterial
+        );
+        pebble.name = `Pebble_${index + 1}`;
+        pebble.position.set(data[0], data[1], data[2]);
+        pebble.scale.setScalar(data[3]);
+        pebble.rotation.set(index * 0.4, index * 0.7, index * 0.2);
+        pebble.castShadow = true;
+        pebble.receiveShadow = true;
+        assetRoot.add(pebble);
+      });
+
+      return rockBase;
+    }
+
+    assetRoot.add(createRockPatch());
+
+    // ------------------------------------------------------------
+    // Snow-dusted foliage cones
+    // ------------------------------------------------------------
+
+    function createFoliageCone(index, y, radius, height) {
+      const foliage = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, 9, 1, false),
+        foliageMaterial
+      );
+      foliage.name = `Snow_Dusted_Foliage_Cone_${index}`;
+      foliage.position.y = y;
+      foliage.rotation.y = index * 0.31;
+      foliage.castShadow = true;
+      foliage.receiveShadow = true;
+      assetRoot.add(foliage);
+
+      // A slightly irregular snow cap/rim around the lower edge.
+      const snowRim = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          radius * 0.96,
+          radius * 1.01,
+          0.10,
+          9,
+          1,
+          true
+        ),
+        snowMaterial
+      );
+      snowRim.name = `Cone_${index}_Snow_Rim`;
+      snowRim.position.y = y - height * 0.42;
+      snowRim.rotation.y = foliage.rotation.y;
+      snowRim.castShadow = true;
+      snowRim.receiveShadow = true;
+      assetRoot.add(snowRim);
+
+      // Low-poly individual spikes break up the silhouette.
+      const spikeGeometry = new THREE.ConeGeometry(
+        radius * 0.19,
+        height * 0.28,
+        4
+      );
+
+      for (let spikeIndex = 0; spikeIndex < 7; spikeIndex++) {
+        const angle = (spikeIndex / 7) * Math.PI * 2 + index * 0.23;
+        const radius = radius * 0.61;
+
+        const spike = new THREE.Mesh(spikeGeometry, foliageMaterial);
+        spike.name = `Cone_${index}_Foliage_Spike_${spikeIndex + 1}`;
+        spike.position.set(
+          Math.cos(angle) * radius,
+          y + height * 0.27,
+          Math.sin(angle) * radius
+        );
+        spike.rotation.z = Math.cos(angle) * 0.16;
+        spike.rotation.x = Math.sin(angle) * 0.16;
+        spike.castShadow = true;
+        assetRoot.add(spike);
+      }
+
+      return foliage;
+    }
+
+    createFoliageCone(1, -1.43, 1.52, 1.18);
+    createFoliageCone(2, -0.63, 1.38, 1.05);
+    createFoliageCone(3, 0.18, 1.20, 0.93);
+    createFoliageCone(4, 1.02, 0.98, 0.78);
+
+    // ------------------------------------------------------------
+    // Additional small pine sprigs around the base
+    // ------------------------------------------------------------
+
+    function createSprig(name, x, z, scale) {
+      const sprig = new THREE.Group();
+      sprig.name = name;
+      sprig.position.set(x, -2.13, z);
+      sprig.scale.setScalar(scale);
+
+      const stemGeometry = new THREE.CylinderGeometry(
+        0.018,
+        0.035,
+        0.55,
+        5
+      );
+
+      const stem = new THREE.Mesh(stemGeometry, darkWoodMaterial);
+      stem.position.y = 0.25;
+      stem.castShadow = true;
+      sprig.add(stem);
+
+      const leafGeometry = new THREE.ConeGeometry(0.13, 0.48, 4);
+      for (let leafIndex = 0; leafIndex < 4; leafIndex++) {
+        const leaf = new THREE.Mesh(leafGeometry, foliageMaterial);
+        leaf.position.set(
+          Math.cos(leafIndex * 1.7) * 0.13,
+          0.35 + leafIndex * 0.07,
+          Math.sin(leafIndex * 1.7) * 0.13
+        );
+        leaf.rotation.z = Math.cos(leafIndex * 1.7) * 0.65;
+        leaf.rotation.x = Math.sin(leafIndex * 1.7) * 0.65;
+        leaf.castShadow = true;
+        sprig.add(leaf);
+      }
+
+      assetRoot.add(sprig);
+    }
+
+    createSprig("Pine_Sprig_01", -1.18, 0.52, 0.72);
+    createSprig("Pine_Sprig_02", 1.12, 0.65, 0.6);
+    createSprig("Pine_Sprig_03", 0.45, -1.12, 0.54);
+
+    // ------------------------------------------------------------
+    // Non-exported presentation ground
+    // ------------------------------------------------------------
+
+    const presentationGround = new THREE.Mesh(
+      new THREE.CircleGeometry(18, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x1b2930,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    presentationGround.rotation.x = -Math.PI / 2;
+    presentationGround.position.y = -2.52;
+    presentationGround.receiveShadow = true;
+    scene.add(presentationGround);
+
+    // ------------------------------------------------------------
+    // GLB export
+    // ------------------------------------------------------------
+
+    const exporter = new GLTFExporter();
+
+    function showStatus(message) {
+      status.textContent = message;
+      status.classList.add("visible");
+    }
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      showStatus("Preparing GLB…");
+
+      // Export only the asset root, excluding the ground, camera, and lights.
+      exporter.parse(
+        assetRoot,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "stylized_low_poly_evergreen_pine.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+          exportButton.disabled = false;
+          showStatus("GLB exported successfully.");
+          setTimeout(() => status.classList.remove("visible"), 2600);
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          showStatus("Export failed. See the browser console.");
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          truncateDrawRange: true
+        }
+      );
+    });
+
+    // ------------------------------------------------------------
+    // Resize and render loop
+    // ------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cute Stylized Low-Poly Red Fox</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #182027;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: min(360px, calc(100vw - 40px));
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      color: #f7f4ed;
+      background: rgba(20, 27, 33, 0.78);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      font-size: 21px;
+      letter-spacing: 0.01em;
+    }
+
+    p {
+      margin: 0;
+      color: #b9c3ca;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #172027;
+      background: #e8c36f;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      color: #eef2f4;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #status {
+      min-height: 18px;
+      margin-top: 10px;
+      color: #91a0ac;
+      font-size: 12px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 18px;
+      bottom: 15px;
+      z-index: 10;
+      color: rgba(237, 241, 244, 0.62);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    @media (max-width: 560px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Cute Low-Poly Red Fox</h1>
+    <p>
+      A stylized, seated fox with a warm red coat, cream chest tuft,
+      pointed ears, expressive eyes, and a large fluffy white-tipped tail.
+    </p>
+
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <button id="resetButton" class="secondary" type="button">Reset View</button>
+    </div>
+
+    <div id="status" aria-live="polite"></div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const resetButton = document.getElementById("resetButton");
+    const status = document.getElementById("status");
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x182027);
+    scene.fog = new THREE.Fog(0x182027, 9, 18);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    const initialCameraPosition = new THREE.Vector3(5.4, 3.7, 7.3);
+    const initialTarget = new THREE.Vector3(0, 1.65, 0.05);
+    camera.position.copy(initialCameraPosition);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(initialTarget);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.065;
+    controls.minDistance = 4.2;
+    controls.maxDistance = 13;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    // Lighting is kept outside the exported character.
+    const hemisphere = new THREE.HemisphereLight(0xcfe6ff, 0x4b3528, 2.15);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffe2bd, 4.0);
+    keyLight.position.set(4.5, 7, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 6;
+    keyLight.shadow.camera.bottom = -3;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x89bfff, 1.25);
+    fillLight.position.set(-5, 3, 4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xff9b70, 2.0);
+    rimLight.position.set(-3, 5, -5);
+    scene.add(rimLight);
+
+    // A subtle ground shadow is not part of the GLB export.
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(3.25, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x26313a,
+        roughness: 0.96,
+        metalness: 0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0.012;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const fox = new THREE.Group();
+    fox.name = "Cute_Red_Fox";
+    scene.add(fox);
+
+    const materials = {
+      fur: new THREE.MeshStandardMaterial({
+        color: 0xb93632,
+        roughness: 0.9,
+        metalness: 0,
+        flatShading: true
+      }),
+      furDark: new THREE.MeshStandardMaterial({
+        color: 0x7e2527,
+        roughness: 0.95,
+        metalness: 0,
+        flatShading: true
+      }),
+      cream: new THREE.MeshStandardMaterial({
+        color: 0xf4e8d1,
+        roughness: 0.96,
+        metalness: 0,
+        flatShading: true
+      }),
+      creamShade: new THREE.MeshStandardMaterial({
+        color: 0xd7c5a9,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true
+      }),
+      innerEar: new THREE.MeshStandardMaterial({
+        color: 0xd88675,
+        roughness: 0.95,
+        metalness: 0,
+        flatShading: true
+      }),
+      eye: new THREE.MeshStandardMaterial({
+        color: 0x111315,
+        roughness: 0.3,
+        metalness: 0.05,
+        flatShading: true
+      }),
+      eyeWhite: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.25,
+        metalness: 0,
+        flatShading: true
+      }),
+      nose: new THREE.MeshStandardMaterial({
+        color: 0x251a19,
+        roughness: 0.55,
+        metalness: 0,
+        flatShading: true
+      }),
+      mouth: new THREE.MeshStandardMaterial({
+        color: 0x3a2020,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true
+      })
+    };
+
+    function mesh(geometry, material, name, position, scale, rotation) {
+      const object = new THREE.Mesh(geometry, material);
+      object.name = name;
+      if (position) object.position.set(...position);
+      if (scale) object.scale.set(...scale);
+      if (rotation) object.rotation.set(...rotation);
+      object.castShadow = true;
+      object.receiveShadow = true;
+      fox.add(object);
+      return object;
+    }
+
+    function ico(radius, detail = 1) {
+      return new THREE.IcosahedronGeometry(radius, detail);
+    }
+
+    function dodeca(radius = 1) {
+      return new THREE.DodecahedronGeometry(radius, 0);
+    }
+
+    function customTuftGeometry() {
+      // A broad, irregular, cream chest tuft built from several low-poly lobes.
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+
+      const lobes = [
+        { p: [0, 0.18, 0], s: [0.42, 0.50, 0.25] },
+        { p: [-0.25, 0.10, 0.03], s: [0.31, 0.40, 0.23] },
+        { p: [0.25, 0.10, 0.03], s: [0.31, 0.40, 0.23] },
+        { p: [-0.12, -0.18, 0.04], s: [0.30, 0.32, 0.22] },
+        { p: [0.12, -0.18, 0.04], s: [0.30, 0.32, 0.22] },
+        { p: [0, -0.28, 0.02], s: [0.25, 0.27, 0.20] }
+      ];
+
+      for (const lobe of lobes) {
+        for (const vertex of ico(1, 1).attributes.position) {
+          const nx = vertex.getX(...) / 1024;
+          const ny = vertex.getY(...) / 1024;
+          const nz = vertex.getZ(...) / 1024;
+
+          const variation =
+            1 +
+            Math.sin(nx * 7.3 + ny * 4.1) * 0.055 +
+            Math.cos(ny * 8.2 - nz * 5.6) * 0.045;
+
+          positions.push(
+            lobe.p[0] + nx * lobe.s[0] * variation,
+            lobe.p[1] + ny * lobe.s[1] * variation,
+            lobe.p[2] + nz * lobe.s[2] * variation
+          );
+        }
+      }
+
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(positions, 3)
+      );
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    // Body and seated torso.
+    mesh(
+      ico(1, 2),
+      materials.fur,
+      "Body",
+      [0, 1.35, 0],
+      [0.78, 1.0, 0.58]
+    );
+
+    mesh(
+      customTuftGeometry(),
+      materials.cream,
+      "White_Chest_Tuft",
+      [0, 1.20, 0.49]
+    );
+
+    // Rear haunches.
+    mesh(
+      ico(1, 1),
+      materials.fur,
+      "Left_Haunch",
+      [-0.55, 0.73, -0.05],
+      [0.43, 0.48, 0.48]
+    );
+
+    mesh(
+      ico(1, 1),
+      materials.fur,
+      "Right_Haunch",
+      [0.55, 0.73, -0.05],
+      [0.43, 0.48, 0.48]
+    );
+
+    // Front legs and paws.
+    for (const side of [-1, 1]) {
+      const label = side < 0 ? "Left" : "Right";
+
+      mesh(
+        new THREE.CylinderGeometry(0.20, 0.25, 0.78, 7),
+        materials.fur,
+        `${label}_Front_Leg`,
+        [side * 0.36, 0.66, 0.34],
+        [1, 1, 0.9],
+        [0.04, 0, side * -0.055]
+      );
+
+      mesh(
+        dodeca(0.25),
+        materials.fur,
+        `${label}_Paw`,
+        [side * 0.38, 0.27, 0.49],
+        [1.05, 0.65, 1.15]
+      );
+
+      mesh(
+        dodeca(0.18),
+        materials.cream,
+        `${label}_Paw_Pad`,
+        [side * 0.38, 0.25, 0.66],
+        [0.9, 0.42, 0.55]
+      );
+    }
+
+    // Head.
+    mesh(
+      ico(1, 2),
+      materials.fur,
+      "Head",
+      [0, 2.52, 0.18],
+      [0.73, 0.68, 0.64]
+    );
+
+    // Ears: low-poly triangular pyramids with softly rose inner triangles.
+    for (const side of [-1, 1]) {
+      const label = side < 0 ? "Left" : "Right";
+
+      const ear = mesh(
+        new THREE.ConeGeometry(0.34, 0.78, 3),
+        materials.fur,
+        `${label}_Pointed_Ear`,
+        [side * 0.47, 3.18, 0.08],
+        [1, 1, 0.86],
+        [0, Math.PI / 2, side * -0.16]
+      );
+
+      // The cone's triangular cross-section faces the camera.
+      ear.rotation.y = Math.PI / 2 + side * 0.08;
+
+      const inner = mesh(
+        new THREE.ConeGeometry(0.19, 0.47, 3),
+        materials.innerEar,
+        `${label}_Inner_Ear`,
+        [side * 0.47, 3.17, 0.255],
+        [1, 1, 0.45],
+        [0, Math.PI / 2, side * -0.16]
+      );
+
+      inner.castShadow = false;
+    }
+
+    // Face and bushy muzzle.
+    mesh(
+      ico(1, 1),
+      materials.cream,
+      "Muzzle",
+      [0, 2.38, 0.71],
+      [0.49, 0.31, 0.31]
+    );
+
+    mesh(
+      ico(1, 1),
+      materials.creamShade,
+      "Left_Cheek",
+      [-0.25, 2.37, 0.62],
+      [0.24, 0.22, 0.18]
+    );
+
+    mesh(
+      ico(1, 1),
+      materials.creamShade,
+      "Right_Cheek",
+      [0.25, 2.37, 0.62],
+      [0.24, 0.22, 0.18]
+    );
+
+    mesh(
+      dodeca(0.13),
+      materials.nose,
+      "Nose",
+      [0, 2.48, 1.015],
+      [1.15, 0.78, 0.72]
+    );
+
+    // Eyes with small catchlights.
+    for (const side of [-1, 1]) {
+      const label = side < 0 ? "Left" : "Right";
+
+      mesh(
+        new THREE.SphereGeometry(0.105, 10, 7),
+        materials.eyeWhite,
+        `${label}_Eye_White`,
+        [side * 0.265, 2.65, 0.745]
+      );
+
+      mesh(
+        new THREE.SphereGeometry(0.064, 9, 6),
+        materials.eye,
+        `${label}_Eye`,
+        [side * 0.268, 2.655, 0.837]
+      );
+
+      mesh(
+        new THREE.SphereGeometry(0.019, 7, 5),
+        materials.eyeWhite,
+        `${label}_Eye_Highlight`,
+        [side * 0.268 - 0.018, 2.682, 0.892]
+      );
+    }
+
+    // Small mouth line beneath the nose.
+    mesh(
+      new THREE.BoxGeometry(0.20, 0.025, 0.025),
+      materials.mouth,
+      "Mouth_Line",
+      [0, 2.29, 0.982]
+    );
+
+    // Large fluffy tail, curved upward behind the body.
+    const tail = new THREE.Group();
+    tail.name = "Large_Fluffy_Tail";
+    fox.add(tail);
+
+    const tailBase = new THREE.Mesh(
+      new THREE.ConeGeometry(0.34, 1.15, 8),
+      materials.fur
+    );
+    tailBase.name = "Tail_Base";
+    tailBase.position.set(0, 0.92, -0.62);
+    tailBase.rotation.x = -Math.PI / 2;
+    tailBase.rotation.z = -0.28;
+    tailBase.castShadow = true;
+    tail.add(tailBase);
+
+    const tailTip = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.43, 1),
+      materials.cream
+    );
+    tailTip.name = "Tail_White_Tip";
+    tailTip.position.set(0.12, 1.52, -0.85);
+    tailTip.scale.set(0.9, 1.0, 0.8);
+    tailTip.castShadow = true;
+    tail.add(tailTip);
+
+    // A narrower cream tip makes the white tail read clearly.
+    const tailTipNose = new THREE.Mesh(
+      new THREE.ConeGeometry(0.25, 0.48, 7),
+      materials.cream
+    );
+    tailTipNose.name = "Tail_Tip";
+    tailTipNose.position.set(0.13, 1.73, -0.86);
+    tailTipNose.rotation.x = -Math.PI / 2;
+    tailTipNose.rotation.z = -0.28;
+    tailTipNose.castShadow = true;
+    tail.add(tailTipNose);
+
+    // Slightly angle the whole character for a friendly presentation.
+    fox.rotation.y = -0.08;
+    fox.position.y = 0.02;
+
+    // Export only the character hierarchy, excluding floor and lights.
+    const exporter = new GLTFExporter();
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      exporter.parse(
+        fox,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "cute_stylized_low_poly_red_fox.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB exported successfully.";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed. See the browser console.";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          truncateDrawRange: true
+        }
+      );
+    });
+
+    resetButton.addEventListener("click", () => {
+      camera.position.copy(initialCameraPosition);
+      controls.target.copy(initialTarget);
+      controls.update();
+      status.textContent = "View reset.";
+    });
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener("resize", resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

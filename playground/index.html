@@ -1,0 +1,2351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>ThreeCoder WebGPU Playground | In-Browser 3D &amp; GLB Flywheel</title>
+  <style>
+    @layer base, theme, components, utilities;
+
+    @layer theme {
+      :root {
+        --brand-accent-light: #0055b8;
+        --brand-accent-dark: #5cc8ff;
+        --brand-accent-text-light: #ffffff;
+        --brand-accent-text-dark: #041829;
+
+        --bg-canvas-light: #f4f7fb;
+        --bg-canvas-dark: #0b111a;
+        --bg-surface-light: #ffffff;
+        --bg-surface-dark: #121b28;
+        --bg-subtle-light: #e9eff7;
+        --bg-subtle-dark: #192536;
+
+        --text-primary-light: #0f172a;
+        --text-primary-dark: #e6eef8;
+        --text-muted-light: #475569;
+        --text-muted-dark: #9fb2c8;
+
+        --border-ui-light: #cbd5e1;
+        --border-ui-dark: #293a52;
+
+        --status-ok-light: #0f766e;
+        --status-ok-dark: #2dd4bf;
+        --status-warn-light: #b45309;
+        --status-warn-dark: #fbbf24;
+        --status-err-light: #b91c1c;
+        --status-err-dark: #f87171;
+
+        --scrollbar-track-light: #e2e8f0;
+        --scrollbar-track-dark: #111827;
+        --scrollbar-thumb-light: #64748b;
+        --scrollbar-thumb-dark: #4b607f;
+
+        /* Fallback custom properties for browsers without light-dark() */
+        --accent-color: var(--brand-accent-light);
+        --accent-contrast: var(--brand-accent-text-light);
+        --bg-canvas: var(--bg-canvas-light);
+        --bg-surface: var(--bg-surface-light);
+        --bg-subtle: var(--bg-subtle-light);
+        --text-primary: var(--text-primary-light);
+        --text-muted: var(--text-muted-light);
+        --border-ui: var(--border-ui-light);
+        --status-ok: var(--status-ok-light);
+        --status-warn: var(--status-warn-light);
+        --status-err: var(--status-err-light);
+        --scrollbar-track: var(--scrollbar-track-light);
+        --scrollbar-thumb: var(--scrollbar-thumb-light);
+        --focus-ring: #d946ef;
+
+        @media (prefers-color-scheme: dark) {
+          --accent-color: var(--brand-accent-dark);
+          --accent-contrast: var(--brand-accent-text-dark);
+          --bg-canvas: var(--bg-canvas-dark);
+          --bg-surface: var(--bg-surface-dark);
+          --bg-subtle: var(--bg-subtle-dark);
+          --text-primary: var(--text-primary-dark);
+          --text-muted: var(--text-muted-dark);
+          --border-ui: var(--border-ui-dark);
+          --status-ok: var(--status-ok-dark);
+          --status-warn: var(--status-warn-dark);
+          --status-err: var(--status-err-dark);
+          --scrollbar-track: var(--scrollbar-track-dark);
+          --scrollbar-thumb: var(--scrollbar-thumb-dark);
+          --focus-ring: #f0abfc;
+        }
+
+        @supports (color: light-dark(white, black)) {
+          --accent-color: light-dark(var(--brand-accent-light), var(--brand-accent-dark));
+          --accent-contrast: light-dark(var(--brand-accent-text-light), var(--brand-accent-text-dark));
+          --bg-canvas: light-dark(var(--bg-canvas-light), var(--bg-canvas-dark));
+          --bg-surface: light-dark(var(--bg-surface-light), var(--bg-surface-dark));
+          --bg-subtle: light-dark(var(--bg-subtle-light), var(--bg-subtle-dark));
+          --text-primary: light-dark(var(--text-primary-light), var(--text-primary-dark));
+          --text-muted: light-dark(var(--text-muted-light), var(--text-muted-dark));
+          --border-ui: light-dark(var(--border-ui-light), var(--border-ui-dark));
+          --status-ok: light-dark(var(--status-ok-light), var(--status-ok-dark));
+          --status-warn: light-dark(var(--status-warn-light), var(--status-warn-dark));
+          --status-err: light-dark(var(--status-err-light), var(--status-err-dark));
+          --scrollbar-track: light-dark(var(--scrollbar-track-light), var(--scrollbar-track-dark));
+          --scrollbar-thumb: light-dark(var(--scrollbar-thumb-light), var(--scrollbar-thumb-dark));
+        }
+
+        color-scheme: light dark;
+        accent-color: var(--accent-color);
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      @supports not (scrollbar-color: auto) {
+        :root::-webkit-scrollbar,
+        pre::-webkit-scrollbar,
+        textarea::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+
+        :root::-webkit-scrollbar-thumb,
+        pre::-webkit-scrollbar-thumb,
+        textarea::-webkit-scrollbar-thumb {
+          background: var(--scrollbar-thumb);
+          border-radius: 5px;
+        }
+
+        :root::-webkit-scrollbar-track,
+        pre::-webkit-scrollbar-track,
+        textarea::-webkit-scrollbar-track {
+          background: var(--scrollbar-track);
+        }
+      }
+    }
+
+    @layer base {
+      :where(
+        html, body, header, main, aside, footer, section, dialog,
+        form, fieldset, details, summary, div, p, h1, h2, h3,
+        pre, code, label, input, select, textarea, button, progress,
+        iframe, table, th, td, figure, figcaption
+      ) {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--bg-canvas);
+        color: var(--text-primary);
+        min-block-size: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      :where(a:any-link, button, input, select, textarea, summary, pre[tabindex="0"]):focus-visible {
+        outline: 3px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+
+      pre,
+      code {
+        color-scheme: dark;
+        accent-color: var(--accent-color);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      [inert],
+      [inert] :where(button, input, select, textarea, a) {
+        opacity: 0.5;
+        cursor: default;
+        user-select: none;
+      }
+    }
+
+    @layer components {
+      .skip-link:focus-visible {
+        position: fixed;
+        inset-block-start: 0.75rem;
+        inset-inline-start: 0.75rem;
+        z-index: 100;
+        padding-block: 0.5rem;
+        padding-inline: 1rem;
+        background-color: var(--accent-color);
+        color: var(--accent-contrast);
+        border-radius: 0.5rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .site-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-block: 0.85rem;
+        padding-inline: 1.25rem;
+        background-color: var(--bg-surface);
+        border-block-end: 1px solid var(--border-ui);
+      }
+
+      .brand-group {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      .brand-group h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 750;
+      }
+
+      .badge {
+        display: inline-block;
+        padding-block: 0.15rem;
+        padding-inline: 0.55rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        background-color: var(--bg-subtle);
+        border: 1px solid var(--border-ui);
+        color: var(--text-muted);
+      }
+
+      .badge.ready {
+        color: var(--status-ok);
+        border-color: currentColor;
+      }
+
+      .badge.busy {
+        color: var(--accent-color);
+        border-color: currentColor;
+      }
+
+      .badge.warn {
+        color: var(--status-warn);
+        border-color: currentColor;
+      }
+
+      .badge.error {
+        color: var(--status-err);
+        border-color: currentColor;
+      }
+
+      @keyframes pulse-opacity {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      .status-dot {
+        display: inline-block;
+        inline-size: 0.55rem;
+        block-size: 0.55rem;
+        border-radius: 50%;
+        background-color: var(--text-muted);
+        margin-inline-end: 0.35rem;
+        vertical-align: middle;
+      }
+
+      .status-dot.active {
+        background-color: var(--accent-color);
+        animation: pulse-opacity 1.1s ease-in-out infinite;
+      }
+
+      .status-dot.ready {
+        background-color: var(--status-ok);
+      }
+
+      .status-dot.warn {
+        background-color: var(--status-warn);
+        animation: pulse-opacity 1.1s ease-in-out infinite;
+      }
+
+      .status-dot.error {
+        background-color: var(--status-err);
+      }
+
+      .heartbeat-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.4rem;
+        margin-block-start: 0.45rem;
+        font-size: 0.76rem;
+        color: var(--text-muted);
+      }
+
+      .heartbeat-row.warn {
+        color: var(--status-warn);
+        font-weight: 600;
+      }
+
+      .heartbeat-row.error {
+        color: var(--status-err);
+        font-weight: 600;
+      }
+
+      .worker-log-box {
+        margin-block-start: 0.75rem;
+      }
+
+      .worker-log-box pre[tabindex="0"] {
+        max-block-size: 9.5rem;
+        font-size: 0.74rem;
+        padding: 0.6rem;
+      }
+
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .workspace-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(21rem, 27rem) minmax(0, 1fr);
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        align-items: start;
+      }
+
+      @media (max-width: 980px) {
+        .workspace-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background-color: var(--bg-surface);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.75rem;
+        padding: 1rem;
+      }
+
+      .panel h2 {
+        margin-block: 0 0.75rem;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .field-group {
+        margin-block-end: 0.9rem;
+      }
+
+      .field-group label {
+        display: block;
+        font-size: 0.88rem;
+        font-weight: 650;
+        margin-block-end: 0.2rem;
+      }
+
+      .field-hint {
+        margin-block: 0 0.35rem;
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+
+      select,
+      textarea,
+      input[type="file"] {
+        inline-size: 100%;
+        padding-block: 0.5rem;
+        padding-inline: 0.65rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-ui);
+        background-color: var(--bg-canvas);
+        color: var(--text-primary);
+        font: inherit;
+        font-size: 0.9rem;
+        min-block-size: 2.25rem;
+      }
+
+      textarea {
+        resize: vertical;
+        min-block-size: 6.5rem;
+      }
+
+      .preset-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-block-start: 0.45rem;
+      }
+
+      button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-block-size: 2.25rem;
+        min-inline-size: 2.25rem;
+        padding-block: 0.45rem;
+        padding-inline: 0.85rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-ui);
+        background-color: var(--bg-subtle);
+        color: var(--text-primary);
+        font: inherit;
+        font-size: 0.86rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      @media (pointer: coarse) {
+        button,
+        select,
+        input[type="file"] {
+          min-block-size: 2.75rem;
+          min-inline-size: 2.75rem;
+        }
+      }
+
+      button:hover:not(:disabled) {
+        filter: brightness(1.06);
+        border-color: var(--accent-color);
+      }
+
+      button.primary {
+        background-color: var(--accent-color);
+        color: var(--accent-contrast);
+        border-color: transparent;
+      }
+
+      button.danger {
+        color: var(--status-err);
+        border-color: currentColor;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .chip-btn {
+        padding-block: 0.25rem;
+        padding-inline: 0.6rem;
+        font-size: 0.78rem;
+      }
+
+      .toggle-card {
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-ui);
+        background-color: var(--bg-canvas);
+        margin-block-end: 0.9rem;
+      }
+
+      .toggle-card:has(input[type="checkbox"]:checked) {
+        border-color: var(--accent-color);
+        background-color: var(--bg-subtle);
+      }
+
+      .toggle-card label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        font-size: 0.86rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-block-size: 1.75rem;
+      }
+
+      .slider-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-block-end: 0.9rem;
+      }
+
+      .slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        font-size: 0.82rem;
+        margin-block-end: 0.25rem;
+      }
+
+      input[type="range"] {
+        inline-size: 100%;
+        min-block-size: 1.75rem;
+        cursor: pointer;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-block-end: 0.85rem;
+      }
+
+      .cta-row button.primary {
+        flex: 1 1 13rem;
+      }
+
+      .progress-box {
+        padding: 0.65rem 0.75rem;
+        border-radius: 0.5rem;
+        background-color: var(--bg-canvas);
+        border: 1px solid var(--border-ui);
+      }
+
+      .progress-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-block-end: 0.35rem;
+      }
+
+      progress {
+        inline-size: 100%;
+        block-size: 0.65rem;
+      }
+
+      /* Progressive enhancement fallback when accent-color is unsupported */
+      @supports not (accent-color: var(--accent-color)) {
+        .toggle-card input[type="checkbox"] {
+          position: absolute !important;
+          clip-path: inset(50%) !important;
+          overflow: hidden !important;
+          width: 1px !important;
+          height: 1px !important;
+          margin: -1px !important;
+          padding: 0 !important;
+          border: 0 !important;
+          white-space: nowrap !important;
+        }
+
+        .toggle-card label {
+          position: relative;
+          padding-inline-start: 1.9rem;
+        }
+
+        .toggle-card input[type="checkbox"] + span::before {
+          content: "";
+          position: absolute;
+          inset-inline-start: 0;
+          inset-block-start: 50%;
+          transform: translateY(-50%);
+          inline-size: 1.15rem;
+          block-size: 1.15rem;
+          border: 2px solid var(--border-ui);
+          background-color: var(--bg-surface);
+          border-radius: 0.25rem;
+        }
+
+        .toggle-card input[type="checkbox"]:focus-visible + span::before {
+          outline: 3px solid var(--focus-ring);
+          outline-offset: 2px;
+        }
+
+        .toggle-card input[type="checkbox"]:checked + span::before {
+          background-color: var(--accent-color);
+          border-color: var(--accent-color);
+        }
+
+        .toggle-card input[type="checkbox"]:checked + span::after {
+          content: "✓";
+          position: absolute;
+          inset-inline-start: 0.25rem;
+          inset-block-start: 50%;
+          transform: translateY(-50%);
+          color: var(--accent-contrast);
+          font-size: 0.85rem;
+          font-weight: 700;
+        }
+
+        input[type="range"] {
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+        }
+
+        input[type="range"]::-webkit-slider-runnable-track {
+          inline-size: 100%;
+          block-size: 0.5rem;
+          background: linear-gradient(
+            to right,
+            var(--accent-color) var(--progress, 50%),
+            var(--border-ui) var(--progress, 50%)
+          );
+          border-radius: 0.25rem;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          block-size: 1rem;
+          inline-size: 1rem;
+          border-radius: 50%;
+          background: var(--accent-color);
+          margin-block-start: -0.25rem;
+        }
+
+        progress {
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          appearance: none;
+          border: none;
+          background: var(--border-ui);
+          border-radius: 0.25rem;
+        }
+
+        progress::-webkit-progress-bar {
+          background-color: var(--border-ui);
+          border-radius: 0.25rem;
+        }
+
+        progress::-webkit-progress-value {
+          background-color: var(--accent-color);
+          border-radius: 0.25rem;
+        }
+      }
+
+      .image-preview-figure[hidden] {
+        display: none !important;
+      }
+
+      .image-preview-figure:not([hidden]) {
+        margin-block: 0.5rem 0;
+        margin-inline: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-ui);
+        background-color: var(--bg-canvas);
+      }
+
+      .image-preview-figure img:not([src]),
+      .image-preview-figure img[src=""] {
+        display: none !important;
+      }
+
+      .image-preview-figure img {
+        inline-size: 4rem;
+        block-size: 4rem;
+        object-fit: cover;
+        border-radius: 0.35rem;
+      }
+
+      .viewport-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .viewport-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-block-end: 0.75rem;
+      }
+
+      .viewport-header h2 {
+        margin: 0;
+      }
+
+      .flywheel-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .preview-frame {
+        display: block;
+        inline-size: 100%;
+        block-size: min(62dvh, 36rem);
+        border: 1px solid var(--border-ui);
+        border-radius: 0.6rem;
+        background-color: #0b1420;
+      }
+
+      .alert-banner {
+        margin-block: 0.6rem 0;
+        padding: 0.6rem 0.8rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--status-err);
+        color: var(--status-err);
+        background-color: var(--bg-canvas);
+        font-size: 0.84rem;
+      }
+
+      .recovery-bar {
+        margin-block-start: 0.75rem;
+        padding: 0.85rem 1rem;
+        border-radius: 0.6rem;
+        border: 1px solid var(--status-warn);
+        background-color: var(--bg-subtle);
+      }
+
+      .recovery-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-block-end: 0.35rem;
+      }
+
+      .recovery-title {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .recovery-detail {
+        margin-block: 0 0.65rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+
+      .recovery-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      details {
+        border: 1px solid var(--border-ui);
+        border-radius: 0.6rem;
+        background-color: var(--bg-surface);
+        padding: 0.65rem 0.9rem;
+      }
+
+      details + details {
+        margin-block-start: 0.75rem;
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 650;
+        font-size: 0.9rem;
+        padding-block: 0.2rem;
+      }
+
+      pre[tabindex="0"] {
+        margin-block: 0.65rem 0;
+        padding: 0.85rem;
+        border-radius: 0.5rem;
+        background-color: #090e17;
+        color: #dbeafe;
+        overflow: auto;
+        max-block-size: 20rem;
+        font-size: 0.8rem;
+        line-height: 1.45;
+      }
+
+      .editor-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-block-start: 0.6rem;
+      }
+
+      dialog {
+        inline-size: min(56rem, 92vw);
+        max-block-size: 85dvh;
+        border: 1px solid var(--border-ui);
+        border-radius: 0.85rem;
+        background-color: var(--bg-surface);
+        color: var(--text-primary);
+        padding: 1.25rem;
+      }
+
+      dialog::backdrop {
+        background-color: rgba(4, 10, 20, 0.65);
+        backdrop-filter: blur(3px);
+      }
+
+      .dialog-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-block-end: 0.85rem;
+      }
+
+      .dialog-header h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      table {
+        inline-size: 100%;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+      }
+
+      caption {
+        text-align: start;
+        font-weight: 650;
+        color: var(--text-muted);
+        margin-block-end: 0.5rem;
+      }
+
+      th,
+      td {
+        padding: 0.5rem 0.6rem;
+        border-block-end: 1px solid var(--border-ui);
+        text-align: start;
+        vertical-align: top;
+      }
+
+      .site-footer {
+        padding-block: 0.75rem;
+        padding-inline: 1.25rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        border-block-start: 1px solid var(--border-ui);
+        background-color: var(--bg-surface);
+      }
+    }
+
+    @layer utilities {
+      [hidden] {
+        display: none !important;
+      }
+
+      .visually-hidden:where(:not(:focus-within, :active)) {
+        position: absolute !important;
+        clip-path: inset(50%) !important;
+        overflow: hidden !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        padding: 0 !important;
+        border: 0 !important;
+        white-space: nowrap !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a href="#main-title" class="skip-link visually-hidden">Skip to main content</a>
+    <div class="brand-group">
+      <h1 id="main-title" tabindex="-1">ThreeCoder WebGPU Playground</h1>
+      <span id="gpu-badge" class="badge">Checking WebGPU…</span>
+      <span id="model-state-badge" class="badge">Model: Not Loaded</span>
+      <span id="flywheel-badge" class="badge">0 flywheel events</span>
+    </div>
+    <div class="header-actions">
+      <a href="/benchmarks/eval10/compare.html" class="chip-btn" style="text-decoration: none; display: inline-flex; align-items: center;">Eval-10 Matrix</a>
+      <button type="button" id="preload-btn">Preload WebGPU Model</button>
+      <button type="button" id="open-telemetry-btn">Telemetry Log</button>
+    </div>
+  </header>
+
+  <main class="workspace-grid">
+    <aside class="panel">
+      <h2>Generation Setup</h2>
+      <form id="gen-form">
+        <div class="field-group">
+          <label for="model-select">WebGPU ONNX Checkpoint</label>
+          <p id="model-hint" class="field-hint">Runs 100% locally in your browser via Transformers.js v4 WebGPU (q4f16).</p>
+          <select id="model-select" aria-describedby="model-hint">
+            <option value="Qwen3.5-4B-GLB-3D-Coder-ONNX-q4f16">Qwen3.5-4B-GLB-3D-Coder-ONNX-q4f16 (Local)</option>
+            <option value="onnx-community/Qwen3.5-4B-ONNX-OPT">onnx-community/Qwen3.5-4B-ONNX-OPT (Base Remote)</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="preset-select">Inspect Saved Benchmark Output</label>
+          <p id="preset-hint" class="field-hint">Compare local BF16, Q8_0, and 4-bit q4f16 runs directly in the viewport.</p>
+          <select id="preset-select" aria-describedby="preset-hint">
+            <option value="">— Load a benchmark HTML scene —</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="prompt-input">3D / GLB Asset Prompt</label>
+          <p id="prompt-hint" class="field-hint">Describe geometry, materials, and whether skeletal or keyframe animation is needed.</p>
+          <textarea
+            id="prompt-input"
+            aria-describedby="prompt-hint"
+            required
+            placeholder="Example: Create an animated low-poly brass clockwork owl perched on a gear with flapping wings and Export GLB button."
+          >Create an animated low-poly brass clockwork owl perched on a wooden gear with spinning back gears and bobbing wings, ready for Godot GLB export.</textarea>
+          <div class="preset-pills">
+            <button type="button" class="chip-btn" data-prompt="Create a cozy winter cabin snowglobe on a carved wooden base at dusk with warm cabin windows and pine trees.">Snowglobe</button>
+            <button type="button" class="chip-btn" data-prompt="Create an animated low-poly brass clockwork owl perched on a wooden gear with spinning back gears and flapping wings, exporting THREE.AnimationClip tracks in the GLB.">Animated Owl</button>
+            <button type="button" class="chip-btn" data-prompt="Create an animated fantasy treasure chest that opens its lid to reveal glowing crystal potions, with GLB animation export.">Potion Chest</button>
+          </div>
+        </div>
+
+        <div class="field-group" id="vision-field-group">
+          <label for="image-input">Reference Image (Optional Vision-to-GLB)</label>
+          <p id="image-hint" class="field-hint">Attach a concept sketch or object photo to condition Qwen3.5's multimodal vision encoder.</p>
+          <input type="file" id="image-input" accept="image/*" aria-describedby="image-hint">
+          <figure id="image-preview-box" class="image-preview-figure" hidden>
+            <img id="image-preview" alt="Selected reference concept preview" width="64" height="64">
+            <figcaption id="image-caption"></figcaption>
+            <button type="button" id="clear-image-btn" class="chip-btn">Remove</button>
+          </figure>
+        </div>
+
+        <div class="field-group">
+          <label for="thinking-mode">Reasoning &amp; Speed Mode</label>
+          <p id="thinking-mode-hint" class="field-hint">Caps &lt;think&gt; reasoning so q4f16 stays coherent without 15-minute waits or placeholder stubs.</p>
+          <select id="thinking-mode" aria-describedby="thinking-mode-hint">
+            <option value="budget" selected>Balanced: Capped &lt;think&gt; (1,500 tok) → HTML (~2.5 min)</option>
+            <option value="fast">Fast Direct HTML: Concise Plan → &lt;!DOCTYPE html&gt; (~1.5 min)</option>
+            <option value="full">Deep &lt;think&gt;: Uncapped Reasoning (~12–17 min)</option>
+          </select>
+        </div>
+
+        <div class="toggle-card">
+          <label for="autoresume-toggle">
+            <input type="checkbox" id="autoresume-toggle" checked>
+            <span>Auto-resume on runtime/syntax errors or truncation (up to 3 retries)</span>
+          </label>
+        </div>
+
+        <div class="slider-grid">
+          <div>
+            <div class="slider-header">
+              <label for="temp-range">Temperature</label>
+              <output id="temp-output" for="temp-range">0.65</output>
+            </div>
+            <input type="range" id="temp-range" min="0" max="1.2" step="0.05" value="0.65">
+          </div>
+          <div>
+            <div class="slider-header">
+              <label for="tokens-range">Max Tokens</label>
+              <output id="tokens-output" for="tokens-range">16384</output>
+            </div>
+            <input type="range" id="tokens-range" min="2048" max="26624" step="1024" value="16384">
+          </div>
+        </div>
+
+        <div class="cta-row">
+          <button type="submit" id="generate-btn" class="primary">Generate 3D Asset on WebGPU</button>
+          <button type="button" id="skip-think-btn" hidden disabled>Skip &lt;think&gt; → HTML</button>
+          <button type="button" id="stop-btn" class="danger" disabled>Stop</button>
+        </div>
+
+        <div class="progress-box">
+          <div class="progress-meta">
+            <span><span id="status-dot" class="status-dot" aria-hidden="true"></span><strong id="phase-label">Idle — Model not loaded yet</strong></span>
+            <span id="speed-label">0 tok · 0.0 tok/s</span>
+          </div>
+          <label for="gen-progress" class="visually-hidden">Model loading and generation progress</label>
+          <progress id="gen-progress" max="100" value="0">0%</progress>
+          <div id="heartbeat-row" class="heartbeat-row">
+            <span id="elapsed-label">Elapsed: 0.0s</span>
+            <span id="heartbeat-label">Worker booting…</span>
+          </div>
+        </div>
+
+        <p id="worker-error-banner" class="alert-banner" role="alert" hidden></p>
+
+        <details id="worker-log-details" class="worker-log-box" open>
+          <summary>Live Engine &amp; WebGPU Activity Log</summary>
+          <pre tabindex="0"><code id="worker-log-code">[boot] Initializing WebGPU worker…</code></pre>
+        </details>
+      </form>
+    </aside>
+
+    <div class="viewport-column">
+      <section class="panel">
+        <div class="viewport-header">
+          <h2>3D &amp; GLB Live Viewport</h2>
+          <div class="flywheel-bar">
+            <button type="button" id="rate-good-btn" disabled>Good Asset (+SFT)</button>
+            <button type="button" id="rate-bad-btn" disabled>Needs Work (-DPO)</button>
+            <button type="button" id="download-html-btn" disabled>Download HTML</button>
+          </div>
+        </div>
+
+        <iframe
+          id="preview-frame"
+          class="preview-frame"
+          title="Interactive 3D GLB Asset Preview"
+          sandbox="allow-scripts allow-downloads"
+        ></iframe>
+
+        <p id="sandbox-error" class="alert-banner" role="alert" hidden></p>
+
+        <div id="recovery-bar" class="recovery-bar" role="region" aria-labelledby="recovery-title" hidden>
+          <div class="recovery-header">
+            <p id="recovery-title" class="recovery-title">Session Stuck or Incomplete — Pick Up on WebGPU</p>
+            <button type="button" id="dismiss-recovery-btn" class="chip-btn">Dismiss</button>
+          </div>
+          <p id="recovery-detail" class="recovery-detail"></p>
+          <div class="recovery-actions">
+            <button type="button" id="continue-btn" class="primary">Continue / Complete HTML on WebGPU</button>
+            <button type="button" id="cancel-autoresume-btn" class="danger" hidden>Cancel Auto-Resume</button>
+            <button type="button" id="rewind-line-btn" hidden>Rewind Before Error Line &amp; Resume</button>
+            <button type="button" id="jump-line-btn" hidden>Jump to Line in Editor</button>
+          </div>
+        </div>
+
+        <p id="polite-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Reasoning &amp; Generated Source</h2>
+        <details id="think-details">
+          <summary id="think-summary">Model Reasoning (&lt;think&gt; stream)</summary>
+          <pre tabindex="0"><code id="think-code">Waiting for generation…</code></pre>
+        </details>
+
+        <details id="html-details" open>
+          <summary id="html-summary">Standalone Three.js HTML Source</summary>
+          <pre tabindex="0"><code id="html-code">&lt;!-- Generated or benchmark Three.js HTML will appear here --&gt;</code></pre>
+        </details>
+
+        <details id="repair-details">
+          <summary>Edit &amp; Log Human Repair Pair (Flywheel Editor)</summary>
+          <div class="field-group" style="margin-block-start: 0.65rem;">
+            <label for="repair-textarea">Editable HTML Source</label>
+            <p id="repair-hint" class="field-hint">Tweak materials, lighting, or fix an API call, then re-render and save the repair pair for fine-tuning.</p>
+            <textarea id="repair-textarea" aria-describedby="repair-hint" spellcheck="false"></textarea>
+          </div>
+          <div class="editor-actions">
+            <button type="button" id="apply-repair-btn" class="primary">Render Edited HTML &amp; Log Repair Pair</button>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    ThreeCoder Browser Lab · Local WebGPU Inference + Opt-In SFT/DPO Telemetry (`playground/telemetry/events.jsonl`)
+  </footer>
+
+  <dialog id="telemetry-dialog" closedby="any" aria-labelledby="telemetry-dialog-title">
+    <div class="dialog-header">
+      <h2 id="telemetry-dialog-title">Local Flywheel Telemetry (`events.jsonl`)</h2>
+      <form method="dialog">
+        <button value="close">Close</button>
+      </form>
+    </div>
+    <p id="telemetry-summary" class="field-hint">Loading telemetry stats…</p>
+    <table>
+      <caption>Most recent 15 captured generation, GLB export, rating, and repair events</caption>
+      <thead>
+        <tr>
+          <th scope="col">Time (UTC)</th>
+          <th scope="col">Event</th>
+          <th scope="col">Model / Source</th>
+          <th scope="col">Metrics &amp; Notes</th>
+        </tr>
+      </thead>
+      <tbody id="telemetry-tbody"></tbody>
+    </table>
+  </dialog>
+
+  <script type="module">
+    const DRAFT_STORAGE_KEY = "threecoder_playground_draft_v3";
+    const FAST_PLAN_TEMPLATE =
+      "Plan:\n" +
+      "1. Create one complete, self-contained HTML document using an ES module importmap for Three.js (0.169.0), OrbitControls, and GLTFExporter.\n" +
+      "2. Build clean low-poly procedural geometry grouped under an asset root with balanced PBR materials and scene lighting.\n" +
+      "3. If animation is requested, construct named pivot groups and seamless looping THREE.AnimationClip keyframe tracks played via AnimationMixer, and pass animations: [clip], binary: true to GLTFExporter on Export GLB click.";
+    const HTML_OPEN_BRIDGE = '\n</think>\n\n```html\n<!DOCTYPE html>\n<html lang="en">\n';
+
+    const MAX_AUTO_RESUMES = 3;
+    const imageHint = document.getElementById("image-hint");
+    const autoResumeToggle = document.getElementById("autoresume-toggle");
+    const cancelAutoResumeBtn = document.getElementById("cancel-autoresume-btn");
+    const gpuBadge = document.getElementById("gpu-badge");
+    const modelStateBadge = document.getElementById("model-state-badge");
+    const flywheelBadge = document.getElementById("flywheel-badge");
+    const modelSelect = document.getElementById("model-select");
+    const presetSelect = document.getElementById("preset-select");
+    const promptInput = document.getElementById("prompt-input");
+    const imageInput = document.getElementById("image-input");
+    const imagePreviewBox = document.getElementById("image-preview-box");
+    const imagePreview = document.getElementById("image-preview");
+    const imageCaption = document.getElementById("image-caption");
+    const clearImageBtn = document.getElementById("clear-image-btn");
+    const thinkingModeSelect = document.getElementById("thinking-mode");
+    const tempRange = document.getElementById("temp-range");
+    const tempOutput = document.getElementById("temp-output");
+    const tokensRange = document.getElementById("tokens-range");
+    const tokensOutput = document.getElementById("tokens-output");
+    const genForm = document.getElementById("gen-form");
+    const preloadBtn = document.getElementById("preload-btn");
+    const generateBtn = document.getElementById("generate-btn");
+    const skipThinkBtn = document.getElementById("skip-think-btn");
+    const stopBtn = document.getElementById("stop-btn");
+    const statusDot = document.getElementById("status-dot");
+    const phaseLabel = document.getElementById("phase-label");
+    const speedLabel = document.getElementById("speed-label");
+    const genProgress = document.getElementById("gen-progress");
+    const heartbeatRow = document.getElementById("heartbeat-row");
+    const elapsedLabel = document.getElementById("elapsed-label");
+    const heartbeatLabel = document.getElementById("heartbeat-label");
+    const workerErrorBanner = document.getElementById("worker-error-banner");
+    const workerLogCode = document.getElementById("worker-log-code");
+    const previewFrame = document.getElementById("preview-frame");
+    const sandboxError = document.getElementById("sandbox-error");
+    const recoveryBar = document.getElementById("recovery-bar");
+    const recoveryTitle = document.getElementById("recovery-title");
+    const recoveryDetail = document.getElementById("recovery-detail");
+    const dismissRecoveryBtn = document.getElementById("dismiss-recovery-btn");
+    const continueBtn = document.getElementById("continue-btn");
+    const rewindLineBtn = document.getElementById("rewind-line-btn");
+    const jumpLineBtn = document.getElementById("jump-line-btn");
+    const politeAnnouncer = document.getElementById("polite-announcer");
+    const thinkDetails = document.getElementById("think-details");
+    const thinkSummary = document.getElementById("think-summary");
+    const thinkCode = document.getElementById("think-code");
+    const htmlSummary = document.getElementById("html-summary");
+    const htmlCode = document.getElementById("html-code");
+    const repairDetails = document.getElementById("repair-details");
+    const repairTextarea = document.getElementById("repair-textarea");
+    const applyRepairBtn = document.getElementById("apply-repair-btn");
+    const rateGoodBtn = document.getElementById("rate-good-btn");
+    const rateBadBtn = document.getElementById("rate-bad-btn");
+    const downloadHtmlBtn = document.getElementById("download-html-btn");
+    const openTelemetryBtn = document.getElementById("open-telemetry-btn");
+    const telemetryDialog = document.getElementById("telemetry-dialog");
+    const telemetrySummary = document.getElementById("telemetry-summary");
+    const telemetryTbody = document.getElementById("telemetry-tbody");
+
+    let currentSandboxToken = "";
+    let currentHtml = "";
+    let currentThinkPart = "";
+    let originalGeneratedHtml = "";
+    let currentRunMeta = null;
+    let selectedImageBlob = null;
+    let previewObjectUrl = null;
+    let rawAccumulator = "";
+    let lastSandboxErrorMsg = "";
+    let lastSandboxErrorLine = 0;
+    let autoResumeCount = 0;
+    let autoResumeTimer = null;
+    let armedForAutoResume = false;
+    const healedIdentifiers = new Set();
+
+    function escapeRegExp(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function autoHealDuplicateIdentifier(html, errorMsg) {
+      if (!html || !errorMsg) return null;
+      const dupMatch = String(errorMsg).match(
+        /Identifier\s+['"`]([A-Za-z_$][\w$]*)['"`]\s+has already been declared/
+      );
+      if (!dupMatch) return null;
+      const ident = dupMatch[1];
+      if (healedIdentifiers.has(ident) || healedIdentifiers.size >= 8) return null;
+
+      const escaped = escapeRegExp(ident);
+      const declRe = new RegExp(`(^|[;{\\n\\r]\\s*)(?:const|let)(\\s+${escaped}\\b)`, "g");
+      const fnRe = new RegExp(`(^|[;{\\n\\r]\\s*)function\\s+(${escaped})\\s*\\(`, "g");
+      let replacements = 0;
+      const healed = html.replace(
+        /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
+        (_full, openTag, scriptBody, closeTag) => {
+          let updatedBody = scriptBody.replace(declRe, (_m, prefix, rest) => {
+            replacements += 1;
+            return `${prefix}var${rest}`;
+          });
+          updatedBody = updatedBody.replace(fnRe, (_m, prefix, fnName) => {
+            replacements += 1;
+            return `${prefix}var ${fnName} = function(`;
+          });
+          return `${openTag}${updatedBody}${closeTag}`;
+        }
+      );
+
+      if (replacements < 1 || healed === html) return null;
+      healedIdentifiers.add(ident);
+      return { ident, replacements, healedHtml: healed };
+    }
+
+    function clearPendingAutoResume(logMsg = "") {
+      if (autoResumeTimer) {
+        clearTimeout(autoResumeTimer);
+        autoResumeTimer = null;
+      }
+      cancelAutoResumeBtn.hidden = true;
+      if (logMsg) {
+        appendWorkerLog(logMsg);
+      }
+    }
+
+    function syncVisionControlForModel() {
+      const m = String(modelSelect.value || "").toLowerCase();
+      const supportsVision = m.includes("qwen3.5") || m.includes("qwen3_5") || m.includes("-vl");
+      imageInput.disabled = !supportsVision;
+      imageHint.textContent = supportsVision
+        ? "Attach a concept sketch or object photo to condition Qwen3.5's multimodal vision encoder."
+        : "Selected checkpoint is text-only (LFM3 / causal LM); switch to Qwen3.5 for Vision-to-GLB.";
+      if (!supportsVision) {
+        clearImageSelection();
+      }
+    }
+
+    // Live Worker & GPU telemetry state
+    let workerBooted = false;
+    let modelLoadedInVram = false;
+    let activeJobStart = null;
+    let lastWorkerSignalAt = performance.now();
+    let lastTokenAt = null;
+    let recordedTtftSec = null;
+    let activePhase = "idle";
+    const logLines = [];
+
+    function appendWorkerLog(line) {
+      const now = new Date();
+      const stamp = now.toTimeString().slice(0, 8);
+      logLines.push(`[${stamp}] ${line}`);
+      if (logLines.length > 80) logLines.shift();
+      workerLogCode.textContent = logLines.join("\n");
+      const pre = workerLogCode.parentElement;
+      if (pre) pre.scrollTop = pre.scrollHeight;
+    }
+
+    function setBadgeState(badgeEl, text, variant = "") {
+      badgeEl.textContent = text;
+      badgeEl.className = variant ? `badge ${variant}` : "badge";
+    }
+
+    function setIndeterminateProgress() {
+      genProgress.removeAttribute("value");
+    }
+
+    function setDeterminateProgress(pct) {
+      genProgress.value = Math.max(0, Math.min(100, pct));
+    }
+
+    function syncMidStreamButtons() {
+      const inThink = Boolean(activeJobStart) && activePhase === "streaming_think";
+      skipThinkBtn.hidden = !inThink;
+      skipThinkBtn.disabled = !inThink;
+    }
+
+    function isPlaceholderStub(html) {
+      if (!html) return true;
+      const trimmed = html.trim();
+      if (trimmed.length < 120) return true;
+      if (trimmed.includes("<style>...</style>") || trimmed.includes("<meta charset...")) return true;
+      if (/\.\.\.button\b/i.test(trimmed) || /^\s*\.\.\.\s*$/m.test(trimmed)) return true;
+      if (/<\/html>/i.test(trimmed) && trimmed.length < 1800) return true;
+      return false;
+    }
+
+    function isThinkingGarbage(thinkText) {
+      if (!thinkText || !thinkText.trim()) return true;
+      if (thinkText.includes("<style>...</style>") || /\.\.\.button\b/i.test(thinkText)) return true;
+      return false;
+    }
+
+    function inferErrorLine(html, errorMsg, reportedLine) {
+      if (!html) return 0;
+      const lines = html.split("\n");
+      if (reportedLine > 0 && reportedLine <= lines.length) {
+        return reportedLine;
+      }
+      const lowerMsg = String(errorMsg || "").toLowerCase();
+      if (lowerMsg.includes("'...'") || lowerMsg.includes("unexpected token '...'")) {
+        const idx = lines.findIndex((ln) => ln.trim() === "..." || ln.includes("..."));
+        if (idx !== -1) return idx + 1;
+      }
+      if (lowerMsg.includes("import map")) {
+        const idx = lines.findIndex((ln) => ln.toLowerCase().includes("importmap"));
+        if (idx !== -1) return idx + 1;
+      }
+      return 0;
+    }
+
+    function saveSessionDraft(extra = {}) {
+      try {
+        const draft = {
+          modelId: modelSelect.value,
+          prompt: promptInput.value.trim(),
+          thinkingMode: thinkingModeSelect.value,
+          thinkPart: currentThinkPart,
+          html: currentHtml,
+          lastError: lastSandboxErrorMsg,
+          lastErrorLine: lastSandboxErrorLine,
+          updatedAt: Date.now(),
+          ...extra,
+        };
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      } catch {
+        // Ignore storage errors
+      }
+    }
+
+    function updateRecoveryBar({ reasonTitle, detailText, errorLine = 0 }) {
+      lastSandboxErrorLine = errorLine;
+      recoveryTitle.textContent = reasonTitle;
+      recoveryDetail.textContent = detailText;
+      recoveryBar.hidden = false;
+
+      const stub = isPlaceholderStub(currentHtml);
+      const hasClosingHtml = /<\/html>/i.test(currentHtml);
+
+      if (stub) {
+        continueBtn.textContent = "Continue → Write Full HTML on WebGPU";
+        rewindLineBtn.hidden = true;
+      } else if (!hasClosingHtml) {
+        const lineCount = currentHtml.split("\n").length;
+        continueBtn.textContent = `Continue Truncated HTML from Line ${lineCount}`;
+        rewindLineBtn.hidden = true;
+      } else if (errorLine > 5) {
+        const safeLine = Math.max(1, errorLine - 3);
+        continueBtn.textContent = `Rewind to Line ${safeLine} & Resume on WebGPU`;
+        rewindLineBtn.textContent = `Rewind Earlier (Line ${Math.max(1, errorLine - 10)})`;
+        rewindLineBtn.hidden = errorLine <= 15;
+      } else {
+        continueBtn.textContent = "Continue / Regenerate Clean HTML on WebGPU";
+        rewindLineBtn.hidden = true;
+      }
+
+      jumpLineBtn.hidden = !currentHtml || currentHtml.trim().length === 0;
+      if (!jumpLineBtn.hidden) {
+        jumpLineBtn.textContent = errorLine > 0
+          ? `Jump to Line ${errorLine} in Editor`
+          : "Open Source in Flywheel Editor";
+      }
+    }
+
+    function showWorkerError(message, detail = "") {
+      activePhase = "error";
+      activeJobStart = null;
+      generateBtn.disabled = false;
+      preloadBtn.disabled = false;
+      stopBtn.disabled = true;
+      syncMidStreamButtons();
+      setDeterminateProgress(0);
+      statusDot.className = "status-dot error";
+      heartbeatRow.className = "heartbeat-row error";
+      phaseLabel.textContent = "Error — Generation Halted";
+      heartbeatLabel.textContent = "Check error banner & activity log below";
+      setBadgeState(modelStateBadge, "Model: Error", "error");
+
+      const fullMsg = detail ? `${message}\n${detail}` : message;
+      workerErrorBanner.textContent = `WebGPU / Worker Error: ${message}`;
+      workerErrorBanner.hidden = false;
+      sandboxError.textContent = `WebGPU Worker Error: ${message}`;
+      sandboxError.hidden = false;
+      appendWorkerLog(`ERROR: ${fullMsg}`);
+
+      updateRecoveryBar({
+        reasonTitle: "WebGPU Worker Interrupted — Ready to Resume",
+        detailText: `Worker stopped with: ${message}`,
+        errorLine: 0,
+      });
+    }
+
+    // 250ms live UI heartbeat so the user always sees whether it is active, slow, or stalled
+    setInterval(() => {
+      if (!activeJobStart) return;
+      const now = performance.now();
+      const elapsed = ((now - activeJobStart) / 1000).toFixed(1);
+      elapsedLabel.textContent = `Elapsed: ${elapsed}s${recordedTtftSec !== null ? ` · TTFT: ${recordedTtftSec}s` : ""}`;
+
+      const sinceSignal = (now - lastWorkerSignalAt) / 1000;
+      if (activePhase === "compiling_webgpu") {
+        statusDot.className = "status-dot warn";
+        heartbeatRow.className = "heartbeat-row warn";
+        heartbeatLabel.textContent = `Uploading 2.85 GB & compiling WebGPU shaders (${sinceSignal.toFixed(1)}s in GPU init)…`;
+      } else if (activePhase === "prefilling") {
+        statusDot.className = sinceSignal > 8 ? "status-dot warn" : "status-dot active";
+        heartbeatRow.className = sinceSignal > 8 ? "heartbeat-row warn" : "heartbeat-row";
+        heartbeatLabel.textContent = `Running WebGPU prompt prefill (${sinceSignal.toFixed(1)}s waiting for next token)…`;
+      } else if (activePhase === "streaming_think" || activePhase === "streaming_html") {
+        const sinceTok = lastTokenAt ? (now - lastTokenAt) / 1000 : sinceSignal;
+        if (sinceTok > 4.0) {
+          statusDot.className = "status-dot warn";
+          heartbeatRow.className = "heartbeat-row warn";
+          heartbeatLabel.textContent = `Slow GPU step (${sinceTok.toFixed(1)}s since last token — shader compile or memory pressure)`;
+        } else {
+          statusDot.className = "status-dot active";
+          heartbeatRow.className = "heartbeat-row";
+          heartbeatLabel.textContent = `Streaming live · last token ${sinceTok.toFixed(2)}s ago`;
+        }
+      } else {
+        statusDot.className = sinceSignal > 12 ? "status-dot warn" : "status-dot active";
+        heartbeatRow.className = sinceSignal > 12 ? "heartbeat-row warn" : "heartbeat-row";
+        heartbeatLabel.textContent =
+          sinceSignal > 12
+            ? `Waiting on worker/network (${sinceSignal.toFixed(1)}s since last update)…`
+            : `Active · updated ${sinceSignal.toFixed(1)}s ago`;
+      }
+    }, 250);
+
+    // Progressive enhancement range fill for browsers without accent-color
+    function syncRangeProgress(slider) {
+      if (!CSS.supports("accent-color", "#0055b8")) {
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const val = Number(slider.value || 0);
+        const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+        slider.style.setProperty("--progress", `${pct}%`);
+      }
+    }
+
+    tempRange.addEventListener("input", () => {
+      tempOutput.textContent = Number(tempRange.value).toFixed(2);
+      syncRangeProgress(tempRange);
+    });
+    tokensRange.addEventListener("input", () => {
+      tokensOutput.textContent = tokensRange.value;
+      syncRangeProgress(tokensRange);
+    });
+    syncRangeProgress(tempRange);
+    syncRangeProgress(tokensRange);
+
+    // WebGPU capability detection
+    async function checkWebGPU() {
+      if (!("gpu" in navigator)) {
+        setBadgeState(gpuBadge, "WebGPU Adapter: Unavailable", "error");
+        return;
+      }
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        if (adapter) {
+          setBadgeState(gpuBadge, "WebGPU Adapter: Ready", "ready");
+        } else {
+          setBadgeState(gpuBadge, "WebGPU Adapter: None", "error");
+        }
+      } catch {
+        setBadgeState(gpuBadge, "WebGPU Adapter: Blocked", "error");
+      }
+    }
+
+    // Telemetry helper
+    async function logTelemetry(eventType, details = {}) {
+      try {
+        await fetch("/api/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_type: eventType,
+            model_id: currentRunMeta?.modelId || modelSelect.value,
+            prompt: currentRunMeta?.prompt || promptInput.value,
+            thinking_mode: currentRunMeta?.thinkingMode || thinkingModeSelect.value,
+            enable_thinking: true,
+            ...details,
+          }),
+        });
+        await refreshTelemetryCount();
+      } catch {
+        // Non-blocking telemetry
+      }
+    }
+
+    async function refreshTelemetryCount() {
+      try {
+        const res = await fetch("/api/telemetry/stats");
+        if (!res.ok) return null;
+        const data = await res.json();
+        flywheelBadge.textContent = `${data.total_events} flywheel event${data.total_events === 1 ? "" : "s"}`;
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
+    // Populate available local ONNX models & saved benchmarks
+    async function loadCatalogs() {
+      try {
+        const mRes = await fetch("/api/models");
+        if (mRes.ok) {
+          const { models } = await mRes.json();
+          if (Array.isArray(models) && models.length > 0) {
+            modelSelect.replaceChildren();
+            const groups = {};
+            for (const m of models) {
+              const grpName = m.group || "WebGPU Models";
+              if (!groups[grpName]) {
+                const optGroup = document.createElement("optgroup");
+                optGroup.label = grpName;
+                groups[grpName] = optGroup;
+                modelSelect.appendChild(optGroup);
+              }
+              const opt = document.createElement("option");
+              opt.value = m.id;
+              opt.textContent = m.label;
+              opt.dataset.desc = m.description || "";
+              opt.dataset.hasVision = m.has_vision ? "true" : "false";
+              opt.dataset.type = m.type || "glb";
+              groups[grpName].appendChild(opt);
+            }
+
+            function updateModelHint() {
+              const selectedOpt = modelSelect.options[modelSelect.selectedIndex];
+              if (selectedOpt && selectedOpt.dataset.desc) {
+                const hint = document.getElementById("model-hint");
+                if (hint) hint.textContent = selectedOpt.dataset.desc;
+              }
+            }
+            modelSelect.addEventListener("change", updateModelHint);
+            updateModelHint();
+          }
+        }
+      } catch {
+        // Keep static defaults
+      }
+
+      try {
+        const bRes = await fetch("/api/benchmarks");
+        if (bRes.ok) {
+          const { benchmarks } = await bRes.json();
+          for (const item of benchmarks || []) {
+            const opt = document.createElement("option");
+            opt.value = item.path;
+            opt.textContent = item.label;
+            presetSelect.appendChild(opt);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    // Single-line bridge attached directly to <head> so ev.lineno matches rawHtml 1:1 (zero line offset)
+    function buildInstrumentedHtml(rawHtml, token, parentOrigin) {
+      const bridgeScript =
+        `<script>(function(){const TOKEN=${JSON.stringify(token)},TARGET_ORIGIN=${JSON.stringify(parentOrigin)};` +
+        `function notify(k,p){try{parent.postMessage({source:"threecoder-sandbox",token:TOKEN,kind:k,payload:p},TARGET_ORIGIN);}catch(_){}}` +
+        `window.addEventListener("error",function(ev){notify("runtime_error",{message:String(ev.message||"Script error"),line:ev.lineno||0,col:ev.colno||0});});` +
+        `window.addEventListener("unhandledrejection",function(ev){notify("runtime_error",{message:String(ev.reason&&ev.reason.message?ev.reason.message:ev.reason),line:0,col:0});});` +
+        `const orig=URL.createObjectURL.bind(URL);URL.createObjectURL=function(obj){if(obj&&typeof obj.size==="number"&&(obj.type==="model/gltf-binary"||obj.type==="application/octet-stream")){notify("glb_exported",{byteSize:obj.size,mimeType:obj.type});}return orig(obj);};` +
+        `})();<\/script>`;
+      if (/<head[^>]*>/i.test(rawHtml)) {
+        return rawHtml.replace(/<head[^>]*>/i, (match) => `${match}${bridgeScript}`);
+      }
+      return `${bridgeScript}${rawHtml}`;
+    }
+
+    function makeSandboxToken() {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    function renderHtmlInSandbox(htmlString, sourceLabel = "generated") {
+      sandboxError.hidden = true;
+      sandboxError.textContent = "";
+      lastSandboxErrorMsg = "";
+      lastSandboxErrorLine = 0;
+      currentHtml = htmlString;
+      htmlSummary.textContent = `Standalone Three.js HTML Source (${htmlString.split("\n").length} lines)`;
+      htmlCode.textContent = htmlString;
+      repairTextarea.value = htmlString;
+      currentSandboxToken = makeSandboxToken();
+      previewFrame.srcdoc = buildInstrumentedHtml(htmlString, currentSandboxToken, window.location.origin);
+      rateGoodBtn.disabled = false;
+      rateBadBtn.disabled = false;
+      downloadHtmlBtn.disabled = false;
+      politeAnnouncer.textContent = `Rendered ${sourceLabel} 3D asset in viewport.`;
+    }
+
+    // Strict postMessage origin + source + capability token validation
+    window.addEventListener("message", (event) => {
+      const allowedSandboxOrigin = event.origin === "null" || event.origin === window.location.origin;
+      if (!allowedSandboxOrigin) return;
+      if (event.source !== previewFrame.contentWindow) return;
+      const data = event.data;
+      if (!data || data.source !== "threecoder-sandbox" || data.token !== currentSandboxToken) return;
+
+      if (data.kind === "runtime_error") {
+        const msg = String(data.payload?.message || "Runtime error inside 3D scene");
+        const reportedLine = Number(data.payload?.line || 0);
+        const effLine = inferErrorLine(currentHtml, msg, reportedLine);
+
+        const healed = autoHealDuplicateIdentifier(currentHtml, msg);
+        if (healed) {
+          lastSandboxErrorMsg = "";
+          lastSandboxErrorLine = 0;
+          sandboxError.hidden = true;
+          recoveryBar.hidden = true;
+          appendWorkerLog(
+            `Auto-healed duplicate identifier '${healed.ident}' (${healed.replacements} const/let → var) in <1ms`
+          );
+          logTelemetry("sandbox_duplicate_healed", {
+            identifier: healed.ident,
+            replacements: healed.replacements,
+            error_line: effLine,
+          });
+          renderHtmlInSandbox(healed.healedHtml, "auto-healed");
+          saveSessionDraft({ html: healed.healedHtml, lastError: "", lastErrorLine: 0 });
+          return;
+        }
+
+        lastSandboxErrorMsg = msg;
+
+        const lines = currentHtml ? currentHtml.split("\n") : [];
+        const snippet = effLine > 0 && lines[effLine - 1] ? lines[effLine - 1].trim().slice(0, 120) : "";
+        const linePrefix = effLine > 0 ? ` (Line ${effLine})` : "";
+
+        sandboxError.textContent = `Sandbox Runtime Error${linePrefix}: ${msg}`;
+        sandboxError.hidden = false;
+
+        let detail = `Error: ${msg}`;
+        if (isPlaceholderStub(currentHtml)) {
+          detail +=
+            `\nDetected placeholder HTML stub (${currentHtml.length} chars). Click Continue below to stream the real standalone Three.js scene directly.`;
+        } else if (effLine > 0) {
+          detail += `\nLine ${effLine}: ${snippet}\nClick Rewind & Resume below to prefill lines 1–${Math.max(1, effLine - 3)} on WebGPU (~1.5s) and regenerate cleanly past the error.`;
+        }
+
+        updateRecoveryBar({
+          reasonTitle: "Sandbox Runtime Error — Pick Up & Fix Without Restarting",
+          detailText: detail,
+          errorLine: effLine,
+        });
+        saveSessionDraft({ lastError: msg, lastErrorLine: effLine });
+        logTelemetry("sandbox_runtime_error", { error_message: msg, error_line: effLine });
+        scheduleAutoResume(`Sandbox Runtime Error${linePrefix}: ${msg}`);
+      } else if (data.kind === "glb_exported") {
+        const kb = Math.round(Number(data.payload?.byteSize || 0) / 1024);
+        politeAnnouncer.textContent = `Exported valid GLB binary (${kb} KB).`;
+        logTelemetry("glb_exported", { glb_bytes: Number(data.payload?.byteSize || 0) });
+      }
+    });
+
+    function extractHtmlFromStream(text) {
+      let body = text;
+      let thinkPart = "";
+      if (text.includes("</think>")) {
+        const idx = text.indexOf("</think>");
+        thinkPart = text.slice(0, idx).replace(/^<think>\s*/i, "");
+        body = text.slice(idx + "</think>".length);
+      } else {
+        thinkPart = text.replace(/^<think>\s*/i, "");
+        body = "";
+      }
+
+      let code = body.trim();
+      const htmlFenceMatch =
+        code.match(/```html\s*([\s\S]*?)```/i) ||
+        code.match(/```\s*((?:<!doctype html|<html)[\s\S]*?)```/i) ||
+        code.match(/```(?:html)?\s*([\s\S]*?)```/i);
+      if (htmlFenceMatch) {
+        code = htmlFenceMatch[1].trim();
+      } else {
+        const openFence =
+          code.match(/```html\s*([\s\S]*)$/i) ||
+          code.match(/```(?:html)?\s*((?:<!doctype html|<html)[\s\S]*)$/i);
+        if (openFence) {
+          code = openFence[1].trim();
+        }
+      }
+      return { thinkPart, code };
+    }
+
+    function refreshStreamPanels(fullStreamText) {
+      const { thinkPart, code } = extractHtmlFromStream(fullStreamText);
+      if (thinkPart) {
+        currentThinkPart = thinkPart;
+        thinkSummary.textContent = `Model Reasoning (<think> stream · ${thinkPart.length.toLocaleString()} chars)`;
+        thinkCode.textContent = thinkPart;
+        const thinkPre = thinkCode.parentElement;
+        if (thinkPre && !code) {
+          thinkPre.scrollTop = thinkPre.scrollHeight;
+        }
+      }
+      if (code) {
+        htmlSummary.textContent = `Standalone Three.js HTML Source (${code.split("\n").length} lines)`;
+        htmlCode.textContent = code;
+        const htmlPre = htmlCode.parentElement;
+        if (htmlPre) {
+          htmlPre.scrollTop = htmlPre.scrollHeight;
+        }
+      }
+      return { thinkPart, code };
+    }
+
+    // Build prefilled assistant state to continue or rewind from stuck/errored output
+    function startContinuation({ rewindExtraLines = 4 } = {}) {
+      const isLfm3 = String(modelSelect.value || "").toLowerCase().includes("lfm3");
+      const hasValidThink = !isThinkingGarbage(currentThinkPart);
+      const thinkBlockPrefix = hasValidThink
+        ? `${currentThinkPart.replace(/^<think>\s*/i, "").trim().slice(0, 6000)}\n</think>\n\n`
+        : isLfm3
+          ? "</think>"
+          : `${FAST_PLAN_TEMPLATE}\n</think>\n\n`;
+
+      let assistantPrefix = "";
+      let continuationKind = "from_plan_bridge";
+      let keptLineCount = 0;
+
+      const stub = isPlaceholderStub(currentHtml);
+      const hasClosingHtml = /<\/html>/i.test(currentHtml);
+
+      const dupRewindMatch = String(lastSandboxErrorMsg || "").match(
+        /Identifier\s+['"`]([A-Za-z_$][\w$]*)['"`]\s+has already been declared/
+      );
+
+      if (!stub && !hasClosingHtml) {
+        const lines = currentHtml.split("\n");
+        const safeLines = lines.slice(0, Math.max(1, lines.length - 1));
+        keptLineCount = safeLines.length;
+        assistantPrefix = `${thinkBlockPrefix}\`\`\`html\n${safeLines.join("\n")}\n`;
+        continuationKind = "resume_truncated_html";
+      } else if (!stub && lastSandboxErrorLine > 5) {
+        const lines = currentHtml.split("\n");
+        const cutoff = Math.max(1, lastSandboxErrorLine - rewindExtraLines);
+        const safeLines = lines.slice(0, cutoff);
+        if (dupRewindMatch) {
+          safeLines.push(
+            `    // Reuse existing '${dupRewindMatch[1]}' above or declare a distinct variable name:`
+          );
+        }
+        keptLineCount = safeLines.length;
+        assistantPrefix = `${thinkBlockPrefix}\`\`\`html\n${safeLines.join("\n")}\n`;
+        continuationKind = "rewind_before_error_line";
+      } else {
+        assistantPrefix = isLfm3 && !hasValidThink
+          ? "</think>```html\n<!DOCTYPE html>\n<html lang=\"en\">\n"
+          : `${hasValidThink ? currentThinkPart.replace(/^<think>\s*/i, "").trim().slice(0, 6000) : FAST_PLAN_TEMPLATE}${HTML_OPEN_BRIDGE}`;
+        continuationKind = "direct_html_from_plan";
+      }
+
+      rawAccumulator = assistantPrefix;
+      activeJobStart = performance.now();
+      lastWorkerSignalAt = activeJobStart;
+      lastTokenAt = null;
+      recordedTtftSec = null;
+      activePhase = modelLoadedInVram ? "prefilling" : "loading_weights";
+
+      recoveryBar.hidden = true;
+      workerErrorBanner.hidden = true;
+      sandboxError.hidden = true;
+      generateBtn.disabled = true;
+      preloadBtn.disabled = true;
+      stopBtn.disabled = false;
+      syncMidStreamButtons();
+      statusDot.className = "status-dot active";
+      setIndeterminateProgress();
+
+      refreshStreamPanels(assistantPrefix);
+      phaseLabel.textContent = keptLineCount > 0
+        ? `Prefilling ${keptLineCount} kept HTML lines on WebGPU to resume…`
+        : "Prefilling structured plan & jumping directly into <!DOCTYPE html>…";
+      appendWorkerLog(
+        `Continuation (${continuationKind}): prefilling ${assistantPrefix.length.toLocaleString()} chars (${keptLineCount} HTML lines kept)`
+      );
+
+      const baseTemp = Number(tempRange.value) || 0.65;
+      const resumeTemp = dupRewindMatch ? Math.max(baseTemp, 0.62) : Math.min(baseTemp, 0.58);
+      currentRunMeta = {
+        modelId: modelSelect.value,
+        prompt: promptInput.value.trim(),
+        thinkingMode: `continue:${continuationKind}`,
+      };
+
+      logTelemetry("continuation_started", {
+        continuation_mode: continuationKind,
+        kept_html_lines: keptLineCount,
+        prefix_chars: assistantPrefix.length,
+      });
+
+      worker.postMessage({
+        action: "continue",
+        payload: {
+          modelId: modelSelect.value,
+          dtype: "q4f16",
+          prompt: promptInput.value.trim(),
+          thinkingMode: thinkingModeSelect.value,
+          assistantPrefix,
+          temperature: resumeTemp,
+          maxNewTokens: Number(tokensRange.value),
+          imageBlob: selectedImageBlob,
+        },
+      });
+    }
+
+    function scheduleAutoResume(reasonLabel) {
+      if (!armedForAutoResume || !autoResumeToggle.checked || activeJobStart) {
+        return;
+      }
+      if (autoResumeCount >= MAX_AUTO_RESUMES) {
+        appendWorkerLog(
+          `Auto-resume limit reached (${MAX_AUTO_RESUMES}/${MAX_AUTO_RESUMES}); awaiting manual Continue or edit.`
+        );
+        return;
+      }
+      clearPendingAutoResume();
+      autoResumeCount += 1;
+      const rewindSteps = [4, 18, 36];
+      const rewindExtra = rewindSteps[Math.min(autoResumeCount - 1, rewindSteps.length - 1)];
+      const attemptTag = `${autoResumeCount}/${MAX_AUTO_RESUMES}`;
+      recoveryTitle.textContent = `Auto-Resume (${attemptTag}) in 1.2s — Continuing on WebGPU…`;
+      phaseLabel.textContent = `Auto-Resume (${attemptTag}) queued…`;
+      cancelAutoResumeBtn.hidden = false;
+      appendWorkerLog(`Auto-Resume (${attemptTag}) scheduled for: ${reasonLabel}`);
+
+      autoResumeTimer = setTimeout(() => {
+        autoResumeTimer = null;
+        cancelAutoResumeBtn.hidden = true;
+        if (!armedForAutoResume || !autoResumeToggle.checked || activeJobStart) return;
+        startContinuation({ rewindExtraLines: rewindExtra, isAuto: true });
+      }, 1200);
+    }
+
+    // Web Worker setup + explicit error/boot watchdogs
+    const worker = new Worker("./worker.js?v=7", { type: "module" });
+
+    worker.addEventListener("error", (ev) => {
+      ev.preventDefault();
+      const loc = ev.filename ? ` (${ev.filename}:${ev.lineno || 0})` : "";
+      showWorkerError(
+        ev.message ? `${ev.message}${loc}` : `Worker script failed to load or crashed${loc}`
+      );
+    });
+
+    worker.addEventListener("messageerror", () => {
+      showWorkerError("Failed to deserialize message from WebGPU worker.");
+    });
+
+    setTimeout(() => {
+      if (!workerBooted && activePhase !== "error") {
+        showWorkerError("WebGPU worker did not respond within 8s (check network or reload page).");
+      }
+    }, 8000);
+
+    modelSelect.addEventListener("change", () => {
+      modelLoadedInVram = false;
+      syncVisionControlForModel();
+      setBadgeState(modelStateBadge, "Model: Not Loaded", "");
+      if (!activeJobStart) {
+        phaseLabel.textContent = "Idle — Click Preload or Generate";
+      }
+    });
+
+    worker.addEventListener("message", (event) => {
+      const msg = event.data || {};
+      lastWorkerSignalAt = performance.now();
+
+      if (msg.type === "boot") {
+        workerBooted = true;
+        heartbeatLabel.textContent = "Worker online · ready to load model";
+        appendWorkerLog(msg.message);
+      } else if (msg.type === "log") {
+        appendWorkerLog(msg.message);
+      } else if (msg.type === "stream_reset") {
+        rawAccumulator = msg.initialPrefix || "";
+        if (rawAccumulator) {
+          refreshStreamPanels(rawAccumulator);
+        }
+      } else if (msg.type === "status") {
+        activePhase = msg.phase || "working";
+        syncMidStreamButtons();
+        phaseLabel.textContent = msg.message;
+        statusDot.className =
+          msg.phase === "compiling_webgpu" ? "status-dot warn" : "status-dot active";
+
+        if (
+          msg.phase === "booting_runtime" ||
+          msg.phase === "loading_processor" ||
+          msg.phase === "loading_weights"
+        ) {
+          setBadgeState(modelStateBadge, "Model: Loading Shards…", "busy");
+        } else if (msg.phase === "compiling_webgpu") {
+          setBadgeState(modelStateBadge, "Model: Compiling WebGPU…", "warn");
+        } else if (msg.phase === "prefilling") {
+          setBadgeState(modelStateBadge, "Model: Prefilling Context…", "busy");
+        }
+
+        if (
+          msg.phase === "booting_runtime" ||
+          msg.phase === "loading_processor" ||
+          msg.phase === "compiling_webgpu" ||
+          msg.phase === "preparing_inputs" ||
+          msg.phase === "prefilling"
+        ) {
+          setIndeterminateProgress();
+        }
+      } else if (msg.type === "load_progress") {
+        activePhase = "loading_weights";
+        setDeterminateProgress(msg.percent);
+        const shortFile = String(msg.file || "").split("/").pop();
+        phaseLabel.textContent = `Downloading ${shortFile} (${msg.loadedMB} / ${msg.totalMB} MB · ${msg.percent}%)…`;
+        setBadgeState(modelStateBadge, `Model: Loading ${msg.percent}%`, "busy");
+      } else if (msg.type === "ready") {
+        modelLoadedInVram = true;
+        setBadgeState(modelStateBadge, `Model: Ready in VRAM (${msg.dtype})`, "ready");
+        politeAnnouncer.textContent = `Model ${msg.modelId} loaded on WebGPU in ${msg.loadSeconds}s.`;
+        if (activePhase !== "prefilling" && !generateBtn.disabled) {
+          activePhase = "idle";
+          activeJobStart = null;
+          setDeterminateProgress(100);
+          statusDot.className = "status-dot ready";
+          heartbeatRow.className = "heartbeat-row";
+          phaseLabel.textContent = `Ready on WebGPU (loaded in ${msg.loadSeconds}s)`;
+          heartbeatLabel.textContent = "VRAM warm · click Generate or Continue";
+          preloadBtn.disabled = false;
+        }
+      } else if (msg.type === "token") {
+        rawAccumulator += msg.chunk;
+        lastTokenAt = performance.now();
+        if (msg.ttftSeconds !== null && msg.ttftSeconds !== undefined) {
+          recordedTtftSec = msg.ttftSeconds;
+        }
+        activePhase = msg.streamPhase || "streaming_think";
+        syncMidStreamButtons();
+        setBadgeState(modelStateBadge, "Model: Generating on WebGPU", "ready");
+        speedLabel.textContent = `${msg.tokenCount} tok · ${msg.tokPerSec.toFixed(1)} tok/s`;
+        const maxTok = Number(tokensRange.value) || 16384;
+        setDeterminateProgress(Math.min(99, Math.max(1, Math.round((msg.tokenCount / maxTok) * 100))));
+
+        const { thinkPart, code } = refreshStreamPanels(rawAccumulator);
+        if (thinkPart && !thinkDetails.open && !code) {
+          thinkDetails.open = true;
+        }
+        if (code) {
+          phaseLabel.textContent = `Streaming Three.js HTML (${msg.tokenCount.toLocaleString()} tok · ${code.split("\n").length} lines)…`;
+        } else {
+          phaseLabel.textContent = `Streaming <think> reasoning (${msg.tokenCount.toLocaleString()} tok)…`;
+        }
+      } else if (msg.type === "complete") {
+        activePhase = "idle";
+        activeJobStart = null;
+        generateBtn.disabled = false;
+        preloadBtn.disabled = false;
+        stopBtn.disabled = true;
+        syncMidStreamButtons();
+        setDeterminateProgress(100);
+        statusDot.className = "status-dot ready";
+        heartbeatRow.className = "heartbeat-row";
+        setBadgeState(modelStateBadge, "Model: Ready in VRAM (q4f16)", "ready");
+        phaseLabel.textContent = msg.stoppedByUser
+          ? `Paused at ${msg.tokenCount.toLocaleString()} tok (${msg.wallSeconds}s)`
+          : `Complete in ${msg.wallSeconds}s`;
+        speedLabel.textContent = `${msg.tokenCount} tok · ${msg.tokPerSec} tok/s`;
+        heartbeatLabel.textContent = msg.stoppedByUser
+          ? "Paused — click Continue in viewport to pick up where it stopped"
+          : `Finished (${msg.tokenCount.toLocaleString()} tokens generated)`;
+
+        const { thinkPart, code } = extractHtmlFromStream(msg.fullText);
+        if (thinkPart) {
+          currentThinkPart = thinkPart;
+          thinkCode.textContent = thinkPart;
+        }
+        currentHtml = code || "";
+        if (code) {
+          htmlSummary.textContent = `Standalone Three.js HTML Source (${code.split("\n").length} lines)`;
+          htmlCode.textContent = code;
+          repairTextarea.value = code;
+        }
+
+        const completeDocument = !isPlaceholderStub(code) && /<\/html>/i.test(code);
+        if (completeDocument && !msg.stoppedByUser) {
+          recoveryBar.hidden = true;
+          originalGeneratedHtml = code;
+          renderHtmlInSandbox(code, "WebGPU-generated");
+          saveSessionDraft({ lastError: "", lastErrorLine: 0 });
+          logTelemetry("generation_complete", {
+            tokens: msg.tokenCount,
+            tok_per_sec: msg.tokPerSec,
+            wall_seconds: msg.wallSeconds,
+            has_gltf_exporter: code.includes("GLTFExporter"),
+            has_animation_clip: code.includes("AnimationClip"),
+            html_length: code.length,
+          });
+        } else {
+          const linesCount = code ? code.split("\n").length : 0;
+          const why = msg.stoppedByUser
+            ? `Paused after ${msg.tokenCount.toLocaleString()} tokens (${linesCount} HTML lines buffered).`
+            : isPlaceholderStub(code)
+              ? `Generation stopped before writing full HTML (${thinkPart.length.toLocaleString()} <think> chars buffered).`
+              : `HTML reached Max Tokens before closing </html> (${linesCount} lines buffered).`;
+          updateRecoveryBar({
+            reasonTitle: msg.stoppedByUser
+              ? "Generation Paused — Ready to Continue on WebGPU"
+              : "Incomplete Generation — Pick Up & Complete HTML",
+            detailText: `${why}\nClick Continue below to resume directly on WebGPU without starting over.`,
+            errorLine: 0,
+          });
+          saveSessionDraft({ lastError: why, lastErrorLine: 0 });
+          if (!msg.stoppedByUser) {
+            scheduleAutoResume(why);
+          }
+        }
+      } else if (msg.type === "error") {
+        showWorkerError(msg.message, msg.detail || "");
+      }
+    });
+
+    preloadBtn.addEventListener("click", () => {
+      workerErrorBanner.hidden = true;
+      sandboxError.hidden = true;
+      preloadBtn.disabled = true;
+      activeJobStart = performance.now();
+      lastWorkerSignalAt = activeJobStart;
+      recordedTtftSec = null;
+      activePhase = "loading_weights";
+      statusDot.className = "status-dot active";
+      phaseLabel.textContent = "Starting WebGPU preload…";
+      setIndeterminateProgress();
+      appendWorkerLog(`Requested WebGPU preload for ${modelSelect.value}`);
+      worker.postMessage({
+        action: "preload",
+        payload: { modelId: modelSelect.value, dtype: "q4f16" },
+      });
+    });
+
+    genForm.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      clearPendingAutoResume();
+      autoResumeCount = 0;
+      armedForAutoResume = true;
+      healedIdentifiers.clear();
+      rawAccumulator = "";
+      currentHtml = "";
+      currentThinkPart = "";
+      lastSandboxErrorMsg = "";
+      lastSandboxErrorLine = 0;
+
+      activeJobStart = performance.now();
+      lastWorkerSignalAt = activeJobStart;
+      lastTokenAt = null;
+      recordedTtftSec = null;
+      activePhase = modelLoadedInVram ? "prefilling" : "loading_weights";
+
+      const mode = thinkingModeSelect.value;
+      thinkDetails.open = mode !== "fast";
+      thinkSummary.textContent = "Model Reasoning (<think> stream)";
+      htmlSummary.textContent = "Standalone Three.js HTML Source";
+      thinkCode.textContent =
+        mode === "fast"
+          ? "Using concise structured <think> plan to jump straight into <!DOCTYPE html>…"
+          : "Waiting for WebGPU model load & prompt prefill…";
+      htmlCode.textContent = "Waiting for HTML stream…";
+      recoveryBar.hidden = true;
+      workerErrorBanner.hidden = true;
+      sandboxError.hidden = true;
+      generateBtn.disabled = true;
+      preloadBtn.disabled = true;
+      stopBtn.disabled = false;
+      syncMidStreamButtons();
+      statusDot.className = "status-dot active";
+      phaseLabel.textContent = modelLoadedInVram
+        ? "Submitting prompt to WebGPU…"
+        : "Loading selected ONNX model into WebGPU VRAM first…";
+      speedLabel.textContent = "0 tok · 0.0 tok/s";
+      setIndeterminateProgress();
+      appendWorkerLog(`Submitted prompt (${promptInput.value.trim().length} chars, mode=${mode})`);
+
+      currentRunMeta = {
+        modelId: modelSelect.value,
+        prompt: promptInput.value.trim(),
+        thinkingMode: mode,
+      };
+      saveSessionDraft({ lastError: "", lastErrorLine: 0 });
+
+      worker.postMessage({
+        action: "generate",
+        payload: {
+          modelId: modelSelect.value,
+          dtype: "q4f16",
+          prompt: promptInput.value.trim(),
+          thinkingMode: mode,
+          thinkBudgetTokens: 1500,
+          temperature: Number(tempRange.value),
+          maxNewTokens: Number(tokensRange.value),
+          imageBlob: selectedImageBlob,
+        },
+      });
+    });
+
+    skipThinkBtn.addEventListener("click", () => {
+      skipThinkBtn.disabled = true;
+      phaseLabel.textContent = "Closing <think> & jumping straight into Three.js HTML…";
+      worker.postMessage({ action: "skip_think" });
+    });
+
+    stopBtn.addEventListener("click", () => {
+      armedForAutoResume = false;
+      clearPendingAutoResume("Auto-resume disarmed by user Stop.");
+      phaseLabel.textContent = "Pausing after current token…";
+      worker.postMessage({ action: "stop" });
+    });
+
+    cancelAutoResumeBtn.addEventListener("click", () => {
+      armedForAutoResume = false;
+      clearPendingAutoResume("Cancelled scheduled auto-resume.");
+      recoveryTitle.textContent = "Auto-Resume Cancelled — Click Continue Manually Anytime";
+      phaseLabel.textContent = "Idle — Auto-resume cancelled";
+    });
+
+    continueBtn.addEventListener("click", () => {
+      clearPendingAutoResume();
+      autoResumeCount = 0;
+      armedForAutoResume = true;
+      startContinuation({ rewindExtraLines: 3 });
+    });
+
+    rewindLineBtn.addEventListener("click", () => {
+      clearPendingAutoResume();
+      autoResumeCount = 0;
+      armedForAutoResume = true;
+      startContinuation({ rewindExtraLines: 10 });
+    });
+
+    jumpLineBtn.addEventListener("click", () => {
+      repairDetails.open = true;
+      repairTextarea.focus();
+      if (lastSandboxErrorLine > 0 && repairTextarea.value) {
+        const lines = repairTextarea.value.split("\n");
+        let charStart = 0;
+        for (let i = 0; i < Math.min(lastSandboxErrorLine - 1, lines.length); i += 1) {
+          charStart += lines[i].length + 1;
+        }
+        const targetLineLen = (lines[lastSandboxErrorLine - 1] || "").length;
+        repairTextarea.setSelectionRange(charStart, charStart + targetLineLen);
+      }
+      repairDetails.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+
+    dismissRecoveryBtn.addEventListener("click", () => {
+      armedForAutoResume = false;
+      clearPendingAutoResume("Cancelled auto-resume via Dismiss.");
+      recoveryBar.hidden = true;
+    });
+
+    // Prompt quick-fill chips
+    for (const chip of document.querySelectorAll(".chip-btn[data-prompt]")) {
+      chip.addEventListener("click", () => {
+        promptInput.value = chip.dataset.prompt || "";
+        promptInput.focus();
+      });
+    }
+
+    function clearImageSelection() {
+      imageInput.value = "";
+      selectedImageBlob = null;
+      if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = null;
+      }
+      imagePreview.removeAttribute("src");
+      imagePreview.style.display = "none";
+      imageCaption.textContent = "";
+      imagePreviewBox.hidden = true;
+      imagePreviewBox.setAttribute("hidden", "");
+      imagePreviewBox.style.display = "none";
+    }
+
+    // Reference image upload
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
+      if (!file) {
+        clearImageSelection();
+        return;
+      }
+      selectedImageBlob = file;
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = URL.createObjectURL(file);
+      imagePreview.src = previewObjectUrl;
+      imagePreview.style.display = "";
+      imageCaption.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+      imagePreviewBox.hidden = false;
+      imagePreviewBox.removeAttribute("hidden");
+      imagePreviewBox.style.display = "flex";
+    });
+
+    imagePreview.addEventListener("error", () => {
+      clearImageSelection();
+    });
+
+    clearImageBtn.addEventListener("click", clearImageSelection);
+
+    // Load saved benchmark output into sandbox
+    presetSelect.addEventListener("change", async () => {
+      const path = presetSelect.value;
+      if (!path) return;
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        healedIdentifiers.clear();
+        recoveryBar.hidden = true;
+        originalGeneratedHtml = html;
+        currentRunMeta = {
+          modelId: `benchmark:${path}`,
+          prompt: `Loaded preset ${path}`,
+          thinkingMode: "benchmark",
+        };
+        renderHtmlInSandbox(html, path);
+      } catch (err) {
+        sandboxError.textContent = `Failed to load benchmark HTML: ${err.message}`;
+        sandboxError.hidden = false;
+      }
+    });
+
+    // Flywheel ratings & human repair logging
+    rateGoodBtn.addEventListener("click", () => {
+      logTelemetry("rating_positive", { html: currentHtml });
+      politeAnnouncer.textContent = "Saved positive SFT example to flywheel telemetry.";
+    });
+
+    rateBadBtn.addEventListener("click", () => {
+      logTelemetry("rating_negative", { html: currentHtml });
+      politeAnnouncer.textContent = "Logged negative DPO example to flywheel telemetry.";
+    });
+
+    applyRepairBtn.addEventListener("click", () => {
+      const edited = repairTextarea.value.trim();
+      if (!edited) return;
+      healedIdentifiers.clear();
+      recoveryBar.hidden = true;
+      renderHtmlInSandbox(edited, "human-repaired");
+      if (!isPlaceholderStub(edited) && !/<\/html>/i.test(edited)) {
+        updateRecoveryBar({
+          reasonTitle: "Incomplete HTML in Editor — Ready to Continue on WebGPU",
+          detailText: `Buffered ${edited.split("\n").length} HTML lines without </html>. Click Continue to complete it on WebGPU.`,
+          errorLine: 0,
+        });
+      }
+      saveSessionDraft();
+      logTelemetry("human_repair_pair", {
+        original_html: originalGeneratedHtml,
+        repaired_html: edited,
+      });
+    });
+
+    downloadHtmlBtn.addEventListener("click", () => {
+      if (!currentHtml) return;
+      const blob = new Blob([currentHtml], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "threecoder-asset.html";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    // Telemetry modal dialog
+    openTelemetryBtn.addEventListener("click", async () => {
+      telemetryDialog.showModal();
+      const stats = await refreshTelemetryCount();
+      telemetryTbody.replaceChildren();
+      if (!stats) {
+        telemetrySummary.textContent = "Could not load telemetry stats.";
+        return;
+      }
+      const pairs = Object.entries(stats.counts || {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(" · ");
+      telemetrySummary.textContent = `Total events: ${stats.total_events}${pairs ? ` (${pairs})` : ""}`;
+
+      for (const ev of (stats.recent || []).slice().reverse()) {
+        const tr = document.createElement("tr");
+        const tdTime = document.createElement("td");
+        tdTime.textContent = (ev.logged_at || "").replace("T", " ").slice(0, 19);
+        const tdType = document.createElement("td");
+        tdType.textContent = ev.event_type || "";
+        const tdModel = document.createElement("td");
+        tdModel.textContent = ev.model_id || "";
+        const tdNotes = document.createElement("td");
+        const summaryParts = [];
+        if (ev.tok_per_sec) summaryParts.push(`${ev.tokens} tok @ ${ev.tok_per_sec} tok/s`);
+        if (ev.glb_bytes) summaryParts.push(`GLB ${(ev.glb_bytes / 1024).toFixed(1)} KB`);
+        if (ev.error_message) summaryParts.push(ev.error_message);
+        if (ev.continuation_mode) summaryParts.push(`mode=${ev.continuation_mode}`);
+        if (ev.has_animation_clip) summaryParts.push("AnimationClip");
+        tdNotes.textContent = summaryParts.join(" · ") || (ev.prompt ? String(ev.prompt).slice(0, 70) : "—");
+        tr.append(tdTime, tdType, tdModel, tdNotes);
+        telemetryTbody.appendChild(tr);
+      }
+    });
+
+    // Auto-restore draft from localStorage OR pick up stuck session from telemetry log
+    async function restoreSessionOrTelemetry() {
+      let restoredFromDraft = false;
+      try {
+        const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          if (draft && draft.prompt) {
+            promptInput.value = draft.prompt;
+            if (draft.modelId && !String(draft.modelId).startsWith("benchmark:")) {
+              modelSelect.value = draft.modelId;
+            }
+            if (draft.thinkingMode && ["budget", "fast", "full"].includes(draft.thinkingMode)) {
+              thinkingModeSelect.value = draft.thinkingMode;
+            }
+            currentThinkPart = draft.thinkPart || "";
+            currentHtml = draft.html || "";
+            if (currentThinkPart) {
+              thinkCode.textContent = currentThinkPart;
+            }
+            const completeClean =
+              currentHtml && !isPlaceholderStub(currentHtml) && /<\/html>/i.test(currentHtml) && !draft.lastError;
+            if (completeClean) {
+              originalGeneratedHtml = currentHtml;
+              renderHtmlInSandbox(currentHtml, "restored-session");
+              restoredFromDraft = true;
+            } else if (draft.lastError || (currentHtml && !/<\/html>/i.test(currentHtml))) {
+              if (currentHtml) {
+                htmlCode.textContent = currentHtml;
+                repairTextarea.value = currentHtml;
+              }
+              updateRecoveryBar({
+                reasonTitle: "Recovered Previous Session — Ready to Continue on WebGPU",
+                detailText: draft.lastError || "Previous generation stopped before completing </html>.",
+                errorLine: Number(draft.lastErrorLine || 0),
+              });
+              restoredFromDraft = true;
+            }
+          }
+        }
+      } catch {
+        // Ignore corrupt draft
+      }
+
+      const stats = await refreshTelemetryCount();
+      if (!restoredFromDraft && stats && Array.isArray(stats.recent) && stats.recent.length > 0) {
+        const recent = stats.recent;
+        const lastEv = recent[recent.length - 1];
+        if (
+          lastEv &&
+          lastEv.prompt &&
+          (lastEv.event_type === "sandbox_runtime_error" ||
+            (lastEv.event_type === "generation_complete" && Number(lastEv.html_length || 0) < 1800))
+        ) {
+          promptInput.value = lastEv.prompt;
+          if (lastEv.model_id && !String(lastEv.model_id).startsWith("benchmark:")) {
+            modelSelect.value = lastEv.model_id;
+          }
+          const errText =
+            lastEv.error_message || `Incomplete output (${lastEv.html_length || 0} chars)`;
+          appendWorkerLog(`Auto-detected interrupted session in telemetry: ${errText}`);
+          updateRecoveryBar({
+            reasonTitle: "Detected Interrupted Browser Session — Pick Up & Complete",
+            detailText:
+              `Recovered prompt from telemetry after "${errText}" (caused by disabled <think> emitting a placeholder '...' stub).\n` +
+              `Click Continue below to jump directly into full standalone Three.js HTML generation on WebGPU (~1.5–2 min).`,
+            errorLine: 0,
+          });
+        }
+      }
+    }
+
+    async function initPlayground() {
+      checkWebGPU();
+      await loadCatalogs();
+      await restoreSessionOrTelemetry();
+      syncVisionControlForModel();
+    }
+
+    initPlayground();
+  </script>
+</body>
+</html>

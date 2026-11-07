@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Winter Snowglobe — Three.js</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #b9d7d3;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .title-card {
+      position: fixed;
+      top: clamp(22px, 4vw, 48px);
+      left: clamp(22px, 4vw, 54px);
+      z-index: 2;
+      pointer-events: none;
+      color: #fffaf0;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    .eyebrow {
+      margin-bottom: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(34px, 5vw, 72px);
+      font-weight: 400;
+      line-height: 0.94;
+      letter-spacing: -0.045em;
+    }
+
+    .subtitle {
+      max-width: 330px;
+      margin-top: 18px;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: fixed;
+      right: clamp(16px, 3vw, 40px);
+      bottom: clamp(16px, 3vw, 36px);
+      z-index: 2;
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      background: rgba(36, 55, 56, 0.48);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16);
+      backdrop-filter: blur(14px);
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 999px;
+      padding: 10px 15px;
+      color: #fffaf0;
+      background: rgba(36, 55, 56, 0.48);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    }
+
+    button:hover {
+      border-color: rgba(255, 255, 255, 0.48);
+      background: rgba(61, 72, 73, 0.68);
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 20px;
+        left: 20px;
+      }
+
+      .subtitle {
+        max-width: 230px;
+        font-size: 11px;
+      }
+
+      .controls {
+        right: 20px;
+        bottom: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="title-card">
+    <div class="eyebrow">A quiet winter evening</div>
+    <h1>Snowglobe</h1>
+    <p class="subtitle">
+      A carved wooden base, glowing cabin windows, pine trees, and a tiny
+      snowman drifting through the frosty air.
+    </p>
+  </div>
+
+  <div class="controls">
+    <button id="reset" type="button">Reset view</button>
+  </div>
+
+  <script type="module">
+    window.addEventListener('error', (e) => {
+        console.log('CAPTURED ERROR:', e.message, 'AT', e.filename, ':', e.lineno, e.error?.stack);
+    });
+
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera, and skybox
+    // -------------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional winter scene with a snowglobe and pine trees"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0xb9d7d3);
+    scene.fog = new THREE.Fog(0xb9d7d3, 42, 88);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      140
+    );
+    window.camera = camera;
+
+    // -------------------------------------------------------------------------
+    // Custom camera controls: orbit, zoom, and reset
+    // -------------------------------------------------------------------------
+
+    const cameraState = {
+      yaw: 0.72,
+      pitch: 0.82,
+      radius: 31.4,
+      target: new THREE.Vector3(0, 2.1, 0)
+    };
+
+    const defaultCameraState = { ...cameraState };
+
+    function resetView() {
+      cameraState.yaw = defaultCameraState.yaw;
+      cameraState.pitch = defaultCameraState.pitch;
+      cameraState.radius = defaultCameraState.radius;
+      cameraState.target.copy(defaultCameraState.target);
+    }
+
+    let dragging = false;
+    let pointerX = 0;
+    let pointerY = 0;
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.classList.add("dragging");
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - pointerX;
+      const dy = event.clientY - pointerY;
+
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+
+      cameraState.target.x += dx * 0.006;
+      cameraState.target.y -= dy * 0.006;
+
+      cameraState.pitch -= dx * 0.005;
+      cameraState.pitch = THREE.MathUtils.clamp(
+        cameraState.pitch,
+        0.32,
+        1.48
+      );
+    });
+
+    function endDrag(event) {
+      dragging = false;
+
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+
+        cameraState.radius *= Math.exp(event.deltaY * 0.001);
+        cameraState.radius = THREE.MathUtils.clamp(
+          cameraState.radius,
+          14,
+          52
+        );
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetView);
+
+    document.getElementById("reset").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r") {
+        resetView();
+      }
+
+      // A quick keyboard navigation keeps the orbit and zoom responsive.
+      if (event.key === "ArrowLeft") cameraState.pitch -= 0.08;
+      if (event.key === "ArrowRight") cameraState.pitch += 0.08;
+      if (event.key === "ArrowUp") {
+        cameraState.radius = Math.max(
+          14,
+          cameraState.radius - 0.05
+        );
+      }
+      if (event.key === "ArrowDown") {
+        cameraState.radius = Math.min(
+          52,
+          cameraState.radius + 0.05
+        );
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+
+    const hemisphere = new THREE.HemisphereLight(0xd9ecf2, 0x71809d, 1.55);
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffedcf, 3.2);
+    sun.position.set(-6, 11, 7);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -9;
+    sun.shadow.camera.right = 9;
+    sun.shadow.camera.top = 10;
+    sun.shadow.camera.bottom = -5;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 30;
+    sun.shadow.bias = -0.00035;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xb8d9df, 0.78);
+    fill.position.set(7, 5, 3);
+    scene.add(fill);
+
+    // -------------------------------------------------------------------------
+    // Snowglobe base and carved wooden base
+    // -------------------------------------------------------------------------
+
+    function makeSnowTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#c7dce8";
+      ctx.fillRect(0, 0, 256, 256);
+
+      for (let i = 0; i < 70; i++) {
+        const light = Math.random() > 0.5;
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+
+        ctx.strokeStyle = light
+          ? `rgba(255,255,255,${Math.random() * 0.08})`
+          : `rgba(35,47,53,${Math.random() * 0.12})`;
+
+        ctx.lineWidth = 0.4 + Math.random() * 1.6;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.bezierCurveTo(
+          x + Math.random() * 8 - 4,
+          y + Math.random() * 7 - 3,
+          x + Math.random() * 12 - 6,
+          y + Math.random() * 9 - 4,
+          x + Math.random() * 16 - 8,
+          y + Math.random() * 11 - 5
+        );
+        ctx.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1.8, 1.8);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      return texture;
+    }
+
+    const snowTexture = makeSnowTexture();
+
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      map: snowTexture,
+      roughness: 0.98,
+      metalness: 0
+    });
+
+    const woodenMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.78,
+      metalness: 0
+    });
+
+    const woodEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe8d5c1,
+      roughness: 0.75,
+      metalness: 0
+    });
+
+    const darkWoodMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.8,
+      metalness: 0
+    });
+
+    const blackMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111820,
+      roughness: 0.7
+    });
+
+    const windowMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xffe5a8,
+      emissive: 0xffaa75,
+      emissiveIntensity: 2.4,
+      roughness: 0.18,
+      metalness: 0.1,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.22
+    });
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe9dce4,
+      roughness: 1
+    });
+
+    // -------------------------------------------------------------------------
+    // Snowglobe shell, dome, and carved wooden base
+    // -------------------------------------------------------------------------
+
+    const domeRadius = 2.35;
+    const domeHeight = 2.25;
+
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(domeRadius, 64, 40),
+      [windowMaterial, windowMaterial]
+    );
+
+    dome.position.y = domeHeight / 2;
+    dome.scale.z = domeHeight / domeRadius;
+    dome.castShadow = true;
+    dome.receiveShadow = true;
+
+    scene.add(dome);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80),
+      groundMaterial
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -1.05;
+    ground.receiveShadow = true;
+
+    scene.add(ground);
+
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.18, 3.32, 0.48, 96),
+      [woodenMaterial, darkWoodMaterial]
+    );
+
+    base.position.y = -1.22;
+    base.castShadow = true;
+    base.receiveShadow = true;
+
+    scene.add(base);
+
+    // A raised wooden ring around the dome and carved pine-wood base.
+    const outerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(3.32, 0.13, 24, 96),
+      [woodEdgeMaterial, woodEdgeMaterial]
+    );
+
+    outerRing.position.y = 1.42;
+    outerRing.castShadow = true;
+    scene.add(outerRing);
+
+    const innerBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.02, 3.02, 0.34, 96),
+      [woodenMaterial, darkWoodMaterial]
+    );
+
+    innerBase.position.y = 1.14;
+    innerBase.castShadow = true;
+    scene.add(innerBase);
+
+    // -------------------------------------------------------------------------
+    // Two cabin windows with warm interior light
+    // -------------------------------------------------------------------------
+
+    function createWindowGeometry() {
+      const width = 3.25;
+      const height = 1.52;
+
+      const shape = new THREE.Shape();
+
+      shape.moveTo(-width / 2, -height / 2);
+      shape.lineTo(width / 2, -height / 2);
+      shape.lineTo(width / 2, -height * 0.72);
+      shape.quadraticCurveTo(
+        width / 2,
+        -height * 1.48,
+        width / 2 - 0.08,
+        -height * 1.63
+      );
+      shape.lineTo(-width / 2, -height * 1.63);
+      shape.quadraticCurveTo(
+        -width / 2,
+        -height * 1.48,
+        -width / 2,
+        -height * 0.72
+      );
+      shape.lineTo(-width / 2, -height / 2);
+
+      const bevel = 0.11;
+      const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: height,
+        steps: 1,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 3
+      });
+
+      geometry.rotateX(-Math.PI / 2);
+
+      const postGeometry = new THREE.CylinderGeometry(0.055, 0.055, 1.08, 12);
+      postGeometry.rotateY(Math.PI / 2);
+
+      return { geometry, postGeometry };
+    }
+
+    function createWindow(
+      x,
+      y,
+      z,
+      width,
+      height,
+      rotation,
+      material
+    ) {
+      const g = createWindowGeometry();
+      const mesh = new THREE.Mesh(
+        g.geometry || g,
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = rotation;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      scene.add(mesh);
+
+      return mesh;
+    }
+
+    // Window 1.
+    createWindow(
+      -1.65,
+      2.82,
+      0.32,
+      1.22,
+      1.58,
+      Math.PI / 2,
+      windowMaterial
+    );
+
+    // Window 2.
+    createWindow(
+      1.35,
+      2.82,
+      -0.16,
+      1.12,
+      1.52,
+      Math.PI / 2,
+      windowMaterial
+    );
+
+    function updateCamera() {
+      const horizontal = Math.sin(cameraState.pitch) * cameraState.radius;
+      camera.position.set(
+        cameraState.target.x + horizontal * Math.sin(cameraState.yaw),
+        cameraState.target.y + Math.cos(cameraState.pitch) * cameraState.radius,
+        cameraState.target.z + horizontal * Math.cos(cameraState.yaw)
+      );
+      camera.lookAt(cameraState.target);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(animate);
+
+  </script>
+</body>
+</html>

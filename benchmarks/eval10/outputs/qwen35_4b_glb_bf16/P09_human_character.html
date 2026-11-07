@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Low-Poly Adventurer — GLB Asset Creator</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #182027;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: min(340px, calc(100vw - 40px));
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      color: #edf3f7;
+      background: rgba(20, 28, 34, 0.82);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #aebbc5;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px 14px;
+      border: 0;
+      border-radius: 9px;
+      color: #172027;
+      background: #d7b56d;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+      transition: background 150ms ease, transform 150ms ease;
+    }
+
+    button:hover {
+      background: #e8c985;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
+
+    .hint {
+      margin-top: 10px;
+      margin-bottom: 0;
+      font-size: 11px;
+      color: #84939f;
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 8px;
+      color: #9fc6b0;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Low-Poly Adventurer</h1>
+    <p>
+      A stylized fantasy traveler with a breathing-ready static pose, layered clothing,
+      belt pouch, scarf, and leather backpack.
+    </p>
+    <button id="exportButton" type="button">Export GLB</button>
+    <div id="status"></div>
+    <p class="hint">Drag to orbit · Scroll to zoom · The exported file contains only the character.</p>
+  </section>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    // -------------------------------------------------------------------------
+    // Renderer, camera, and lighting
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x182027);
+    scene.fog = new THREE.Fog(0x182027, 8, 15);
+
+    const camera = new THREE.PerspectiveCamera(
+      36,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(4.1, 3.05, 6.4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.55, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 10;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    scene.add(new THREE.HemisphereLight(0xc9e4ff, 0x4b3828, 2.0));
+
+    const keyLight = new THREE.DirectionalLight(0xffe2b5, 3.1);
+    keyLight.position.set(4.5, 7, 5.5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -4;
+    keyLight.shadow.camera.right = 4;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -2;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0x89baff, 1.6);
+    rimLight.position.set(-4, 3.5, -5);
+    scene.add(rimLight);
+
+    const fillLight = new THREE.PointLight(0xffa965, 0.7, 10);
+    fillLight.position.set(-2, 1.8, 3);
+    scene.add(fillLight);
+
+    // Ground is kept outside the exported asset.
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(4.5, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x303a40,
+        roughness: 0.96,
+        metalness: 0
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.015;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const groundRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.25, 2.29, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0x68757c,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      })
+    );
+    groundRing.rotation.x = -Math.PI / 2;
+    groundRing.position.y = 0.002;
+    scene.add(groundRing);
+
+    // -------------------------------------------------------------------------
+    // Character materials
+    // -------------------------------------------------------------------------
+
+    const material = (color, options = {}) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.82,
+        metalness: 0.02,
+        flatShading: true,
+        ...options
+      });
+
+    const mats = {
+      skin: material(0xc98f67, { roughness: 0.9 }),
+      skinLight: material(0xd9a178, { roughness: 0.9 }),
+      hair: material(0x38251d, { roughness: 0.95 }),
+      tunic: material(0x56735a, { roughness: 0.95 }),
+      tunicDark: material(0x3f5946, { roughness: 0.95 }),
+      tunicLight: material(0x6b8564, { roughness: 0.95 }),
+      leather: material(0x74452c, { roughness: 0.88 }),
+      leatherDark: material(0x4c2e21, { roughness: 0.92 }),
+      leatherLight: material(0x95613a, { roughness: 0.86 }),
+      scarf: material(0xb54c3d, { roughness: 0.95 }),
+      scarfDark: material(0x84372f, { roughness: 0.95 }),
+      metal: material(0xb58a45, {
+        roughness: 0.48,
+        metalness: 0.55
+      }),
+      eye: material(0x241b18, { roughness: 0.7 }),
+      pocket: material(0x633925, { roughness: 0.92 }),
+      stitch: material(0xd2ad72, { roughness: 0.9 })
+    };
+
+    // -------------------------------------------------------------------------
+    // Character root
+    // -------------------------------------------------------------------------
+
+    const adventurer = new THREE.Group();
+    adventurer.name = "LowPoly_Adventurer";
+    scene.add(adventurer);
+
+    const character = new THREE.Group();
+    character.name = "Character";
+    adventurer.add(character);
+
+    function mesh(geometry, mat, name, parent = character) {
+      const object = new THREE.Mesh(geometry, mat);
+      object.name = name;
+      object.castShadow = true;
+      object.receiveShadow = true;
+      parent.add(object);
+      return object;
+    }
+
+    function box(w, h, d, mat, name, position, parent = character) {
+      const object = mesh(new THREE.BoxGeometry(w, h, d), mat, name, parent);
+      object.position.set(...position);
+      return object;
+    }
+
+    function cylinderBetween(a, b, radiusTop, radiusBottom, mat, name, parent = character) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+
+      const object = mesh(
+        new THREE.CylinderGeometry(radiusTop, radiusBottom, length, 7, 1, false),
+        mat,
+        name,
+        parent
+      );
+
+      object.position.copy(start).add(end).multiplyScalar(0.5);
+      object.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      return object;
+    }
+
+    function addFacetedSphere(radius, mat, name, position, scale = [1, 1, 1], parent = character) {
+      const object = mesh(
+        new THREE.IcosahedronGeometry(radius, 1),
+        mat,
+        name,
+        parent
+      );
+      object.position.set(...position);
+      object.scale.set(...scale);
+      return object;
+    }
+
+    // -------------------------------------------------------------------------
+    // Legs and boots
+    // -------------------------------------------------------------------------
+
+    const legPositions = [-0.25, 0.25];
+
+    legPositions.forEach((x, index) => {
+      const leg = mesh(
+        new THREE.CylinderGeometry(0.19, 0.16, 0.73, 7),
+        index === 0 ? mats.tunicDark : mats.tunic,
+        index === 0 ? "Left_Leg" : "Right_Leg"
+      );
+      leg.position.set(x, 0.68, 0);
+      leg.scale.z = 0.88;
+
+      const boot = box(
+        0.34,
+        0.29,
+        0.52,
+        mats.leatherDark,
+        index === 0 ? "Left_Boot" : "Right_Boot",
+        [x, 0.16, 0.11]
+      );
+
+      // Boot toe and sole.
+      const toe = box(
+        0.34,
+        0.20,
+        0.24,
+        mats.leather,
+        index === 0 ? "Left_Boot_Toe" : "Right_Boot_Toe",
+        [x, 0.12, 0.39]
+      );
+      toe.rotation.x = -0.08;
+
+      const sole = box(
+        0.37,
+        0.065,
+        0.58,
+        mats.leatherDark,
+        index === 0 ? "Left_Boot_Sole" : "Right_Boot_Sole",
+        [x, 0.035, 0.10]
+      );
+
+      // Small boot straps.
+      const strap = box(
+        0.36,
+        0.055,
+        0.08,
+        mats.leatherLight,
+        index === 0 ? "Left_Boot_Strap" : "Right_Boot_Strap",
+        [x, 0.28, 0.17]
+      );
+      strap.rotation.x = -0.18;
+
+      const buckle = box(
+        0.085,
+        0.075,
+        0.04,
+        mats.metal,
+        index === 0 ? "Left_Boot_Buckle" : "Right_Boot_Buckle",
+        [x, 0.27, 0.215]
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Tunic body and shoulders
+    // -------------------------------------------------------------------------
+
+    const torso = mesh(
+      new THREE.CylinderGeometry(0.48, 0.58, 1.12, 9),
+      mats.tunic,
+      "Tunic_Torso"
+    );
+    torso.position.set(0, 1.52, 0);
+    torso.scale.z = 0.76;
+
+    const hem = mesh(
+      new THREE.CylinderGeometry(0.58, 0.58, 0.09, 9),
+      mats.tunicDark,
+      "Tunic_Hem"
+    );
+    hem.position.set(0, 1.02, 0);
+    hem.scale.z = 0.76;
+
+    const chest = mesh(
+      new THREE.CylinderGeometry(0.49, 0.46, 0.28, 9),
+      mats.tunicLight,
+      "Tunic_Chest_Yoke"
+    );
+    chest.position.set(0, 1.82, 0.015);
+    chest.scale.z = 0.78;
+
+    const collar = mesh(
+      new THREE.CylinderGeometry(0.19, 0.23, 0.18, 8),
+      mats.tunicDark,
+      "Tunic_Collar"
+    );
+    collar.position.set(0, 2.10, 0);
+
+    // Shoulder caps.
+    addFacetedSphere(0.25, mats.tunicLight, "Left_Shoulder", [-0.43, 1.91, 0]);
+    addFacetedSphere(0.25, mats.tunicLight, "Right_Shoulder", [0.43, 1.91, 0]);
+
+    // -------------------------------------------------------------------------
+    // Arms in a calm breathing pose
+    // -------------------------------------------------------------------------
+
+    const leftShoulder = [-0.43, 1.87, 0.0];
+    const leftElbow = [-0.59, 1.43, 0.03];
+    const leftWrist = [-0.64, 1.05, 0.10];
+
+    const rightShoulder = [0.43, 1.87, 0.0];
+    const rightElbow = [0.57, 1.44, -0.01];
+    const rightWrist = [0.61, 1.06, 0.02];
+
+    cylinderBetween(
+      leftShoulder,
+      leftElbow,
+      0.18,
+      0.16,
+      mats.tunic,
+      "Left_Upper_Sleeve"
+    );
+    cylinderBetween(
+      leftElbow,
+      leftWrist,
+      0.15,
+      0.12,
+      mats.tunicLight,
+      "Left_Forearm_Sleeve"
+    );
+
+    cylinderBetween(
+      rightShoulder,
+      rightElbow,
+      0.18,
+      0.16,
+      mats.tunic,
+      "Right_Upper_Sleeve"
+    );
+    cylinderBetween(
+      rightElbow,
+      rightWrist,
+      0.15,
+      0.12,
+      mats.tunicLight,
+      "Right_Forearm_Sleeve"
+    );
+
+    // Cuffs.
+    const leftCuff = mesh(
+      new THREE.CylinderGeometry(0.135, 0.135, 0.10, 7),
+      mats.leather,
+      "Left_Cuff"
+    );
+    leftCuff.position.set(-0.64, 1.08, 0.09);
+    leftCuff.rotation.z = -0.12;
+
+    const rightCuff = mesh(
+      new THREE.CylinderGeometry(0.135, 0.135, 0.10, 7),
+      mats.leather,
+      "Right_Cuff"
+    );
+    rightCuff.position.set(0.61, 1.08, 0.02);
+    rightCuff.rotation.z = 0.10;
+
+    // Hands.
+    addFacetedSphere(0.14, mats.skin, "Left_Hand", [-0.66, 0.94, 0.11], [0.85, 1.12, 0.72]);
+    addFacetedSphere(0.14, mats.skin, "Right_Hand", [0.63, 0.94, 0.03], [0.85, 1.12, 0.72]);
+
+    // Fingers, kept simple and low-poly.
+    const leftFingers = [
+      [-0.72, 0.89, 0.14],
+      [-0.66, 0.87, 0.17],
+      [-0.60, 0.89, 0.16],
+      [-0.55, 0.92, 0.13]
+    ];
+    const rightFingers = [
+      [0.58, 0.89, 0.05],
+      [0.64, 0.87, 0.08],
+      [0.69, 0.89, 0.06],
+      [0.73, 0.92, 0.03]
+    ];
+
+    leftFingers.forEach((p, i) => {
+      addFacetedSphere(0.045, mats.skin, `Left_Finger_${i + 1}`, p, [0.75, 1.25, 0.75]);
+    });
+    rightFingers.forEach((p, i) => {
+      addFacetedSphere(0.045, mats.skin, `Right_Finger_${i + 1}`, p, [0.75, 1.25, 0.75]);
+    });
+
+    // -------------------------------------------------------------------------
+    // Belt, buckle, and pouch
+    // -------------------------------------------------------------------------
+
+    const belt = mesh(
+      new THREE.CylinderGeometry(0.565, 0.565, 0.13, 10),
+      mats.leatherDark,
+      "Belt"
+    );
+    belt.position.set(0, 1.12, 0);
+    belt.scale.z = 0.78;
+
+    const buckle = box(
+      0.19,
+      0.16,
+      0.07,
+      mats.metal,
+      "Belt_Buckle",
+      [0, 1.12, 0.455]
+    );
+
+    const buckleInset = box(
+      0.105,
+      0.075,
+      0.025,
+      mats.leatherDark,
+      "Belt_Buckle_Inset",
+      [0, 1.12, 0.50]
+    );
+
+    // Pouch on the character's right hip.
+    const pouch = box(
+      0.38,
+      0.39,
+      0.23,
+      mats.leather,
+      "Belt_Pouch",
+      [0.48, 0.98, 0.17]
+    );
+    pouch.rotation.z = -0.08;
+
+    const pouchFlap = box(
+      0.40,
+      0.15,
+      0.25,
+      mats.leatherLight,
+      "Pouch_Flap",
+      [0.48, 1.11, 0.18]
+    );
+    pouchFlap.rotation.z = -0.08;
+
+    const pouchButton = mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.025, 7),
+      mats.metal,
+      "Pouch_Button"
+    );
+    pouchButton.rotation.x = Math.PI / 2;
+    pouchButton.position.set(0.48, 1.04, 0.315);
+
+    // Pouch stitching.
+    const stitch = box(
+      0.29,
+      0.018,
+      0.015,
+      mats.stitch,
+      "Pouch_Stitching",
+      [0.48, 0.84, 0.302]
+    );
+
+    // -------------------------------------------------------------------------
+    // Scarf around the neck
+    // -------------------------------------------------------------------------
+
+    const scarfRing = mesh(
+      new THREE.TorusGeometry(0.265, 0.085, 5, 10),
+      mats.scarf,
+      "Scarf_Collar"
+    );
+    scarfRing.rotation.x = Math.PI / 2;
+    scarfRing.position.set(0, 2.13, 0);
+    scarfRing.scale.z = 0.88;
+
+    const scarfTail = box(
+      0.18,
+      0.48,
+      0.075,
+      mats.scarf,
+      "Scarf_Tail",
+      [-0.25, 1.94, 0.285],
+      character
+    );
+    scarfTail.rotation.z = -0.16;
+
+    const scarfTailEnd = box(
+      0.19,
+      0.07,
+      0.08,
+      mats.scarfDark,
+      "Scarf_Tail_End",
+      [-0.28, 1.69, 0.295],
+      character
+    );
+    scarfTailEnd.rotation.z = -0.16;
+
+    // -------------------------------------------------------------------------
+    // Leather backpack
+    // -------------------------------------------------------------------------
+
+    const backpack = new THREE.Group();
+    backpack.name = "Leather_Backpack";
+    character.add(backpack);
+
+    const packBody = box(
+      0.72,
+      0.88,
+      0.27,
+      mats.leather,
+      "Backpack_Main",
+      [0, 1.63, -0.42],
+      backpack
+    );
+    packBody.rotation.x = -0.03;
+
+    const packFlap = box(
+      0.75,
+      0.25,
+      0.30,
+      mats.leatherLight,
+      "Backpack_Flap",
+      [0, 1.94, -0.43],
+      backpack
+    );
+    packFlap.rotation.x = -0.08;
+
+    const packLower = box(
+      0.66,
+      0.18,
+      0.29,
+      mats.leatherDark,
+      "Backpack_Lower_Panel",
+      [0, 1.31, -0.43],
+      backpack
+    );
+
+    // Front-facing pack straps.
+    const leftStrap = box(
+      0.11,
+      0.78,
+      0.055,
+      mats.leatherDark,
+      "Backpack_Left_Strap",
+      [-0.25, 1.63, 0.39],
+      backpack
+    );
+    leftStrap.rotation.z = -0.04;
+
+    const rightStrap = box(
+      0.11,
+      0.78,
+      0.055,
+      mats.leatherDark,
+      "Backpack_Right_Strap",
+      [0.25, 1.63, 0.39],
+      backpack
+    );
+    rightStrap.rotation.z = 0.04;
+
+    // Shoulder straps over the shoulders.
+    const leftShoulderStrap = box(
+      0.12,
+      0.28,
+      0.07,
+      mats.leatherDark,
+      "Backpack_Left_Shoulder_Strap",
+      [-0.36, 1.94, 0.16],
+      backpack
+    );
+    leftShoulderStrap.rotation.z = -0.35;
+
+    const rightShoulderStrap = box(
+      0.12,
+      0.28,
+      0.07,
+      mats.leatherDark,
+      "Backpack_Right_Shoulder_Strap",
+      [0.36, 1.94, 0.16],
+      backpack
+    );
+    rightShoulderStrap.rotation.z = 0.35;
+
+    // Pack pocket.
+    const packPocket = box(
+      0.42,
+      0.27,
+      0.12,
+      mats.leatherLight,
+      "Backpack_Pocket",
+      [0, 1.46, -0.62],
+      backpack
+    );
+    packPocket.rotation.x = 0.08;
+
+    const packPocketFlap = box(
+      0.44,
+      0.10,
+      0.14,
+      mats.leatherDark,
+      "Backpack_Pocket_Flap",
+      [0, 1.57, -0.64],
+      backpack
+    );
+
+    // Buckle and stitching on the pack.
+    const packBuckle = box(
+      0.11,
+      0.10,
+      0.04,
+      mats.metal,
+      "Backpack_Buckle",
+      [0, 1.78, -0.67],
+      backpack
+    );
+
+    const packStitch = box(
+      0.54,
+      0.018,
+      0.015,
+      mats.stitch,
+      "Backpack_Stitching",
+      [0, 1.34, -0.59],
+      backpack
+    );
+
+    // -------------------------------------------------------------------------
+    // Head, face, hair, and beard
+    // -------------------------------------------------------------------------
+
+    const neck = mesh(
+      new THREE.CylinderGeometry(0.14, 0.16, 0.20, 8),
+      mats.skin,
+      "Neck"
+    );
+    neck.position.set(0, 2.19, 0);
+
+    const head = addFacetedSphere(
+      0.35,
+      mats.skinLight,
+      "Head",
+      [0, 2.48, 0.02],
+      [0.92, 1.12, 0.90]
+    );
+
+    // Ears.
+    addFacetedSphere(0.09, mats.skin, "Left_Ear", [-0.32, 2.46, 0.0], [0.55, 1.0, 0.75]);
+    addFacetedSphere(0.09, mats.skin, "Right_Ear", [0.32, 2.46, 0.0], [0.55, 1.0, 0.75]);
+
+    // Hair cap and rear hair mass.
+    const hairCap = mesh(
+      new THREE.SphereGeometry(0.365, 9, 5, 0, Math.PI * 2, 0, Math.PI * 0.56),
+      mats.hair,
+      "Hair_Cap"
+    );
+    hairCap.position.set(0, 2.51, -0.015);
+    hairCap.scale.z = 0.91;
+
+    addFacetedSphere(
+      0.28,
+      mats.hair,
+      "Hair_Back",
+      [0, 2.46, -0.17],
+      [1.0, 1.15, 0.72]
+    );
+
+    // Beard as a low-poly tapered shape.
+    const beard = mesh(
+      new THREE.ConeGeometry(0.235, 0.34, 6),
+      mats.hair,
+      "Beard"
+    );
+    beard.position.set(0, 2.28, 0.245);
+    beard.rotation.x = Math.PI;
+    beard.scale.z = 0.70;
+
+    // Nose.
+    const nose = mesh(
+      new THREE.ConeGeometry(0.065, 0.16, 5),
+      mats.skin,
+      "Nose"
+    );
+    nose.rotation.x = Math.PI / 2;
+    nose.position.set(0, 2.46, 0.315);
+
+    // Eyes.
+    const leftEye = addFacetedSphere(
+      0.048,
+      mats.eye,
+      "Left_Eye",
+      [-0.115, 2.55, 0.285],
+      [0.85, 0.72, 0.55]
+    );
+    const rightEye = addFacetedSphere(
+      0.048,
+      mats.eye,
+      "Right_Eye",
+      [0.115, 2.55, 0.285],
+      [0.85, 0.72, 0.55]
+    );
+
+    // Brows.
+    const leftBrow = box(
+      0.13,
+      0.026,
+      0.025,
+      mats.hair,
+      "Left_Brow",
+      [-0.115, 2.64, 0.293]
+    );
+    leftBrow.rotation.z = -0.08;
+
+    const rightBrow = box(
+      0.13,
+      0.026,
+      0.025,
+      mats.hair,
+      "Right_Brow",
+      [0.115, 2.64, 0.293]
+    );
+    rightBrow.rotation.z = 0.08;
+
+    // Mouth and mustache.
+    const mouth = box(
+      0.12,
+      0.022,
+      0.02,
+      mats.skin,
+      "Mouth",
+      [0, 2.31, 0.315]
+    );
+
+    const mustacheLeft = box(
+      0.10,
+      0.04,
+      0.035,
+      mats.hair,
+      "Mustache_Left",
+      [-0.065, 2.365, 0.307]
+    );
+    mustacheLeft.rotation.z = -0.14;
+
+    const mustacheRight = box(
+      0.10,
+      0.04,
+      0.035,
+      mats.hair,
+      "Mustache_Right",
+      [0.065, 2.365, 0.307]
+    );
+    mustacheRight.rotation.z = 0.14;
+
+    // -------------------------------------------------------------------------
+    // Subtle idle breathing pose and additional clothing details
+    // -------------------------------------------------------------------------
+
+    // Slight asymmetry in the torso suggests a relaxed breathing stance.
+    const chestAsset = mesh(
+      new THREE.CylinderGeometry(0.49, 0.46, 0.28, 9),
+      mats.tunicLight,
+      "Tunic_Chest_Yoke"
+    );
+    chestAsset.position.set(0.015, 1.82, 0.015);
+    chestAsset.scale.z = 0.78;
+    chestAsset.rotation.z = -0.025;
+
+    // Belt pouch with a subtle flap angle.
+    pouch.rotation.z = -0.045;
+
+    // Small neck scarf tail.
+    scarfTail.rotation.z = -0.11;
+
+    // Pack straps adjusted as if the character has been breathing deeply.
+    leftStrap.rotation.z = -0.025;
+    rightStrap.rotation.z = 0.025;
+
+    // Ground contact shadows.
+    adventurer.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Animation
+    // -------------------------------------------------------------------------
+
+    // The requested pose is static; no animation clips are added.
+    character.userData.assetType = "Static low-poly character";
+    character.userData.pose = "Relaxed idle breathing pose";
+
+    // -------------------------------------------------------------------------
+    // GLB export
+    // -------------------------------------------------------------------------
+
+    const exporter = new GLTFExporter();
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      // Export only the character hierarchy, excluding the ground and lights.
+      exporter.parse(
+        adventurer,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "low-poly-adventurer.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB downloaded successfully.";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed. See the browser console.";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: true,
+          includeCustomExtensions: true
+        }
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Very subtle ambient motion only; the exported character remains static.
+      groundRing.material.opacity = 0.26 + Math.sin(performance.now() * 0.0015) * 0.045;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

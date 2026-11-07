@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stylized Fox Character</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #101820;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+    }
+
+    #stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .panel {
+      position: fixed;
+      top: 24px;
+      left: 26px;
+      z-index: 2;
+      width: min(360px, calc(100vw - 52px));
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 16px;
+      background: linear-gradient(
+        145deg,
+        rgba(19, 22, 25, 0.92),
+        rgba(8, 11, 15, 0.96)
+      );
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px);
+    }
+
+    .eyebrow {
+      margin-bottom: 9px;
+      color: #d8a67e;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(23px, 2vw, 31px);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 12px 0 16px;
+      color: #9aa3a1;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 12px 17px;
+      color: #f5f3ed;
+      background: linear-gradient(135deg, #d9b87e, #c98a55);
+      box-shadow: 0 7px 18px rgba(196, 179, 107, 0.22);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.15);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.primary {
+      color: #211820;
+      background: linear-gradient(135deg, #ffd59f, #e4b77a);
+      box-shadow: 0 6px 18px rgba(227, 190, 109, 0.25);
+    }
+
+    button.primary:hover {
+      filter: brightness(1.35);
+      transform: translateY(2px);
+    }
+
+    #status {
+      min-height: 16px;
+      margin-top: 12px;
+      color: #9aa3a1;
+      font-size: 11px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 26px;
+      bottom: 24px;
+      z-index: 2;
+      padding: 8px 11px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(9, 14, 19, 0.55);
+      color: #aab9b3;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 16px;
+        left: 16px;
+        width: calc(100vw - 32px);
+        padding: 16px;
+      }
+
+      .hint {
+        right: 16px;
+        bottom: 16px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="stage"></div>
+
+  <section class="panel">
+    <p class="eyebrow">Low-poly character asset</p>
+    <h1>Attentive Fox</h1>
+    <p class="subtitle">
+      Stylized red fur, pointed ears, white chest tuft, and a large fluffy
+      tail. Ready for Godot import.
+    </p>
+
+    <div class="actions">
+      <button id="resetView" type="button">Reset View</button>
+      <button id="exportGLB" class="primary" type="button">Export GLB</button>
+      <span id="status">Static asset</span>
+    </div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x101820);
+    scene.fog = new THREE.FogExp2(0x101820, 0.045);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    document.body.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    camera.position.set(8.5, 5.8, 9.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.35, -0.15);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 7;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    const hemisphere = new THREE.HemisphereLight(0x9ddcff, 0x24101a, 2.1);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xe6dfb3, 4.1);
+    keyLight.position.set(7, 12, 10);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -10;
+    keyLight.shadow.camera.right = 10;
+    keyLight.shadow.camera.top = 10;
+    keyLight.shadow.camera.bottom = -10;
+    keyLight.shadow.camera.near = 1;
+    keyLight.shadow.camera.far = 30;
+    keyLight.shadow.bias = -0.0004;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x7bcfff, 1.35);
+    fillLight.position.set(-9, 8, -8);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffbdff, 2.1);
+    rimLight.position.set(3, 7, -12);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const materials = {
+      red: new THREE.MeshStandardMaterial({
+        color: 0xd9b77a,
+        roughness: 0.76,
+        metalness: 0.05
+      }),
+      redDark: new THREE.MeshStandardMaterial({
+        color: 0xb94218,
+        roughness: 0.86,
+        metalness: 0.02
+      }),
+
+      white: new THREE.MeshStandardMaterial({
+        color: 0xf5f3e7,
+        roughness: 0.95,
+        metalness: 0.02
+      }),
+
+      whiteLight: new THREE.MeshStandardMaterial({
+        color: 0xe8f2ff,
+        roughness: 0.98,
+        metalness: 0.00
+      }),
+
+      cream: new THREE.MeshStandardMaterial({
+        color: 0xf7dfd6,
+        roughness: 0.95,
+        metalness: 0.01
+      }),
+
+      black: new THREE.MeshStandardMaterial({
+        color: 0x111820,
+        roughness: 0.92,
+        metalness: 0.03
+      }),
+
+      fur: new THREE.MeshStandardMaterial({
+        color: 0xd88a43,
+        roughness: 0.96,
+        metalness: 0.01
+      }),
+      furDark: new THREE.MeshStandardMaterial({
+        color: 0xa76f18,
+        roughness: 0.98,
+        metalness: 0.00
+      }),
+
+      eye: new THREE.MeshStandardMaterial({
+        color: 0xffc37a,
+        emissive: 0xff9b12,
+        emissiveIntensity: 1.8,
+        roughness: 0.25,
+        metalness: 0.45
+      }),
+      nose: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.95,
+        metalness: 0.02
+      })
+    };
+
+    // -------------------------------------------------------------------------
+    // Asset root and geometry helpers
+    // -------------------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "Stylized_Fox_Character";
+    scene.add(asset);
+
+    function addMesh(geometry, material, name, parent = asset) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function cylinderBetween(
+      start,
+      end,
+      radius,
+      material,
+      name,
+      parent = asset
+    ) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(radius, radius, length, 8);
+      const mesh = new THREE.Mesh(geometry, material);
+
+      mesh.name = name;
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Legs and feet
+    // -------------------------------------------------------------------------
+
+    const legPositions = [
+      {
+        hip: new THREE.Vector3(0, 1.38, 0),
+        knee: new THREE.Vector3(0, 0.72, 0),
+        ankle: new THREE.Vector3(0, 0.18, 0)
+      },
+      {
+        hip: new THREE.Vector3(0, 1.38, 0),
+        knee: new THREE.Vector3(0, 0.72, -0.07),
+        ankle: new THREE.Vector3(0, 0.18, -0.1)
+      },
+      {
+        hip: new THREE.Vector3(0, 1.38, 0),
+        knee: new THREE.Vector3(0, 0.72, 0.07),
+        ankle: new THREE.Vector3(0, 0.18, 0.1)
+      }
+    ];
+
+    for (const leg of legPositions) {
+      const side = leg.side % 2 === 0 ? "right" : "left";
+
+      // Lower leg
+      cylinderBetween(
+        leg.hip,
+        leg.knee,
+        0.16,
+        materials.white,
+        `White_Shin_${side}`
+      );
+
+      // Upper leg and feet
+      cylinderBetween(
+        leg.knee,
+        leg.ankle,
+        0.14,
+        materials.fur,
+        `Fur_Upper_Leg_${side}`
+      );
+
+      cylinderBetween(
+        leg.ankle,
+        new THREE.Vector3(0, 0.18, leg.side * 0.23),
+        0.11,
+        materials.black,
+        `Foot_${side}`
+      );
+
+      // Toe cap
+      const toe = new THREE.Mesh(
+        new THREE.ConeGeometry(0.105, 0.12, 6),
+        materials.furDark
+      );
+      toe.name = `Toe_Cap_${side}`;
+      toe.position.set(leg.ankle.x, leg.ankle.y + 0.03, side * 0.22);
+      toe.rotation.z = Math.PI / 2;
+      asset.add(toe);
+
+      // Large, low-poly talon
+      const foot = new THREE.Mesh(
+        new THREE.ConeGeometry(0.14, 0.16, 6),
+        materials.furDark
+      );
+      foot.name = `Talon_${side}`;
+      foot.position.set(leg.ankle.x, leg.ankle.y - 0.02, side * 0.22);
+      foot.rotation.z = Math.PI / 2;
+      asset.add(foot);
+
+      // White foot pad
+      const footPad = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.13, 0.08, 6),
+        materials.white
+      );
+      footPad.name = `Foot_Pad_${side}`;
+      footPad.position.set(leg.ankle.x, leg.ankle.y, side * 0.23);
+      footPad.castShadow = true;
+      asset.add(footPad);
+    }
+
+    // -------------------------------------------------------------------------
+    // Legs and feet
+    // -------------------------------------------------------------------------
+
+    function createLeg(name, z) {
+      const hip = new THREE.Vector3(0, 1.38, z);
+      const knee = new THREE.Vector3(0, 0.72, z);
+      const ankle = new THREE.Vector3(0, 0.18, z);
+
+      cylinderBetween(
+        hip,
+        knee,
+        0.16,
+        materials.white,
+        name
+      );
+
+      cylinderBetween(
+        knee,
+        ankle,
+        0.14,
+        materials.fur,
+        `Upper_Leg_${name}`
+      );
+
+      const foot = new THREE.Mesh(
+        new THREE.ConeGeometry(0.12, 0.16, 6),
+        materials.black
+      );
+      foot.name = `${name}_Foot`;
+      foot.position.copy(ankle);
+      foot.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      asset.add(foot);
+
+      const toe = new THREE.Mesh(
+        new THREE.ConeGeometry(0.105, 0.12, 6),
+        materials.furDark
+      );
+      toe.name = `${name}_Toe`;
+      toe.position.copy(ankle);
+      toe.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      toe.castShadow = true;
+      asset.add(toe);
+    }
+
+    createLeg("Right_Leg", -0.32);
+    createLeg("Left_Leg", 0.32);
+
+    // -------------------------------------------------------------------------
+    // Torso and chest
+    // -------------------------------------------------------------------------
+
+    const torso = new THREE.Group();
+    torso.name = "Torso";
+    asset.add(torso);
+
+    // Main torso
+    cylinderBetween(
+      new THREE.Vector3(0, 1.38, -0.32),
+      new THREE.Vector3(0, 2.08, -0.32),
+      0.15,
+      materials.white,
+      "Main_Torso"
+    );
+
+    // Red chest tuft
+    cylinderBetween(
+      new THREE.Vector3(0, 1.96, -0.32),
+      new THREE.Vector3(0, 2.13, -0.32),
+      0.075,
+      materials.red,
+      "Red_Chest_Tuft"
+    );
+
+    // Central chest paw
+    cylinderBetween(
+      new THREE.Vector3(0, 2.13, -0.32),
+      new THREE.Vector3(0, 2.13, -0.32),
+      0.17,
+      materials.fur,
+      "Chest_Paw"
+    );
+
+    // Red head and pointed ears
+    cylinderBetween(
+      new THREE.Vector3(0, 2.91, -0.32),
+      new THREE.Vector3(0, 2.91, -0.32),
+      0.12,
+      materials.red,
+      "Red_Head",
+      torso
+    );
+
+    const earPositions = [
+      [-0.15, -0.16],
+      [0.15, -0.16],
+      [-0.15, 0.16],
+      [0.15, 0.16]
+    ];
+
+    for (const [x, z] of earPositions) {
+      const ear = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.125, 0),
+        materials.furDark
+      );
+      ear.name = `Pointed_Ear_${z}`;
+      ear.position.set(x, 2.91, z);
+      asset.add(ear);
+
+      // Small red points make the pointed ears more readable.
+      const tip = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.045, 0),
+        materials.red
+      );
+      tip.name = `Ear_${z}`;
+      tip.position.set(x, 2.91, z + 0.17);
+      asset.add(tip);
+    }
+
+    // -------------------------------------------------------------------------
+    // Head
+    // -------------------------------------------------------------------------
+
+    const head = new THREE.Group();
+    head.name = "Head";
+    asset.add(head);
+
+    cylinderBetween(
+      new THREE.Vector3(0, 2.91, -0.32),
+      new THREE.Vector3(0, 2.91, -0.32),
+      0.13,
+      materials.white,
+      "Red_Head",
+      head
+    );
+
+    // Eyes and small white nose
+    const leftEye = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.052, 0),
+      materials.eye
+    );
+    leftEye.name = "Left_Eye";
+    leftEye.position.set(-0.065, 2.91, -0.32);
+    head.add(leftEye);
+
+    const rightEye = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.052, 0),
+      materials.eye
+    );
+    rightEye.name = "Right_Eye";
+    rightEye.position.set(0.065, 2.91, -0.32);
+    head.add(rightEye);
+
+    const nose = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.035, 0),
+      materials.nose
+    );
+    nose.name = "Nose";
+    nose.position.set(0, 2.92, -0.325);
+    head.add(nose);
+
+    // -------------------------------------------------------------------------
+    // Large fluffy tail
+    // -------------------------------------------------------------------------
+
+    const tail = new THREE.Group();
+    tail.name = "Tail";
+    asset.add(tail);
+
+    function createTaperedSegment(start, end, radius, material, name) {
+      const direction = new THREE.Vector3().subVectors(end, start);
+      const length = direction.length();
+
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        length,
+        6,
+        1,
+        false
+      );
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      tail.add(mesh);
+
+      // Fuzzy lower-pointed tail end
+      const tailPoint = new THREE.Vector3().addVectors(end, start).multiplyScalar(0.5);
+      const tailTip = new THREE.Mesh(
+        new THREE.ConeGeometry(radius * 0.92, radius * 0.19, 6),
+        material
+      );
+      tailTip.name = `${name}_Tail_End`;
+      tailTip.position.copy(tailPoint);
+      tailTip.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      tailTip.castShadow = true;
+      asset.add(tailTip);
+    }
+
+    createTaperedSegment(
+      new THREE.Vector3(-0.72, 0.18, -0.32),
+      new THREE.Vector3(-1.12, 0.18, -0.32),
+      0.14,
+      materials.furDark,
+      "Left_Tail"
+    );
+
+    createTaperedSegment(
+      new THREE.Vector3(0.72, 0.18, -0.32),
+      new THREE.Vector3(1.12, 0.18, -0.32),
+      0.14,
+      materials.furDark,
+      "Right_Tail"
+    );
+
+    // -------------------------------------------------------------------------
+    // Back red chest patch
+    // -------------------------------------------------------------------------
+
+    const patch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.19, 0.19, 0.16, 8),
+      materials.red
+    );
+    patch.name = "Chest_Patch";
+    patch.position.set(0, 1.98, -0.32);
+    head.add(patch);
+
+    // -------------------------------------------------------------------------
+    // Export GLB
+    // -------------------------------------------------------------------------
+
+    const exportButton = document.getElementById("exportGLB");
+    const status = document.getElementById("status");
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      exportButton.textContent = "Exporting…";
+      status.textContent = "Building binary GLB…";
+
+      asset.updateMatrixWorld(true);
+
+      const exporter = new GLTFExporter();
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "stylized-low-poly-fox.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+          exportButton.textContent = "Exported";
+          status.textContent = "GLB downloaded successfully";
+          exportButton.disabled = false;
+        },
+        (error) => {
+          console.error("GLB export failed:", error);
+          exportButton.textContent = "Exporting…";
+          status.textContent = "Export failed — see browser console";
+          exportButton.disabled = false;
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        }
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and render loop
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

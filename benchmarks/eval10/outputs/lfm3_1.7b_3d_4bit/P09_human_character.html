@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pale Man</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e8f5f3;
+      --muted: rgba(173, 196, 201, 0.68);
+      --paper: rgba(28, 35, 38, 0.88);
+      --line: rgba(230, 244, 247, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #07101d;
+      font-family: "Courier New", monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .hud {
+      position: fixed;
+      top: 22px;
+      left: 24px;
+      z-index: 2;
+      max-width: min(360px, calc(100vw - 48px));
+      padding: 18px 20px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--paper);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--ink);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(23px, 3vw, 34px);
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(230, 244, 247, 0.18);
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: rgba(28, 35, 38, 0.82);
+      color: var(--ink);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 7px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover,
+    button:focus-visible {
+      border-color: #dce9e5;
+      color: #b9c4ca;
+    }
+
+    .hint {
+      position: fixed;
+      right: 24px;
+      bottom: 20px;
+      z-index: 2;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(28, 35, 38, 0.78);
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.025em;
+      backdrop-filter: blur(10px);
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      display: grid;
+      place-content: center;
+      background: #07101d;
+      color: var(--ink);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 700px) {
+      .hud {
+        top: 14px;
+        left: 14px;
+        padding: 14px 16px;
+      }
+
+      .subtitle {
+        max-width: calc(100vw - 28px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="hud">
+    <div class="eyebrow">Field Survey / Unit 07</div>
+    <h1>Pale Man</h1>
+    <div class="subtitle">A weathered sentinel of the northern ridge.</div>
+  </div>
+
+  <div class="controls" aria-label="Camera controls">
+    <button id="reset" type="button">Reset view</button>
+    <button id="zoom-in" type="button">Zoom in</button>
+    <button id="zoom-out" type="button">Zoom out</button>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom · Arrow keys to rotate</div>
+  <div class="loading">Preparing the field station</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // ---------------------------------------------------------------------
+    // Renderer and scene
+    // ---------------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene of a low-poly human adventurer"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x07101d);
+    scene.fog = new THREE.Fog(0x07101d, 16, 31);
+
+    const camera = new THREE.PerspectiveCamera(
+      32,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+    window.camera = camera;
+
+    // ---------------------------------------------------------------------
+    // Procedural sky and lighting
+    // ---------------------------------------------------------------------
+
+    function createSky(renderer, scene) {
+      const sky = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: [
+            new THREE.Color(0x4d9ce8),
+            new THREE.Color(0x1f9c99),
+            new THREE.Color(0x78a7aa)
+          ],
+          transparent: true,
+          depthWrite: false
+        })
+      );
+
+      sky.position.set(-18, -30, 24);
+      sky.scale.setScalar(1.15);
+      scene.add(sky);
+
+      const sun = new THREE.DirectionalLight(0xffc6d3, 3.2);
+      sun.position.set(-10, 17, 9);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.left = -13;
+      sun.shadow.camera.right = 13;
+      sun.shadow.camera.top = 15;
+      sun.shadow.camera.bottom = -5;
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 35;
+      sun.shadow.normalBias = 0.035;
+      scene.add(sun);
+
+      const fill = new THREE.DirectionalLight(0x9dbdd0, 0.65);
+      fill.position.set(10, 8, -12);
+      scene.add(fill);
+    }
+
+    createSky(renderer, scene);
+
+    // ---------------------------------------------------------------------
+    // Procedural clouds and stars
+    // ---------------------------------------------------------------------
+
+    const cloudMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9db9c1,
+      roughness: 1,
+      metalness: 0
+    });
+
+    const starMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd7d8d4,
+      roughness: 0.7,
+      metalness: 0
+    });
+
+    function createCloud(x, y, z) {
+      const geometry = new THREE.SphereGeometry(1, 24, 16);
+      const cloud = new THREE.Mesh(geometry, cloudMaterial);
+      cloud.position.set(x, y, z);
+      cloud.scale.setScalar(2.4 + Math.random() * 0.6);
+      scene.add(cloud);
+
+      return cloud;
+    }
+
+    createCloud(-17, -20, 15);
+    createCloud(18, -14, -24);
+    createCloud(-25, 8, -30);
+    createCloud(27, 18, -42);
+    createCloud(-10, 6, -12);
+
+    for (let i = 0; i < 90; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 32 + Math.random() * 25;
+      const radius = 4 + Math.random() * 15;
+
+      const star = new THREE.Mesh(
+        new THREE.SphereGeometry(0.035, 18, 12),
+        starMaterial
+      );
+
+      star.position.set(
+        -40 + Math.cos(angle) * distance,
+        -50 + Math.sin(angle) * distance,
+        30 + Math.sin(angle * 2) * radius
+      );
+      star.scale.z = 1.4 + Math.random() * 0.7;
+      scene.add(star);
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    renderer.domElement.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional scene of a low-poly human adventurer"
+    );
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07101d);
+    scene.fog = new THREE.Fog(0x07101d, 16, 31);
+
+    const camera = new THREE.PerspectiveCamera(
+      32,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+
+    // ---------------------------------------------------------------------
+    // Low-poly character: tunic, boots, belt pouch, scarf, and backpack
+    // ---------------------------------------------------------------------
+
+    const unit = {
+      height: 2.15,
+      shoulderWidth: 0.57,
+      tunicLength: 1.10,
+      tunicWidth: 0.72,
+      tunicColor: [220, 255, 247],
+      tunicOffset: [-0.12, -0.04, 0.08],
+      tunicPattern: [
+        [220, 255, 247],
+        [245, 255, 245],
+        [260, 255, 245]
+      ],
+      tunic: new THREE.Mesh(
+        new THREE.PlaneGeometry(tunicLength, tunicWidth),
+        new THREE.MeshStandardMaterial({
+          color: unit.tunicColor,
+          roughness: 0.88,
+          metalness: 0,
+          side: THREE.DoubleSide
+        })
+      ),
+      tunicOffset: [-1.22, -1.12, -1.04],
+      tunicPoints: [
+        [0, 0, -1.05],
+        [0.08, 0.72, -1.04],
+        [0, 1.16, -0.98],
+        [0.12, 1.18, -0.84],
+        [0.09, 1.15, -0.64],
+        [0, 1.05, -0.36],
+        [0, 1.08, -0.08],
+        [0, 1.08, 0.08],
+        [0, 1.08, 0.44],
+        [0, 1.08, 0.84],
+        [0, 1.08, 1.04],
+        [0, 1.08, 1.14],
+        [0, 1.08, 1.16]
+      ],
+      tunicPointsArc: [
+        [-0.12, -1.22],
+        [0.12, -1.22],
+        [-0.12, -1.04],
+        [0.12, -1.04],
+        [-0.12, -0.84],
+        [0.12, -0.84],
+        [-0.12, 0.08],
+        [0.12, 0.08],
+        [-0.12, 0.44],
+        [0.12, 0.44],
+        [0.12, 0.84],
+        [0, 0.84],
+        [0, 1.04]
+      ],
+      tunicArc: [
+        [-0.12, -1.22],
+        [0.12, -1.22],
+        [-0.12, -1.04],
+        [0.12, -1.04],
+        [-0.12, -0.84],
+        [0.12, -0.84],
+        [-0.12, 0.08],
+        [0.12, 0.08],
+        [-0.12, 0.44],
+        [0.12, 0.44],
+        [0.12, 0.84],
+        [0, 0.84],
+        [0, 1.04]
+      ],
+      tunicPattern: [
+        [220, 255, 247],
+        [245, 255, 245],
+        [260, 255, 245]
+      ],
+      tunicMesh: new THREE.MeshStandardMaterial({
+        color: unit.tunicColor,
+        roughness: 0.9,
+        metalness: 0
+      }),
+      tunicOffset: [-0.16, -0.09],
+      collar: new THREE.Mesh(
+        new THREE.TorusGeometry(0.38, 0.075, 12, 64),
+        new THREE.MeshStandardMaterial({
+          color: unit.tunicColor[1],
+          roughness: 0.9
+        })
+      ),
+      tunicCollar: [
+        [-0.15, -0.16],
+        [0.15, -0.16],
+        [-0.15, 0.16],
+        [0.15, 0.16]
+      ],
+      collarPoints: [
+        [-0.16, 0],
+        [0.16, 0],
+        [0.16, -0.16],
+        [-0.16, -0.16]
+      ],
+      collarPattern: [
+        [220, 255, 247],
+        [245, 255, 245],
+        [260, 255, 245]
+      ],
+      tunicMeshOffset: [-1.15, -1.12],
+      footColor: [255, 244, 205]
+    });
+
+    const boots = {
+      color: [102, 115, 103],
+      offset: [-0.08, 0.04],
+      heelColor: [155, 145, 140],
+      toeColor: [125, 135, 145],
+      rubber: [255, 255, 255],
+      leather: [90, 95, 90]
+    };
+
+    const beltPouch = {
+      color: [150, 155, 152],
+      offset: [-0.25, -0.18],
+      clothColor: [120, 125, 130]
+    };
+
+    const scarf = {
+      color: [255, 255, 255],
+      offset: [-0.13, 0.12],
+      fabric: new THREE.MeshStandardMaterial({
+        map: [
+          [255, 255, 255],
+          [255, 255, 255]
+        ],
+        roughness: 0.88
+      })
+    };
+
+    const backpack = {
+      color: [220, 235, 225],
+      offset: [0.08, -0.18],
+      material: new THREE.MeshStandardMaterial({
+        map: [
+          [220, 245, 225],
+          [220, 245, 225]
+        ],
+        roughness: 0.82
+      })
+    };
+
+    // ---------------------------------------------------------------------
+    // Geometry helpers
+    // ---------------------------------------------------------------------
+
+    function addBox(
+      width,
+      height,
+      depth,
+      material,
+      x = 0,
+      y = 0,
+      z = 0,
+      parent = scene,
+      castShadow = true,
+      receiveShadow = true
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, depth),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = receiveShadow;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    function addCylinder(
+      radius,
+      height,
+      material,
+      x = 0,
+      y = 0,
+      z = 0,
+      parent = scene,
+      radialSegments = 32
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, height, radialSegments),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    function addSphere(
+      radius,
+      material,
+      x = 0,
+      y = 0,
+      z = 0,
+      parent = scene
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 20, 12),
+        material
+      );
+
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      parent.add(mesh);
+
+      return mesh;
+    }
+
+    function addArrow(
+      direction,
+      width,
+      height,
+      parent = scene,
+      count = 3
+    ) {
+      const arrow = new THREE.Mesh(
+        new THREE.ConeGeometry(width, height, 18),
+        new THREE.MeshBasicMaterial({
+          color: 0x8ca9a1,
+          side: THREE.DoubleSide
+        })
+      );
+
+      arrow.position.set(
+        direction.x * width / 2,
+        -height / 2,
+        direction.y * width / 2
+      );
+      arrow.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(direction.x, direction.y, direction.z)
+      );
+      arrow.castShadow = true;
+      parent.add(arrow);
+
+      return arrow;
+    }
+
+    function addGlow(
+      position,
+      color,
+      radius,
+      parent = scene
+    ) {
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 16, 10),
+        new THREE.MeshBasicMaterial({ color })
+      );
+
+      glow.position.set(position.x, position.y, position.z);
+      glow.scale.set(1.15, 1.05, 1.15);
+      glow.castShadow = true;
+      parent.add(glow);
+
+      return glow;
+    }
+
+    function addDoor(x, z) {
+      const door = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 2.3, 0.12),
+        new THREE.MeshStandardMaterial({
+          map: [
+            [220, 255, 247],
+            [220, 255, 248]
+          ],
+          roughness: 0.88
+        })
+      );
+
+      door.position.set(x, 1.15, z);
+      door.castShadow = true;
+      scene.add(door);
+
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 0.12, 0.18),
+        new THREE.MeshStandardMaterial({
+          color: [255, 255, 255],
+          roughness: 0.9
+        })
+      );
+
+      frame.position.set(x, 0.14, z);
+      frame.castShadow = true;
+      scene.add(frame);
+
+      return door;
+    }
+
+    // ---------------------------------------------------------------------
+    // Ground and sky
+    // ---------------------------------------------------------------------
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x09141d,
+      roughness: 1
+    });
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 80),
+      groundMaterial
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.035;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(70, 32, 20),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: {
+          topColor: { value: new THREE.Color(0x9eb6c3) },
+          horizonColor: { value: new THREE.Color(0xc8dce5) }
+        },
+        vertexShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            float height = normalize(vWorldPosition).y;
+            float horizon = smoothstep(-0.34, 0.34, height);
+            float depth = smoothstep(-1.0, 1.0, height);
+            vec3 color = mix(horizonColor, topColor, horizon);
+            float sunDirection = normalize(cameraPosition - worldPosition);
+            float sun = pow(max(dot(sunDirection, vWorldPosition), 0.0), 18.0);
+            float horizonGlow = pow(max(dot(sunDirection, vWorldPosition), 0.0), 12.0);
+            color += vec3(1.0, 0.72, 0.42) * sun * 1.8;
+            float horizonGlow = pow(max(dot(sunDirection, vWorldPosition), 0.0), 11.0);
+            color += vec3(1.0, 0.82, 0.68) * horizonGlow * 1.15;
+            gl_FragColor = vec4(color, 1.0);
+          }
+        `,
+        transparent: true
+      })
+    );
+
+    scene.add(sky);
+
+    const hemisphere = new THREE.HemisphereLight(0x9bc8d3, 0x6a7377, 1.15);
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffc6d3, 2.4);
+    sun.position.set(-8, 13, 9);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -10;
+    sun.shadow.camera.right = 10;
+    sun.shadow.camera.top = 14;
+    sun.shadow.camera.bottom = -5;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 30;
+    sun.shadow.normalBias = 0.035;
+    scene.add(sun);
+
+    const fillLight = new THREE.DirectionalLight(0x9db8d2, 0.6);
+    fillLight.position.set(10, 5, -10);
+    scene.add(fillLight);
+
+    // ---------------------------------------------------------------------
+    // Character geometry and materials
+    // ---------------------------------------------------------------------
+
+    const character = new THREE.Group();
+    scene.add(character);
+
+    const unitMaterial = new THREE.MeshStandardMaterial({
+      color: [220, 255, 247],
+      roughness: 0.9,
+      metalness: 0
+    });
+
+    const tunicMaterial = new THREE.MeshStandardMaterial({
+      color: unitMaterial.color,
+      roughness: 0.88,
+      side: THREE.DoubleSide
+    });
+
+    const beltPouchMaterial = new THREE.MeshStandardMaterial({
+      color: [150, 155, 152],
+      roughness: 0.95
+    });
+
+    const scarfMaterial = new THREE.MeshStandardMaterial({
+      color: [255, 255, 255],
+      roughness: 0.88,
+      side: THREE.DoubleSide
+    });
+
+    const backpackMaterial = new THREE.MeshStandardMaterial({
+      color: [220, 235, 225],
+      roughness: 0.82
+    });
+
+    // Tunic and collar.
+    const tunic = new THREE.Mesh(
+      new THREE.CylinderGeometry(unit.tunicLength, unit.tunicLength, unit.tunicHeight, 64),
+      tunicMaterial
+    );
+
+    tunic.position.y = unit.tunicOffset[0];
+    tunic.castShadow = true;
+    tunic.receiveShadow = true;
+    character.add(tunic);
+
+    const collar = new THREE.Mesh(
+      new THREE.TorusGeometry(unit.tunicLength, 0.075, 12, 64),
+      unitMaterial
+    );
+
+    collar.position.set(0, unit.tunicOffset[1], 0);
+    collar.castShadow = true;
+    character.add(collar);
+
+    // Scarf.
+    const scarf = new THREE.Mesh(
+      new THREE.CylinderGeometry(unit.tunicOffset[2], unit.tunicOffset[2], unit.tunicHeight, 64),
+      scarfMaterial
+    );
+
+    scarf.position.y = unit.tunicOffset[2];
+    scarf.castShadow = true;
+    scarf.receiveShadow = true;
+    character.add(scarf);
+
+    // Belt pouch and leather backpack.
+    const beltPouch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.47, unit.tunicHeight, 32),
+      beltPouchMaterial
+    );
+
+    beltPouch.position.y = unit.tunicOffset[1];
+    beltPouch.castShadow = true;
+    beltPouch.receiveShadow = true;
+    character.add(beltPouch);
+
+    const backpack = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.84, 1.16, 0.34, 64),
+      backpackMaterial
+    );
+
+    backpack.position.y = unit.tunicOffset[1] + unit.tunicHeight;
+    backpack.castShadow = true;
+    backpack.receiveShadow = true;
+    character.add(backpack);
+
+    // Boots.
+    const bootMaterial = new THREE.MeshStandardMaterial({
+      color: unit.bootColor,
+      roughness: 0.9
+    });
+
+    const leftFoot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.16, 0.18, 32),
+      bootMaterial
+    );
+
+    leftFoot.position.set(-unit.bootOffset[0], -0.09, unit.bootOffset[1]);
+    leftFoot.castShadow = true;
+    character.add(leftFoot);
+
+    const rightFoot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.16, 0.18, 32),
+      bootMaterial
+    );
+
+    rightFoot.position.set(unit.bootOffset[0], -0.09, unit.bootOffset[2]);
+    rightFoot.castShadow = true;
+    character.add(rightFoot);
+
+    // Feathered boots.
+    const leftBoot = new THREE.Mesh(
+      new THREE.ConeGeometry(0.17, 0.19, 32),
+      bootMaterial
+    );
+
+    leftBoot.position.set(-unit.bootOffset[0], -0.12, unit.bootOffset[2]);
+    leftBoot.castShadow = true;
+    character.add(leftBoot);
+
+    const rightBoot = new THREE.Mesh(
+      new THREE.ConeGeometry(0.17, 0.19, 32),
+      bootMaterial
+    );
+
+    rightBoot.position.set(unit.bootOffset[0], -0.12, unit.bootOffset[2]);
+    rightBoot.castShadow = true;
+    character.add(rightBoot);
+
+    // Belt loop.
+    const beltLoop = new THREE.Mesh(
+      new THREE.TorusGeometry(0.28, 0.045, 10, 32),
+      unitMaterial
+    );
+
+    beltLoop.position.set(0, unit.tunicOffset[1] + 0.11, -unit.bootOffset[2]);
+    beltLoop.castShadow = true;
+    character.add(beltLoop);
+
+    // Glowing boot soles.
+    const leftSole = addSphere(
+      0.035,
+      new THREE.MeshBasicMaterial({ color: 255, 240, 205 }),
+      unit.bootOffset[0],
+      unit.bootOffset[1],
+      -unit.bootOffset[2]
+    );
+
+    leftSole.scale.y = 0.9;
+    character.add(leftSole);
+
+    const rightSole = addSphere(
+      0.035,
+      new THREE.MeshBasicMaterial({ color: 255, 240, 205 }),
+      unit.bootOffset[0],
+      unit.bootOffset[1],
+      unit.bootOffset[2]
+    );
+
+    rightSole.scale.y = 0.9;
+    character.add(rightSole);
+
+    // Feathered belt loop.
+    const beltFeather = new THREE.Mesh(
+      new THREE.TorusGeometry(0.34, 0.045, 8, 48),
+      unitMaterial
+    );
+
+    beltFeather.position.set(0, unit.tunicOffset[1] + 0.21, -unit.bootOffset[2]);
+    beltFeather.castShadow = true;
+    character.add(beltFeather);
+
+    // Scarf loop.
+    const scarfLoop = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.045, 8, 32),
+      unitMaterial
+    );
+
+    scarfLoop.position.set(0, unit.tunicOffset[2] + 0.14, 0);
+    scarfLoop.castShadow = true;
+    character.add(scarfLoop);
+
+    // Backpack details.
+    const beltPouchCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.19, 0.11, 32),
+      beltPouchMaterial
+    );
+
+    beltPouchCap.position.set(0, unit.tunicOffset[1] + 0.34, -unit.bootOffset[2]);
+    beltPouchCap.castShadow = true;
+    character.add(beltPouchCap);
+
+    const backpackCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.18, 0.12, 32),
+      beltPouchMaterial
+    );
+
+    backpackCap.position.set(0, unit.tunicOffset[1] + 0.42, unit.bootOffset[2]);
+    backpackCap.castShadow = true;
+    character.add(backpackCap);
+
+    // ---------------------------------------------------------------------
+    // Subtle idle breathing motion in three axes.
+    // ---------------------------------------------------------------------
+
+    const breathingSpeed = 0.34;
+    const breathingCycle = 7;
+    const breathingAngle = Math.PI / 2;
+
+    function breathingPhase(time) {
+      const t = time % breathingCycle;
+      if (t < 0) t = 3.5 + t;
+      const normalized = ((t - 3.5) / (breathingCycle - 7)) % 1;
+      return normalized * breathingAngle;
+    }
+
+    function breathingOffset(time, axis) {
+      const phase = breathingPhase(time);
+      const value = Math.sin(phase);
+      const smoothing = 1 - Math.pow(Math.abs(value), 2);
+      return smoothing * breathingSpeed;
+    }
+
+    function breathingHeight(time, axis) {
+      return Math.sin(breathingPhase(time)) * breathingOffset(time, axis);
+    }
+
+    // Small animated breath marks.
+    const breathMarkerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xe5d8d9,
+      transparent: true,
+      opacity: 0.65
+    });
+
+    const breathMark = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 16, 10),
+      breathMarkerMaterial
+    );
+
+    breathMark.position.set(
+      Math.sin(breathingPhase(time)) * 0.065,
+      breathingHeight(time, -1) + 0.01,
+      Math.cos(breathingPhase(time)) * 0.065
+    );
+    character.add(breathMark);
+
+    // ---------------------------------------------------------------------
+    // Direct camera controls implemented without external control modules.
+    // ---------------------------------------------------------------------
+
+    const orbit = {
+      theta: -2.35,
+      phi: 1.16,
+      radius: 14.5,
+      target: new THREE.Vector3(0, 2.45, 0)
+    };
+
+    function resetView() {
+      orbit.theta = -2.35;
+      orbit.phi = 1.16;
+      orbit.radius = 14.5;
+      orbit.target.set(0, 2.45, 0);
+    }
+
+    function zoomIn() {
+      orbit.radius *= 0.9;
+    }
+
+    function zoomOut() {
+      orbit.radius *= 1.1;
+    }
+
+    let dragging = false;
+    let pointerX = 0;
+    let pointerY = 0;
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const deltaX = event.clientX - pointerX;
+      const deltaY = event.clientY - pointerY;
+
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+
+      orbit.theta -= deltaX * 0.006;
+      orbit.phi = THREE.MathUtils.clamp(
+        orbit.phi + deltaY * 0.005,
+        0.42,
+        1.48
+      );
+    });
+
+    function endDrag(event) {
+      dragging = false;
+      if (event.pointerId !== undefined) {
+        try {
+          renderer.domElement.releasePointerCapture(event.pointerId);
+        } catch (_) {}
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        zoomIn ? zoomOut() : zoomIn();
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetView);
+    document.getElementById("reset").addEventListener("click", resetView);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") orbit.theta += 0.08;
+      if (event.key === "ArrowRight") orbit.theta -= 0.08;
+      if (event.key === "ArrowUp") {
+        orbit.phi = Math.max(0.42, orbit.phi - 0.06);
+      }
+      if (event.key === "ArrowDown") {
+        orbit.phi = Math.min(1.48, orbit.phi + 0.06);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = window.innerWidth < 700 ? 38 : 32;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ---------------------------------------------------------------------
+    // Resize and render loop
+    // ---------------------------------------------------------------------
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const speed = breathingSpeed;
+
+      for (const axis of [-1, -2, 1, 2]) {
+        orbit.radius += (breathingOffset(time, axis) - orbit.radius) * speed;
+        orbit.radius = THREE.MathUtils.clamp(
+          orbit.radius,
+          7.5,
+          18
+        );
+      }
+
+      const height = breathingHeight(time, axis);
+      character.position.y = height;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Five Platonic Solids on Pedestals</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 35%, #26334b 0%, #121a29 48%, #090e18 100%);
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .panel {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 10;
+      width: min(340px, calc(100vw - 44px));
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      background: rgba(13, 20, 33, 0.72);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+    }
+
+    h1 {
+      margin: 0 0 7px;
+      color: #f5f7fb;
+      font-size: 19px;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 15px;
+      color: #071018;
+      background: linear-gradient(135deg, #f6c453, #d9974e);
+      box-shadow: 0 6px 18px rgba(217, 151, 78, 0.25);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 140ms ease, filter 140ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.3);
+      opacity: 0.7;
+    }
+
+    #status {
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .hint {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      color: rgba(188, 203, 224, 0.58);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <h1>Five Platonic Solids</h1>
+    <p>
+      A low-poly scientific display arranged in a small circular pedestal ring.
+      Each crystal is rendered in its own metallic color.
+    </p>
+
+    <div class="actions">
+      <button id="exportButton" type="button">Export GLB</button>
+      <span id="status">Ready to export</span>
+    </div>
+  </section>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+    import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+    import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const status = document.getElementById("status");
+
+    // ------------------------------------------------------------
+    // Renderer, camera, and preview lighting
+    // ------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x111827);
+    scene.fog = new THREE.Fog(0x111827, 8, 15);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+    camera.position.set(5.7, 4.5, 6.4);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true
+    });
+    window.renderer = renderer;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0.62, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 10;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const roomEnvironment = new RoomEnvironment();
+    const environmentTarget = pmremGenerator.compile(scene, camera);
+    scene.environment = environmentTarget.texture;
+    roomEnvironment.dispose();
+    pmremGenerator.dispose();
+
+    scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x1d1422, 1.25));
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
+    keyLight.position.set(4, 7, 5);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 18;
+    keyLight.shadow.camera.left = -5;
+    keyLight.shadow.camera.right = 5;
+    keyLight.shadow.camera.top = 5;
+    keyLight.shadow.camera.bottom = -5;
+    scene.add(keyLight);
+
+    const rimLight = new THREE.PointLight(0x7cc9ff, 18, 10, 2);
+    rimLight.position.set(-3.5, 3.2, -3.5);
+    scene.add(rimLight);
+
+    const warmLight = new THREE.PointLight(0xffa64d, 12, 8, 2);
+    warmLight.position.set(3.5, 1.6, -2.5);
+    scene.add(warmLight);
+
+    // Preview-only floor. It is intentionally not part of the exported asset.
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(7, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0x121b2a,
+        roughness: 0.92,
+        metalness: 0.05
+      })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.015;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // ------------------------------------------------------------
+    // Exported asset root
+    // ------------------------------------------------------------
+
+    const asset = new THREE.Group();
+    asset.name = "Five_Platonic_Solids";
+    scene.add(asset);
+
+    const palette = [
+      { name: "Blue", color: 0x2878c8, metalness: 0.72, roughness: 0.27 },
+      { name: "Green", color: 0x43a95c, metalness: 0.68, roughness: 0.3 },
+      { name: "Yellow", color: 0xe4b83f, metalness: 0.73, roughness: 0.26 },
+      { name: "Orange", color: 0xd96b35, metalness: 0.7, roughness: 0.3 },
+      { name: "Purple", color: 0x8e52c7, metalness: 0.67, roughness: 0.29 }
+    ];
+
+    function createSolidGeometry(type) {
+      switch (type) {
+        case "tetrahedron":
+          return new THREE.PolyhedronGeometry(0.58, 0);
+        case "cube":
+          return new RoundedBoxGeometry(0.76, 0.76, 0.76, 1, 0.075);
+        case "octahedron":
+          return new THREE.OctahedronGeometry(0.66, 0);
+        case "dodecahedron":
+          return new THREE.DodecahedronGeometry(0.62, 0);
+        case "icosahedron":
+          return new THREE.IcosahedronGeometry(0.69, 1);
+        default:
+          throw new Error("Unsupported polyhedron.");
+      }
+    }
+
+    function createPedestal(index, radius, height) {
+      const color = palette[index].color;
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        metalness: 0.82,
+        roughness: 0.25
+      });
+
+      const pedestal = new THREE.Group();
+      pedestal.name = `Pedestal_${index + 1}`;
+
+      const base = new THREE.Mesh(
+        new RoundedBoxGeometry(radius * 2.55, 0.13, radius * 2.55, 1, 0.045),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(color).multiplyScalar(0.78),
+          metalness: 0.86,
+          roughness: 0.3
+        })
+      );
+      base.position.y = 0.065;
+      base.castShadow = true;
+      base.receiveShadow = true;
+      pedestal.add(base);
+
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.72, radius * 0.88, height, 8),
+        material
+      );
+      stem.position.y = 0.13 + height * 0.5;
+      stem.castShadow = true;
+      stem.receiveShadow = true;
+      pedestal.add(stem);
+
+      const collar = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 1.03, radius * 1.03, 0.09, 8),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(color).multiplyScalar(1.08),
+          metalness: 0.9,
+          roughness: 0.2
+        })
+      );
+      collar.position.y = 0.13 + height + 0.045;
+      collar.castShadow = true;
+      pedestal.add(collar);
+
+      const top = new THREE.Mesh(
+        new RoundedBoxGeometry(radius * 1.75, 0.1, radius * 1.75, 1, 0.035),
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(color).multiplyScalar(0.86),
+          metalness: 0.84,
+          roughness: 0.26
+        })
+      );
+      top.position.y = 0.13 + height + 0.115;
+      top.castShadow = true;
+      top.receiveShadow = true;
+      pedestal.add(top);
+
+      return pedestal;
+    }
+
+    // ------------------------------------------------------------
+    // Circular arrangement
+    // ------------------------------------------------------------
+
+    const arrangement = new THREE.Group();
+    arrangement.name = "Circular_Arrangement";
+    asset.add(arrangement);
+
+    const ringRadius = 1.32;
+    const solidSize = 0.68;
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 + Math.PI / 10;
+      const x = Math.cos(angle) * ringRadius;
+      const z = Math.sin(angle) * ringRadius;
+
+      const solid = createSolidGeometry(i === 1 ? "cube" : "tetrahedron"
+        ? "octahedron"
+        : "dodecahedron"
+        : "icosahedron");
+
+      const material = new THREE.MeshStandardMaterial({
+        color: palette[i].color,
+        metalness: palette[i].metalness,
+        roughness: palette[i].roughness,
+        flatShading: true
+      });
+
+      solid.material = material;
+      solid.name = `Platonic_Solid_${i + 1}`;
+      solid.position.set(x, 0.79, z);
+      solid.rotation.set(
+        i * 0.16,
+        angle + Math.PI / 2,
+        i % 2 === 0 ? 0.08 : -0.08
+      );
+      solid.castShadow = true;
+      solid.receiveShadow = true;
+      arrangement.add(solid);
+
+      // Small decorative fasteners on the pedestal.
+      const fastenerGeometry = new THREE.CylinderGeometry(
+        0.035,
+        0.035,
+        0.018,
+        8
+      );
+      const fastenerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.95,
+        roughness: 0.18
+      });
+
+      for (const side of [-1, 1]) {
+        const fastener = new THREE.Mesh(fastenerGeometry, fastenerMaterial);
+        fastener.position.set(
+          x + side * radius * 0.91,
+          0.158,
+          z + side * radius * 0.91
+        );
+        fastener.castShadow = true;
+        pedestal.add(fastener);
+      }
+    }
+
+    // ------------------------------------------------------------
+    // Decorative center cap
+    // ------------------------------------------------------------
+
+    const centerCap = new THREE.Group();
+    centerCap.name = "Center_Cap";
+    asset.add(centerCap);
+
+    const capBase = new THREE.Mesh(
+      new RoundedBoxGeometry(0.58, 0.11, 0.58, 1, 0.04),
+      new THREE.MeshStandardMaterial({
+        color: 0x273449,
+        metalness: 0.86,
+        roughness: 0.3
+      })
+    );
+    capBase.position.y = 0.055;
+    capBase.castShadow = true;
+    centerCap.add(capBase);
+
+    const capTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.23, 0.14, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0x64748a,
+        metalness: 0.9,
+        roughness: 0.24
+      })
+    );
+    capTop.position.y = 0.15;
+    capTop.castShadow = true;
+    centerCap.add(capTop);
+
+    // ------------------------------------------------------------
+    // Export GLB
+    // ------------------------------------------------------------
+
+    exportButton.addEventListener("click", () => {
+      exportButton.disabled = true;
+      status.textContent = "Preparing GLB…";
+
+      const exporter = new GLTFExporter();
+
+      exporter.parse(
+        asset,
+        (result) => {
+          const blob = new Blob([result], {
+            type: "model/gltf-binary"
+          });
+
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "five-platonic-solids.glb";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 1000);
+
+          exportButton.disabled = false;
+          status.textContent = "GLB downloaded";
+        },
+        (error) => {
+          console.error(error);
+          exportButton.disabled = false;
+          status.textContent = "Export failed — see console";
+        },
+        {
+          binary: true,
+          onlyVisible: true,
+          trs: false,
+          includeCustomExtensions: false
+        }
+      );
+    });
+
+    // ------------------------------------------------------------
+    // Resize and render loop
+    // ------------------------------------------------------------
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    window.addEventListener("resize", resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

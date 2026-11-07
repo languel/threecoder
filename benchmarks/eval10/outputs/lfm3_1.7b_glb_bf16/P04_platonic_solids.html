@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Five Platonic Solids</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 35%, #d9b88e 0%, #c98a69 48%, #aa9b72 100%);
+      color: #fff9ed;
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+    }
+
+    #viewport canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .panel {
+      position: fixed;
+      z-index: 10;
+      top: 22px;
+      left: 22px;
+      max-width: min(340px, calc(100vw - 44px));
+      padding: 16px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: linear-gradient(
+        145deg,
+        rgba(46, 38, 31, 0.9),
+        rgba(30, 19, 15, 0.92)
+      );
+      box-shadow:
+        0 14px 40px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      margin-bottom: 5px;
+      color: #f1a83e;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(23px, 4vw, 34px);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #b9aa6d;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .actions {
+      position: fixed;
+      z-index: 10;
+      right: 22px;
+      bottom: 22px;
+      display: flex;
+      gap: 8px;
+      padding: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: linear-gradient(
+        145deg,
+        rgba(26, 19, 13, 0.78),
+        rgba(18, 14, 10, 0.88)
+      );
+      box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid #f4cf78;
+      border-radius: 9px;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, #fff7d8, #e9a76b);
+      color: #2a1c0d;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition:
+        transform 140ms ease,
+        filter 140ms ease;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      cursor: wait;
+      filter: grayscale(0.35);
+      opacity: 0.65;
+    }
+
+    #exportButton {
+      color: #17191c;
+      background: linear-gradient(180deg, #ffd36d, #f4cf78);
+      box-shadow: 0 0 16px #fff1a5;
+    }
+
+    #resetButton {
+      color: #d9b88e;
+      background: linear-gradient(180deg, #c98a69, #aa9b72);
+      box-shadow: 0 0 14px rgba(255, 215, 106, 0.22);
+    }
+
+    .hint {
+      position: fixed;
+      z-index: 10;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: rgba(25, 20, 16, 0.55);
+      color: #9e8d7b;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        top: 12px;
+        left: 12px;
+        max-width: calc(100vw - 24px);
+        padding: 13px 15px;
+      }
+
+      .hint {
+        bottom: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <section class="panel">
+    <div class="eyebrow">Godot Game Asset</div>
+    <h1>Five Platonic Solids</h1>
+    <p class="subtitle">
+      Low-poly Platonic solids with metallic finishes, oriented on a circular
+      pedestal. Drag to orbit · Scroll to zoom.
+    </p>
+  </section>
+
+  <div class="actions">
+    <button id="resetButton" type="button">Reset View</button>
+    <button id="exportButton" type="button">Export GLB</button>
+  </div>
+
+  <div class="hint">Drag to orbit · Scroll to zoom</div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+
+    const viewport = document.getElementById("viewport");
+    const exportButton = document.getElementById("exportButton");
+    const resetButton = document.getElementById("resetButton");
+
+    // ------------------------------------------------------------
+    // Renderer, scene, camera
+    // ------------------------------------------------------------
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance"
+    });
+    window.renderer = renderer;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    window.scene = scene;
+    window.THREE = THREE;
+    scene.background = new THREE.Color(0x2e181b);
+    scene.fog = new THREE.Fog(0x2e181b, 12, 28);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    window.camera = camera;
+
+    camera.position.set(7.5, 4.6, 8.3);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.75, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 5;
+    controls.maxDistance = 18;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.update();
+
+    // ------------------------------------------------------------
+    // Lighting
+    // ------------------------------------------------------------
+
+    scene.add(new THREE.HemisphereLight(0xb8c7cf, 0x4b2d1d, 2.15));
+
+    const keyLight = new THREE.DirectionalLight(0xffe3b8, 3.2);
+    keyLight.position.set(5.5, 9, 6.5);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x9fc7d4, 1.35);
+    fillLight.position.set(-7, 3, -4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffa64e, 2.1);
+    rimLight.position.set(1, 4, -8);
+    scene.add(rimLight);
+
+    // ------------------------------------------------------------
+    // Materials
+    // ------------------------------------------------------------
+
+    const materials = {
+      bronze: new THREE.MeshStandardMaterial({
+        color: 0xbc8226,
+        metalness: 0.72,
+        roughness: 0.38,
+        flatShading: true
+      }),
+      bronzeDark: new THREE.MeshStandardMaterial({
+        color: 0x7f5c34,
+        metalness: 0.58,
+        roughness: 0.42,
+        flatShading: true
+      }),
+      bronzeLight: new THREE.MeshStandardMaterial({
+        color: 0xc99b2e,
+        metalness: 0.66,
+        roughness: 0.34,
+        flatShading: true
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0x9a6f22,
+        metalness: 0.78,
+        roughness: 0.29,
+        flatShading: true
+      }),
+      bronzeDarkShade: new THREE.MeshStandardMaterial({
+        color: 0x5e3c20,
+        metalness: 0.72,
+        roughness: 0.36,
+        flatShading: true
+      }),
+      cobalt: new THREE.MeshStandardMaterial({
+        color: 0x2f7fbd,
+        metalness: 0.68,
+        roughness: 0.4,
+        flatShading: true
+      }),
+      cyan: new THREE.MeshStandardMaterial({
+        color: 0x5bb9df,
+        emissive: 0x1c8b35,
+        emissiveIntensity: 1.15,
+        metalness: 0.42,
+        roughness: 0.22,
+        flatShading: true
+      }),
+      cyanDark: new THREE.MeshStandardMaterial({
+        color: 0x2d9ac4,
+        emissive: 0x0b62c3,
+        emissiveIntensity: 1.25,
+        metalness: 0.4,
+        roughness: 0.24,
+        flatShading: true
+      }),
+      iron: new THREE.MeshStandardMaterial({
+        color: 0x35393d,
+        metalness: 0.82,
+        roughness: 0.25,
+        flatShading: true
+      }),
+      ironDark: new THREE.MeshStandardMaterial({
+        color: 0x2f2c1e,
+        metalness: 0.68,
+        roughness: 0.34,
+        flatShading: true
+      })
+    };
+
+    // ------------------------------------------------------------
+    // Geometry helpers
+    // ------------------------------------------------------------
+
+    function addMesh(
+      geometry,
+      material,
+      position = [0, 0, 0],
+      rotation = [0, 0, 0],
+      parent = null
+    ) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(...position);
+      mesh.rotation.set(...rotation);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      if (parent) {
+        parent.add(mesh);
+      }
+      return mesh;
+    }
+
+    function dodecahedronGeometry() {
+      return new THREE.IcosahedronGeometry(1, 0);
+    }
+
+    function smallCylinderGeometry(radius, depth, radialSegments = 6) {
+      return new THREE.CylinderGeometry(
+        radius,
+        radius,
+        depth,
+        radialSegments,
+        1,
+        false
+      );
+    }
+
+    function addSphere(
+      radius,
+      material,
+      position,
+      scale = [1, 1, 1],
+      parent = null
+    ) {
+      return dodecahedronGeometry(radius, 0);
+    }
+
+    // ------------------------------------------------------------
+    // Pedestals
+    // Each pedestal is a separate low-poly group so the exports remain clean.
+    // ------------------------------------------------------------
+
+    const pedestalPositions = [
+      [-2.15, 1.70],
+      [2.15, 1.70],
+      [0.20, 1.82],
+      [-0.20, 1.82],
+      [1.20, 1.82],
+      [-1.20, 1.82]
+    ];
+
+    const pedestalRadii = [
+      1.08,
+      1.08,
+      1.08,
+      1.08,
+      1.08,
+      1.08
+    ];
+
+    const pedestalGeometry = new THREE.Group();
+    pedestalGeometry.name = "PedestalGroup";
+    pedestalGeometry.computeBoundingSphere();
+
+    pedestalPositions.forEach(([x, z], index) => {
+      const pedestal = new THREE.Group();
+      pedestal.name = `Pedestal_${index + 1}`;
+      pedestal.position.set(x, 0.16, z);
+      pedestal.rotation.x = Math.PI / 2;
+      pedestal.rotation.z = (index % 5) * 0.22;
+      pedestalGeometry.add(pedestal);
+
+      const pedestalMesh = addMesh(
+        pedestalGeometry,
+        materials.bronze,
+        [0, 0, 0],
+        [0, 0, 0],
+        pedestal
+      );
+
+      pedestalMesh.castShadow = true;
+      pedestalMesh.receiveShadow = true;
+    });
+
+    // ------------------------------------------------------------
+    // Solids
+    // ------------------------------------------------------------
+
+    var solidPositions = [
+      [-2.15, 1.70],
+      [2.15, 1.70],
+      [0.20, 1.82],
+      [-0.20, 1.82],
+      [1.20, 1.82],
+      [-1.20, 1.82]
+    ];
+
+    const solidRadii = [
+      1.08,
+      1.08,
+      1.08,
+      1.08,
+      1.08,
+      1.08
+    ];
+
+    const solids = [];
+
+    function createSolid(radius, material, x, z) {
+      const group = new THREE.Group();
+      group.name = `Platonic_${index + 1}`;
+      pedestalGeometry.add(group);
+
+      const mesh = addMesh(
+        dodecahedronGeometry(),
+        material,
+        [0, radius * 1.03, 0],
+        [0, 0, 0],
+        group
+      );
+
+      mesh.scale.set(radius, radius * 0.72, radius);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      solids.push({
+        x,
+        z,
+        radius,
+        material,
+        parent: group
+      });
+    }
+
+    // Bronze: faceted, warm metal.
+    createSolid(1.02, materials.bronze, -2.15, 1.70);
+    createSolid(1.02, materials.bronzeDark, 2.15, 1.70);
+    createSolid(1.02, materials.bronzeLight, 0.20, 1.82);
+    createSolid(1.02, materials.bronzeDark, -0.20, 1.82);
+    createSolid(1.02, materials.bronzeLight, 1.20, 1.82);
+    createSolid(1.02, materials.bronzeDark, -1.20, 1.82);
+
+    // Bronze dark: slightly lighter metal.
+    createSolid(1.025, materials.bronzeDarkShade, -2.15, 1.70);
+    createSolid(1.025, materials.bronzeDarkShade, 2.15, 1.70);
+    createSolid(1.025, materials.bronzeDarkShade, 0.20, 1.82);
+    createSolid(1.025, materials.bronzeDarkShade, -0.20, 1.82);
+    createSolid(1.025, materials.bronzeDarkShade, 1.20, 1.82);
+    createSolid(1.025, materials.bronzeDarkShade, -1.20, 1.82);
+
+    // Cylindrical pedestals with a raised top ring.
+    const pedestalRings = [
+      [1.08, 1.10],
+      [1.09, 1.11],
+      [1.10, 1.13],
+      [1.09, 1.14],
+      [1.08, 1.15],
+      [1.10, 1.16]
+    ];
+
+    pedestalRings.forEach(([radius, depth], index) => {
+      const ring = addMesh(
+        smallCylinderGeometry(radius, depth, 6),
+        materials.cobalt,
+        [0, 0.16, 0],
+        [Math.PI / 2, 0, 0],
+        pedestal
+      );
+
+      ring.castShadow = true;
+      ring.receiveShadow = true;
+    });
+
+    // ------------------------------------------------------------
+    // Solid geometry helpers
+    // ------------------------------------------------------------
+
+    var icosahedronData = [
+      [-1.00, -1.00, 0.00],
+      [ 1.00,  1.00, 0.00],
+      [-1.00,  1.00, 0.00],
+      [ 1.00, -1.00, 0.00],
+      [-1.00, -1.00, 0.00],
+      [ 1.00, -1.00, 0.00]
+    ];
+
+    function createIcosahedron(
+      radius,
+      material,
+      position,
+      scale = [1.0, 1.0, 1.0],
+      parent = null
+    ) {
+      const mesh = new THREE.Mesh(dodecahedronGeometry(radius, 0), material);
+      mesh.position.set(...position);
+      mesh.scale.set(...scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      if (parent) {
+        parent.add(mesh);
+      }
+      return mesh;
+    }
+
+    function createTorusGeometry(
+      radius,
+      tube,
+      radialSegments = 24,
+      tubularSegments = 32
+    ) {
+      return new THREE.TorusGeometry(radius, tube, radialSegments, tubularSegments);
+    }
+
+    // ------------------------------------------------------------
+    // Plane pedestals
+    // ------------------------------------------------------------
+
+    function createPedestal(x, z) {
+      const ring = addMesh(
+        createTorusGeometry(1.08, 0.045),
+        materials.cobalt,
+        [x, 0.16, z],
+        [Math.PI / 2, 0, 0],
+        pedestal
+      );
+      ring.castShadow = true;
+    }
+
+    // ------------------------------------------------------------
+    // Small pedestals around the circular pedestal
+    // ------------------------------------------------------------
+
+    const pedestalCenterX = 0.22;
+    const pedestalCenterZ = 1.70;
+    const pedestalRingRadius = 1.08;
+
+    function addSmallPedestal(x, z) {
+      createPedestal(x, z);
+      createSolid(
+        1.025,
+        materials.bronzeDarkShade,
+        [x, 0.16, z],
+        [1.02, 0.68, 0.65]
+      );
+    }
+
+    const pedestalData = [
+      [-2.15, 1.70],
+      [2.15, 1.70],
+      [0.20, 1.82],
+      [-0.20, 1.82],
+      [1.20, 1.82],
+      [-1.20, 1.82]
+    ];
+
+    pedestalData.forEach(([x, z], index) => addSmallPedestal(x, z));
+
+    // ------------------------------------------------------------
+    // Low-poly platonic solids
+    // ------------------------------------------------------------
+
+    const solidIndex = 0;
+    var solidPositions = [];
+
+    function addPlatonicSolids(radius, material, x, z) {
+      const group = new THREE.Group();
+      group.name = `Platonic_${solidIndex++}`;
+      pedestalGeometry.add(group);
+
+      createIcosahedron(
+        radius,
+        material,
+        [0, radius * 1.03, 0],
+        [1.0, 0.72, 0.6]
+      );
+
+      group.position.set(x, 0.16, z);
+      solids.push({
+        x,
+        z,
+        radius,
+        material,
+        parent: group
+      });
+    }
+
+    solidPositions.forEach((data, index) => addPlatonicSolids(data.radius, materials.bronze, data.x, data.z));
+    solidPositions.forEach((data, index) => addPlatonicSolids(data.radius, materials.bronzeDarkShade, data.x, data.z));
+
+    var icosahedronData = [
+      [-1.00, -1.00, 0.00],
+      [ 1.00,  1.00, 0.00],
+      [-1.00,  1.00, 0.00],
+      [ 1.00, -1.00, 0.00],
+      [-1.00, -1.00, 0.00],
+      [ 1.00, -1.00, 0.00]
+    ];
+
+    icosahedronData.forEach(([x, z], index) => addPlatonicSolids(1.025, materials.bronzeDarkShade, x, z));
+
+    // ------------------------------------------------------------
+    // Icubes
+    // ------------------------------------------------------------
+
+    const cubeX = [-2.15, 2.15];
+    const cubeZ = [-1.70, 1.70];
+
+    var addCube = function(x, z) {
+      createPedestal(x, z);
+      createSolid(1.025, materials.bronzeDarkShade, [x, 0.16, z], [1.02, 0.68, 0.65]);
+    }
+
+    cubeX.forEach((x) => addCube(x, -1.70));
+    cubeZ.forEach((z) => addCube(x, z));
+
+    // ------------------------------------------------------------
+    // Octahedra
+    // ------------------------------------------------------------
+
+    function createOctahedron(x, z) {
+      const group = new THREE.Group();
+      group.name = `Platonic_Octahedron_${solidIndex++}`;
+      pedestalGeometry.add(group);
+
+      addIcosahedron(
+        0.68,
+        materials.bronzeDarkShade,
+        [x, 0.16, z],
+        [1.0, 0.72, 0.65]
+      );
+
+      group.position.set(x, 0.16, z);
+      solids.push({
+        x,
+        z,
+        radius: 0.68,
+        material,
+        parent: group
+      });
+    }
+
+    cubeX.forEach((x) => addCube(x, -1.70));
+    cubeZ.forEach((z) => addOctahedron(x, z));
+
+    // ------------------------------------------------------------
+    // Dodecahedra
+    // ------------------------------------------------------------
+
+    function createDodecahedron(x, z) {
+      const group = new THREE.Group();
+      group.name = `Platonic_Dodecahedron_${solidIndex++}`;
+      pedestalGeometry.add(group);
+
+      addIcosahedron(
+        1.0,
+        materials.bronzeDarkShade,
+        [x, 0.16, z],
+        [0.72, 0.72, 0.62]
+      );
+
+      group.position.set(x, 0.16, z);
+      solids.push({
+        x,
+        z,
+        radius: 1.0,
+        material,
+        parent: group
+      });
+    }
+
+    cubeX.forEach((x) => addDodecahedron(x, -1.70));
+    cubeZ.forEach((z) => addDodecahedron(z, -1.70));
+
+    // ------------------------------------------------------------
+    // Icubes
+    // ------------------------------------------------------------
+
+    var addCube = function(x, z) {
+      createPedestal(x, z);
+      createSolid(1.025, materials.bronzeDarkShade, [x, 0.16, z], [1.02, 0.68, 0.65]);
+    }
+
+    cubeX.forEach((x, index) => addCube(x, -1.70));
+    cubeZ.forEach((z, index) => addCube(z, -1.70));
+
+    // ------------------------------------------------------------
+    // Icuboids
+    // ------------------------------------------------------------
+
+    function createIcuboid(x, z) {
+      const group = new THREE.Group();
+      group.name = `Platonic_Icuboid_${solidIndex++}`;
+      pedestalGeometry.add(group);
+
+      addIcosahedron(
+        0.25,
+        materials.bronzeDarkShade,
+        [x, 0.16, z],
+        [1, 1, 1]
+      );
+
+      group.position.set(x, 0.16, z);
+      solids.push({
+        x,
+        z,
+        radius: 0.25,
+        material,
+        parent: group
+      });
+    }
+
+    cubeX.forEach((x) => createIcuboid(x, -1.70));
+    cubeZ.forEach((z) => createIcuboid(z, -1.70));
+
+    // ------------------------------------------------------------
+    // Render loop and interaction
+    // ------------------------------------------------------------
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener("resize", resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    resetButton.addEventListener("click", () => {
+      camera.position.set(7.5, 4.6, 8.3);
+      controls.target.set(0, 1.75, 0);
+      controls.update();
+    });
+
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      exportButton.textContent = "Exporting…";
+
+      try {
+        pedestalGeometry.dispose();
+        pedestalGeometry = new THREE.Group();
+        pedestalGeometry.name = "Pedestal";
+        pedestalGeometry.rotation.x = Math.PI / 2;
+        pedestalGeometry.position.y = 0.16;
+        pedestalGeometry.rotateZ(Math.PI / 4);
+        pedestalGeometry.geometry.dispose();
+        pedestalGeometry = new THREE.Group();
+        pedestalGeometry.name = "PedestalGroup";
+        pedestalGeometry.position.y = 0.16;
+        pedestalGeometry.rotation.x = Math.PI / 2;
+        pedestalGeometry.rotation.z = Math.PI / 4;
+        pedestalGeometry.geometry.dispose();
+
+        const exportRoot = new THREE.Group();
+        exportRoot.name = "ExportRoot";
+        exportRoot.add(pedestalGeometry);
+
+        const exporter = new GLTFExporter();
+        exporter.parse(
+          exportRoot,
+          (result) => {
+            const blob = new Blob([result], {
+              type: "model/gltf-binary"
+            });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "five_platonic_solids.glb";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+            exportButton.textContent = "Exported";
+            exportButton.disabled = false;
+          },
+          (error) => {
+            console.error(error);
+            exportButton.textContent = "Export Failed";
+            exportButton.disabled = false;
+          },
+          {
+            binary: true,
+            onlyVisible: true,
+            trs: false
+          }
+        );
+      } catch (error) {
+        console.error(error);
+        exportButton.textContent = "Export Failed";
+        exportButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
