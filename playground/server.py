@@ -287,9 +287,9 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
                 return
             raw = self.rfile.read(length)
             try:
-                import urllib.request
+                import http.client
                 payload = json.loads(raw.decode("utf-8"))
-                stream = payload.get("stream", False)
+                stream = payload.get("stream", True)
                 
                 ollama_req_data = {
                     "model": payload.get("model", "LisyNeko/qwen3.8-9b-coder:latest"),
@@ -297,23 +297,23 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
                     "system": payload.get("system", "Use only the Three.js core ES module from https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js. Implement any camera controls directly inside the HTML."),
                     "stream": stream,
                     "options": {
+                        "num_ctx": int(payload.get("num_ctx", 8192)),
                         "temperature": float(payload.get("temperature", 0.6)),
                         "top_p": float(payload.get("top_p", 0.95)),
                         "num_predict": int(payload.get("num_predict", -1))
                     }
                 }
                 
-                req = urllib.request.Request(
-                    "http://localhost:11434/api/generate",
-                    data=json.dumps(ollama_req_data).encode("utf-8"),
-                    headers={"Content-Type": "application/json"}
-                )
+                conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=180)
+                body_bytes = json.dumps(ollama_req_data).encode("utf-8")
+                conn.request("POST", "/api/generate", body_bytes, {"Content-Type": "application/json"})
+                resp = conn.getresponse()
                 
                 if not stream:
-                    with urllib.request.urlopen(req, timeout=300) as resp:
-                        res_data = json.loads(resp.read().decode("utf-8"))
-                        self.send_json(200, res_data)
-                        return
+                    res_body = resp.read().decode("utf-8")
+                    conn.close()
+                    self.send_json(resp.status, json.loads(res_body))
+                    return
                 else:
                     self.send_response(200)
                     self.add_security_headers()
@@ -322,11 +322,15 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
                     self.send_header("Connection", "keep-alive")
                     self.end_headers()
                     
-                    with urllib.request.urlopen(req, timeout=300) as resp:
-                        for chunk in resp:
-                            if chunk:
-                                self.wfile.write(b"data: " + chunk + b"\n\n")
-                                self.wfile.flush()
+                    while True:
+                        line = resp.readline()
+                        if not line:
+                            break
+                        clean_line = line.strip()
+                        if clean_line:
+                            self.wfile.write(b"data: " + clean_line + b"\n\n")
+                            self.wfile.flush()
+                    conn.close()
                     return
             except Exception as e:
                 self.send_json(500, {"error": str(e)})

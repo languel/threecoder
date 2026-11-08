@@ -619,26 +619,41 @@
           <button type="button" id="stop-btn" class="btn-danger" style="display:none; padding:0.25rem 0.6rem; font-size:0.75rem;">Stop Generation</button>
         </div>
 
-        <!-- Generation Progress Bar & Telemetry -->
-        <div id="gen-progress-row" style="display:none; margin-top:0.6rem;">
-          <div class="live-stats">
-            <span id="phase-label">Generating…</span>
-            <span id="tok-rate-label">0 tok · 0 tok/s</span>
+        <!-- Generation Progress Bar & Telemetry HUD -->
+        <div id="gen-progress-row" style="display:none; margin-top:0.6rem; background:var(--bg-surface); border:1px solid var(--border); border-radius:6px; padding:0.5rem 0.65rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.25rem;">
+            <div style="display:flex; align-items:center; gap:0.4rem;">
+              <span id="gen-phase-dot" class="dot busy"></span>
+              <strong id="phase-label" style="font-size:0.75rem; color:var(--text);">Initializing Generation…</strong>
+            </div>
+            <span id="gen-elapsed-badge" style="font-family:var(--font-mono); font-size:0.7rem; color:var(--accent);">0.0s</span>
           </div>
-          <div class="progress-bar-wrap">
+
+          <div class="progress-bar-wrap" style="height:4px; margin:0.35rem 0;">
             <div id="progress-bar-fill" class="progress-bar-fill"></div>
+          </div>
+
+          <div class="live-stats" style="margin-top:0.25rem;">
+            <span id="tok-rate-label" style="color:var(--text);">0 tokens · 0.0 tok/s</span>
+            <span id="est-time-label" style="color:var(--text-dim);">Est. remaining: calculating…</span>
           </div>
         </div>
       </div>
 
-      <!-- Quick Self-Healing Log / Telemetry Drawer -->
-      <div class="sidebar-section" style="flex:1;">
-        <div class="field-label" style="margin-bottom:0.35rem;">
-          <span>Diagnostic Log</span>
-          <span id="log-count" style="font-weight:400; color:var(--text-dim);">0 events</span>
+      <!-- Live Engine & Diagnostic Trace Drawer -->
+      <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; min-height:220px;">
+        <div class="field-label" style="margin-bottom:0.4rem;">
+          <div style="display:flex; align-items:center; gap:0.4rem;">
+            <span>Engine &amp; Gen Trace</span>
+            <span id="log-count" style="font-weight:400; color:var(--text-dim);">0 events</span>
+          </div>
+          <div style="display:flex; gap:0.3rem;">
+            <button type="button" id="copy-log-btn" class="chip" style="padding:0.1rem 0.35rem; font-size:0.68rem;">Copy</button>
+            <button type="button" id="clear-log-btn" class="chip" style="padding:0.1rem 0.35rem; font-size:0.68rem;">Clear</button>
+          </div>
         </div>
-        <div id="diag-log" style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-muted); background:var(--bg-input); padding:0.45rem; border-radius:4px; height:100px; overflow-y:auto; line-height:1.4;">
-          Ready. Select a model or gold training preset to begin.
+        <div id="diag-log" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-muted); background:var(--bg-input); padding:0.55rem; border:1px solid var(--border); border-radius:6px; flex:1; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-word;">
+[00:00:00] Studio engine initialized. Select a model or gold training preset to begin.
         </div>
       </div>
 
@@ -722,6 +737,10 @@
     const progressBarFill = document.getElementById("progress-bar-fill");
     const phaseLabel = document.getElementById("phase-label");
     const tokRateLabel = document.getElementById("tok-rate-label");
+    const estTimeLabel = document.getElementById("est-time-label");
+    const genElapsedBadge = document.getElementById("gen-elapsed-badge");
+    const copyLogBtn = document.getElementById("copy-log-btn");
+    const clearLogBtn = document.getElementById("clear-log-btn");
 
     let eventCount = 0;
     function logEvent(msg, type = "info") {
@@ -729,10 +748,25 @@
       logCount.textContent = `${eventCount} events`;
       const time = new Date().toLocaleTimeString().split(" ")[0];
       const line = document.createElement("div");
-      line.style.color = type === "heal" ? "var(--ok)" : type === "err" ? "var(--err)" : "var(--text-muted)";
+      line.style.color = type === "heal" ? "var(--ok)" : type === "err" ? "var(--err)" : type === "warn" ? "var(--warn)" : "var(--text-muted)";
       line.textContent = `[${time}] ${msg}`;
       diagLog.appendChild(line);
       diagLog.scrollTop = diagLog.scrollHeight;
+    }
+
+    // Copy / Clear Log Buttons
+    if (copyLogBtn) {
+      copyLogBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(diagLog.textContent);
+        logEvent("Copied engine trace to clipboard");
+      });
+    }
+    if (clearLogBtn) {
+      clearLogBtn.addEventListener("click", () => {
+        diagLog.replaceChildren();
+        eventCount = 0;
+        logCount.textContent = "0 events";
+      });
     }
 
     // Prompt char count
@@ -933,13 +967,32 @@
       generateBtn.disabled = true;
       stopBtn.style.display = "inline-flex";
       genProgressRow.style.display = "block";
-      progressBarFill.style.width = "5%";
+      progressBarFill.style.width = "4%";
       statusDot.className = "dot busy";
       statusText.textContent = "Generating Scene…";
+      phaseLabel.textContent = "Initializing Engine Pipeline…";
+      tokRateLabel.textContent = "0 tokens · 0.0 tok/s";
+      estTimeLabel.textContent = "Estimating remaining time…";
+      genElapsedBadge.textContent = "0.0s";
 
       const t0 = performance.now();
       let generatedText = "";
       let tokenCount = 0;
+      let firstTokenTime = null;
+
+      // Live Heartbeat Timer
+      const heartbeatInterval = setInterval(() => {
+        if (!isGenerating) return;
+        const now = performance.now();
+        const elapsedSec = ((now - t0) / 1000).toFixed(1);
+        genElapsedBadge.textContent = `${elapsedSec}s`;
+
+        if (!firstTokenTime) {
+          if (parseFloat(elapsedSec) > 12) {
+            phaseLabel.textContent = "Compiling WebGPU shaders or fetching weights (~15–30s on first run)…";
+          }
+        }
+      }, 250);
 
       const modelVal = modelSelect.value;
 
@@ -947,7 +1000,8 @@
         if (activeEngine === "ollama") {
           // Native Ollama Generation
           const ollamaModel = modelVal.replace("ollama:", "");
-          logEvent(`Dispatching prompt to Ollama model ${ollamaModel}…`);
+          logEvent(`[Ollama] Dispatching prompt to ${ollamaModel}…`);
+          phaseLabel.textContent = `Connecting to Ollama model ${ollamaModel}…`;
 
           abortController = new AbortController();
           const res = await fetch("/api/ollama/generate", {
@@ -962,7 +1016,7 @@
             signal: abortController.signal
           });
 
-          if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
+          if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: Ensure 'ollama serve' is running.`);
 
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
@@ -980,15 +1034,29 @@
                 try {
                   const j = JSON.parse(chunk.slice(6));
                   if (j.response) {
+                    if (!firstTokenTime) {
+                      firstTokenTime = performance.now();
+                      const ttft = ((firstTokenTime - t0) / 1000).toFixed(2);
+                      logEvent(`[Ollama] First token generated (TTFT: ${ttft}s)`, "heal");
+                      phaseLabel.textContent = `Streaming Three.js code from ${ollamaModel}…`;
+                    }
                     generatedText += j.response;
                     tokenCount++;
                     codeViewer.textContent = generatedText;
                     codeLinesCount.textContent = `${generatedText.split("\n").length} lines`;
 
-                    const elapsed = (performance.now() - t0) / 1000;
-                    const tps = (tokenCount / elapsed).toFixed(1);
-                    tokRateLabel.textContent = `${tokenCount} tok · ${tps} tok/s`;
-                    progressBarFill.style.width = `${Math.min(95, tokenCount / 20)}%`;
+                    const decodeElapsed = (performance.now() - firstTokenTime) / 1000;
+                    const tps = decodeElapsed > 0.05 ? (tokenCount / decodeElapsed).toFixed(1) : "0.0";
+                    tokRateLabel.textContent = `${tokenCount} tokens · ${tps} tok/s`;
+
+                    const targetEst = 1200;
+                    const remainingTokens = Math.max(0, targetEst - tokenCount);
+                    if (parseFloat(tps) > 1) {
+                      const secLeft = Math.round(remainingTokens / parseFloat(tps));
+                      estTimeLabel.textContent = secLeft > 0 ? `Est. remaining: ~${secLeft}s` : "Finalizing syntax…";
+                    }
+
+                    progressBarFill.style.width = `${Math.min(95, Math.round((tokenCount / targetEst) * 100))}%`;
                   }
                 } catch(e) {}
               }
@@ -996,12 +1064,16 @@
           }
         } else {
           // WebGPU In-Browser Engine via worker
-          logEvent(`Dispatching prompt to WebGPU model ${modelVal}…`);
+          logEvent(`[WebGPU] Dispatching prompt to ${modelVal}…`);
           if (!webgpuWorker) {
+            logEvent("[WebGPU] Spawning dedicated WebGPU Worker thread…");
             webgpuWorker = new Worker("./worker.js", { type: "module" });
           }
 
-          generatedText = await runWebGpuGeneration(modelVal, prompt, t0);
+          generatedText = await runWebGpuGeneration(modelVal, prompt, t0, (metrics) => {
+            firstTokenTime = metrics.firstTokenTime;
+            tokenCount = metrics.tokenCount;
+          });
         }
 
         // Clean & extract HTML from response
@@ -1011,21 +1083,27 @@
 
         statusDot.className = "dot active";
         statusText.textContent = "Ready";
-        logEvent(`Generation finished in ${((performance.now() - t0)/1000).toFixed(1)}s (${tokenCount} tokens)`);
+        const totalSec = ((performance.now() - t0) / 1000).toFixed(1);
+        const finalTps = (tokenCount / Math.max(0.1, (performance.now() - (firstTokenTime || t0)) / 1000)).toFixed(1);
+        logEvent(`Generation finished in ${totalSec}s (${tokenCount} tokens @ ${finalTps} tok/s)`);
+        phaseLabel.textContent = "Generation Complete";
+        progressBarFill.style.width = "100%";
       } catch (err) {
         if (err.name === "AbortError") {
           logEvent("Generation cancelled by user.", "warn");
+          phaseLabel.textContent = "Cancelled";
         } else {
           logEvent(`Generation error: ${err.message}`, "err");
+          phaseLabel.textContent = "Engine Error";
         }
         statusDot.className = "dot err";
         statusText.textContent = "Error";
       } finally {
+        clearInterval(heartbeatInterval);
         isGenerating = false;
         generateBtn.disabled = false;
         stopBtn.style.display = "none";
-        progressBarFill.style.width = "100%";
-        setTimeout(() => { genProgressRow.style.display = "none"; }, 1500);
+        setTimeout(() => { if (!isGenerating) genProgressRow.style.display = "none"; }, 4000);
       }
     });
 
@@ -1035,9 +1113,9 @@
         abortController.abort();
       }
       if (webgpuWorker) {
-        webgpuWorker.postMessage({ type: "stop" });
+        webgpuWorker.postMessage({ action: "stop" });
       }
-      logEvent("Stopping generation…", "warn");
+      logEvent("Stop signal sent to active generator…", "warn");
     });
 
     function extractHtml(raw) {
@@ -1056,38 +1134,77 @@
       return txt.trim();
     }
 
-    function runWebGpuGeneration(modelKey, prompt, t0) {
+    function runWebGpuGeneration(modelKey, prompt, t0, onMetrics = null) {
       return new Promise((resolve, reject) => {
         let full = "";
         let tokCount = 0;
+        let firstTokenTime = null;
 
         const handler = (ev) => {
           const msg = ev.data;
-          if (msg.type === "chunk") {
-            full += msg.text;
-            tokCount++;
+          if (!msg) return;
+
+          if (msg.type === "log") {
+            logEvent(`[WebGPU] ${msg.message}`);
+          } else if (msg.type === "status") {
+            phaseLabel.textContent = msg.message;
+            logEvent(`[WebGPU Status] ${msg.message}`);
+          } else if (msg.type === "load_progress") {
+            const pct = msg.percent || 0;
+            progressBarFill.style.width = `${Math.min(100, pct)}%`;
+            const fileInfo = msg.file ? msg.file.split("/").pop() : "weights";
+            const mbInfo = msg.totalMB ? ` (${msg.loadedMB || 0}/${msg.totalMB} MB)` : "";
+            phaseLabel.textContent = `Loading ${fileInfo}: ${pct}%${mbInfo}`;
+            tokRateLabel.textContent = `Transferring ONNX shards… ${pct}%`;
+          } else if (msg.type === "token") {
+            if (!firstTokenTime) {
+              firstTokenTime = performance.now();
+              const ttft = ((firstTokenTime - t0) / 1000).toFixed(2);
+              logEvent(`[WebGPU] First token generated (TTFT: ${ttft}s)`, "heal");
+              if (onMetrics) onMetrics({ firstTokenTime, tokenCount: tokCount });
+            }
+            full += (msg.chunk || "");
+            tokCount = msg.tokenCount || (tokCount + 1);
+            if (onMetrics) onMetrics({ firstTokenTime, tokenCount: tokCount });
+
             codeViewer.textContent = full;
-            const elapsed = (performance.now() - t0) / 1000;
-            const tps = (tokCount / Math.max(0.1, elapsed)).toFixed(1);
-            tokRateLabel.textContent = `${tokCount} tok · ${tps} tok/s`;
-            progressBarFill.style.width = `${Math.min(95, tokCount / 15)}%`;
+            codeLinesCount.textContent = `${full.split("\n").length} lines`;
+
+            const decodeElapsed = (performance.now() - firstTokenTime) / 1000;
+            const tps = decodeElapsed > 0.05 ? (tokCount / decodeElapsed).toFixed(1) : (msg.tokPerSec || 0);
+            tokRateLabel.textContent = `${tokCount} tokens · ${tps} tok/s`;
+
+            const targetEstimate = 1200;
+            const remainingTokens = Math.max(0, targetEstimate - tokCount);
+            if (parseFloat(tps) > 1) {
+              const secLeft = Math.round(remainingTokens / parseFloat(tps));
+              estTimeLabel.textContent = secLeft > 0 ? `Est. remaining: ~${secLeft}s` : "Finalizing syntax…";
+            }
+
+            progressBarFill.style.width = `${Math.min(95, Math.round((tokCount / targetEstimate) * 100))}%`;
+            phaseLabel.textContent = msg.streamPhase === "streaming_html" ? "Writing Three.js HTML Scene…" : "Generating Geometry Plan…";
           } else if (msg.type === "complete") {
             webgpuWorker.removeEventListener("message", handler);
-            resolve(full);
+            resolve(msg.fullText || full);
           } else if (msg.type === "error") {
             webgpuWorker.removeEventListener("message", handler);
-            reject(new Error(msg.message || "WebGPU worker error"));
+            const errStr = `${msg.message || "WebGPU Error"}${msg.detail ? ": " + msg.detail : ""}`;
+            logEvent(`[WebGPU Error] ${errStr}`, "err");
+            reject(new Error(errStr));
           }
         };
 
         webgpuWorker.addEventListener("message", handler);
         webgpuWorker.postMessage({
-          type: "generate",
-          modelKey,
-          prompt,
-          temp: parseFloat(tempSlider.value),
-          maxTokens: parseInt(tokensSlider.value),
-          thinkingMode: "fast"
+          action: "generate",
+          payload: {
+            modelId: modelKey,
+            dtype: "q4f16",
+            prompt: prompt,
+            temperature: parseFloat(tempSlider.value),
+            maxNewTokens: parseInt(tokensSlider.value),
+            thinkingMode: "fast"
+          }
         });
       });
     }
