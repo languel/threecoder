@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Axis — Formal Garden</title>
+
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #25332d;
+      --paper: rgba(245, 242, 230, 0.82);
+      --line: rgba(45, 66, 54, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #dbe5e0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      outline: none;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      color: var(--ink);
+    }
+
+    .title-card {
+      position: absolute;
+      top: 28px;
+      left: 30px;
+      max-width: 360px;
+      padding: 18px 20px 17px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 14px 40px rgba(41, 56, 47, 0.08);
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      opacity: 0.66;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(28px, 3.2vw, 44px);
+      font-weight: 400;
+      letter-spacing: -0.025em;
+      line-height: 1;
+    }
+
+    .subtitle {
+      margin: 11px 0 0;
+      max-width: 290px;
+      font-size: 12px;
+      line-height: 1.6;
+      opacity: 0.72;
+    }
+
+    .view-buttons {
+      position: absolute;
+      top: 28px;
+      right: 30px;
+      display: flex;
+      gap: 6px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      pointer-events: auto;
+    }
+
+    button {
+      border: 0;
+      padding: 9px 12px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 160ms ease, color 160ms ease;
+    }
+
+    button:hover,
+    button.active {
+      background: var(--ink);
+      color: #f4f1e6;
+    }
+
+    .help {
+      position: absolute;
+      bottom: 25px;
+      left: 30px;
+      padding: 10px 13px;
+      border-left: 2px solid rgba(37, 51, 45, 0.55);
+      background: rgba(245, 242, 230, 0.58);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .axis-key {
+      position: absolute;
+      right: 30px;
+      bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .axis-key::before {
+      content: "";
+      width: 30px;
+      height: 1px;
+      background: #526a5c;
+      box-shadow: 0 0 0 1px rgba(82, 106, 92, 0.08);
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      background: #dbe5e0;
+      color: #41554a;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      transition: opacity 500ms ease, visibility 500ms ease;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    @media (max-width: 700px) {
+      .title-card {
+        top: 14px;
+        left: 14px;
+        padding: 14px 16px;
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .view-buttons {
+        top: auto;
+        right: 14px;
+        bottom: 62px;
+      }
+
+      button {
+        padding: 9px;
+        font-size: 9px;
+      }
+
+      .help {
+        left: 14px;
+        bottom: 14px;
+        max-width: calc(100vw - 28px);
+        font-size: 9px;
+      }
+
+      .axis-key {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="scene" aria-label="Interactive formal garden with a reflecting canal"></canvas>
+
+  <div class="overlay">
+    <section class="title-card">
+      <p class="eyebrow">A formal garden study</p>
+      <h1>The Axis</h1>
+      <p class="subtitle">
+        A long reflecting canal separates ten clipped planting rooms.
+        Discreet footbridges and transverse paths connect the gardens while
+        preserving the central vista.
+      </p>
+    </section>
+
+    <nav class="view-buttons" aria-label="Camera views">
+      <button class="active" data-view="perspective">Perspective</button>
+      <button data-view="plan">Plan</button>
+      <button data-view="axis">Axis</button>
+    </nav>
+
+    <div class="help">Drag to orbit · Scroll to zoom · Shift-drag to pan</div>
+    <div class="axis-key">Central canal axis</div>
+  </div>
+
+  <div id="loading">Preparing the garden</div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer and scene
+    // -------------------------------------------------------------------------
+
+    const canvas = document.querySelector("#scene");
+    const loading = document.querySelector("#loading");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // The garden and lights are static, so shadows only need one initial update.
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xdbe5e0);
+    scene.fog = new THREE.Fog(0xdbe5e0, 78, 185);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      400
+    );
+
+    // -------------------------------------------------------------------------
+    // Procedural textures
+    // -------------------------------------------------------------------------
+
+    function seededRandom(seed) {
+      return function () {
+        seed |= 0;
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function makeFoliageTexture() {
+      const size = 128;
+      const textureCanvas = document.createElement("canvas");
+      textureCanvas.width = textureCanvas.height = size;
+
+      const context = textureCanvas.getContext("2d");
+      const image = context.createImageData(size, size);
+      const random = seededRandom(1931);
+
+      for (let i = 0; i < image.data.length; i += 4) {
+        const variation = Math.floor((random() - 0.5) * 35);
+        const warm = random() > 0.91 ? 10 : 0;
+
+        image.data[i] = 47 + variation + warm;
+        image.data[i + 1] = 79 + variation;
+        image.data[i + 2] = 45 + variation;
+        image.data[i + 3] = 255;
+      }
+
+      context.putImageData(image, 0, 0);
+
+      const texture = new THREE.CanvasTexture(textureCanvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(2, 2);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy()
+      );
+
+      return texture;
+    }
+
+    const foliageTexture = makeFoliageTexture();
+
+    // -------------------------------------------------------------------------
+    // Materials
+    // -------------------------------------------------------------------------
+
+    const materials = {
+      ground: new THREE.MeshStandardMaterial({
+        color: 0xb9b49a,
+        roughness: 0.98
+      }),
+      path: new THREE.MeshStandardMaterial({
+        color: 0xd2cab4,
+        roughness: 0.93
+      }),
+      stone: new THREE.MeshStandardMaterial({
+        color: 0xded8c5,
+        roughness: 0.88
+      }),
+      joint: new THREE.MeshStandardMaterial({
+        color: 0xa9a58f,
+        roughness: 0.96
+      }),
+      bed: new THREE.MeshStandardMaterial({
+        color: 0x75865c,
+        roughness: 1
+      }),
+      hedge: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: foliageTexture,
+        roughness: 0.98
+      }),
+      cypress: new THREE.MeshStandardMaterial({
+        color: 0x2e4d32,
+        roughness: 1
+      }),
+      topiary: new THREE.MeshStandardMaterial({
+        color: 0x47653d,
+        map: foliageTexture,
+        roughness: 0.98
+      }),
+      soil: new THREE.MeshStandardMaterial({
+        color: 0x40523a,
+        roughness: 1
+      })
+    };
+
+    const flowerMaterials = [
+      new THREE.MeshStandardMaterial({ color: 0xf1ead7, roughness: 0.78 }),
+      new THREE.MeshStandardMaterial({ color: 0xb4a4c4, roughness: 0.78 }),
+      new THREE.MeshStandardMaterial({ color: 0xb97870, roughness: 0.78 })
+    ];
+
+    // -------------------------------------------------------------------------
+    // Sky and lighting
+    // -------------------------------------------------------------------------
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(235, 40, 24),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        vertexShader: `
+          varying vec3 vWorldPosition;
+
+          void main() {
+            vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+            gl_Position = projectionMatrix * modelViewMatrix *
+                          vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorldPosition;
+
+          void main() {
+            vec3 direction = normalize(vWorldPosition);
+            float height = smoothstep(-0.08, 0.88, direction.y);
+
+            vec3 horizon = vec3(0.77, 0.83, 0.80);
+            vec3 zenith = vec3(0.38, 0.58, 0.68);
+            vec3 color = mix(horizon, zenith, height);
+
+            vec3 sunDirection = normalize(vec3(-0.45, 0.65, 0.35));
+            float sun = max(dot(direction, sunDirection), 0.0);
+            color += pow(sun, 180.0) * vec3(1.0, 0.88, 0.64) * 1.1;
+            color += pow(sun, 12.0) * vec3(0.20, 0.14, 0.07);
+
+            gl_FragColor = vec4(color, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }
+        `
+      })
+    );
+
+    sky.renderOrder = -1000;
+    scene.add(sky);
+
+    const hemisphere = new THREE.HemisphereLight(0xe7f0ed, 0x666044, 1.85);
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xfff0d5, 3.25);
+    sun.position.set(-34, 56, 28);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -58;
+    sun.shadow.camera.right = 58;
+    sun.shadow.camera.top = 67;
+    sun.shadow.camera.bottom = -67;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 150;
+    sun.shadow.bias = -0.00025;
+    sun.shadow.normalBias = 0.035;
+    scene.add(sun);
+    scene.add(sun.target);
+
+    // -------------------------------------------------------------------------
+    // Instanced geometry helpers
+    // -------------------------------------------------------------------------
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const instanceSets = {
+      tallHedge: [],
+      lowHedge: [],
+      bed: [],
+      path: [],
+      joint: [],
+      topiary: [],
+      trunk: [],
+      cypress: [],
+      bench: [],
+      benchLeg: []
+    };
+
+    const dummy = new THREE.Object3D();
+
+    function addInstance(set, x, y, z, sx, sy, sz, rotationY = 0) {
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(0, rotationY, 0);
+      dummy.scale.set(sx, sy, sz);
+      dummy.updateMatrix();
+      instanceSets[set].push(dummy.matrix.clone());
+    }
+
+    function createInstances(geometry, material, matrices, castShadow = true) {
+      if (!matrices.length) return null;
+
+      const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
+      matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function addBox(width, height, depth, x, y, z, material, castShadow = true) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, depth),
+        material
+      );
+      mesh.position.set(x, y, z);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Ground, paths and clipped rooms
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(94, 164),
+      materials.ground
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.055;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const canalLength = 116;
+    const canalHalfWidth = 2.6;
+    const roomCenters = [-40, -20, 0, 20, 40];
+    const roomBoundaries = [-50, -30, -10, 10, 30, 50];
+
+    // Long side paths remain parallel to the axis.
+    for (const side of [-1, 1]) {
+      addBox(
+        1.75, 0.09, canalLength,
+        side * 4.15, 0.015, 0,
+        materials.path,
+        false
+      );
+
+      addBox(
+        2.0, 0.09, canalLength,
+        side * 12.45, 0.015, 0,
+        materials.path,
+        false
+      );
+    }
+
+    // Cross paths and the two discreet footbridge thresholds.
+    for (const z of [-10, 10]) {
+      for (const side of [-1, 1]) {
+        addBox(
+          8.4, 0.10, 1.35,
+          side * 7.65, 0.055, z,
+          materials.path,
+          false
+        );
+      }
+    }
+
+    // Planting beds and internal parterre paths.
+    for (const side of [-1, 1]) {
+      for (const z of roomCenters) {
+        const roomX = side * 8.2;
+
+        addBox(
+          5.2, 0.13, 14.4,
+          roomX, 0.09, z,
+          materials.bed,
+          false
+        );
+
+        addBox(
+          0.5, 0.075, 14.4,
+          roomX, 0.19, z,
+          materials.path,
+          false
+        );
+
+        addBox(
+          5.2, 0.075, 0.5,
+          roomX, 0.19, z,
+          materials.path,
+          false
+        );
+      }
+    }
+
+    // Tall clipped hedges define ten garden rooms.
+    for (const side of [-1, 1]) {
+      for (const z of roomCenters) {
+        // Outer hedge.
+        addInstance(
+          "tallHedge",
+          side * 11.12, 0.75, z,
+          0.58, 1.42, 18.45
+        );
+
+        // Inner hedge, split to leave an entrance from the axial side path.
+        addInstance(
+          "tallHedge",
+          side * 5.15, 0.75, z - 5.6,
+          0.56, 1.42, 7.0
+        );
+
+        addInstance(
+          "tallHedge",
+          side * 5.15, 0.75, z + 5.6,
+          0.56, 1.42, 7.0
+        );
+      }
+
+      // Transverse clipped hedges, with gaps at bridge paths.
+      for (const boundary of roomBoundaries) {
+        if (boundary === -10 || boundary === 10) {
+          addInstance(
+            "tallHedge",
+            side * 8.15, 0.75, boundary - 1.25,
+            5.95, 1.42, 1.25
+          );
+
+          addInstance(
+            "tallHedge",
+            side * 8.15, 0.75, boundary + 1.25,
+            5.95, 1.42, 1.25
+          );
+        } else {
+          addInstance(
+            "tallHedge",
+            side * 8.15, 0.75, boundary,
+            5.95, 1.42, 0.58
+          );
+        }
+      }
+
+      // Outer enclosure.
+      addInstance(
+        "tallHedge",
+        side * 14.45, 0.90, 0,
+        0.72, 1.72, 118
+      );
+    }
+
+    // Four low parterres in every room.
+    const random = seededRandom(7254);
+    const flowerMatrices = [[], [], []];
+
+    for (const side of [-1, 1]) {
+      for (const roomZ of roomCenters) {
+        const roomX = side * 8.2;
+
+        for (const xOffset of [-1.42, 1.42]) {
+          for (const zOffset of [-3.75, 3.75]) {
+            const bedX = roomX + xOffset;
+            const bedZ = roomZ + zOffset;
+            const bedWidth = 1.75;
+            const bedLength = 5.8;
+
+            addInstance(
+              "lowHedge",
+              bedX - bedWidth / 2, 0.35, bedZ,
+              0.17, 0.34, bedLength + 0.17
+            );
+
+            addInstance(
+              "lowHedge",
+              bedX + bedWidth / 2, 0.35, bedZ,
+              0.17, 0.34, bedLength + 0.17
+            );
+
+            addInstance(
+              "lowHedge",
+              bedX, 0.35, bedZ - bedLength / 2,
+              bedWidth, 0.34, 0.17
+            );
+
+            addInstance(
+              "lowHedge",
+              bedX, 0.35, bedZ + bedLength / 2,
+              bedWidth, 0.34, 0.17
+            );
+
+            // Small flowers embedded in the parterres.
+            for (let i = 0; i < 16; i++) {
+              const flowerX =
+                bedX + (random() - 0.5) * (bedWidth - 0.34);
+              const flowerZ =
+                bedZ + (random() - 0.5) * (bedLength - 0.34);
+              const size = 0.055 + random() * 0.035;
+              const colorIndex = Math.floor(random() * flowerMatrices.length);
+
+              const matrix = new THREE.Matrix4();
+              matrix.compose(
+                new THREE.Vector3(flowerX, 0.31, flowerZ),
+                new THREE.Quaternion(),
+                new THREE.Vector3(size, size, size)
+              );
+              flowerMatrices[colorIndex].push(matrix);
+            }
+          }
+        }
+
+        // Rounded topiary at the garden-room entrance.
+        for (const zOffset of [-7.0, 7.0]) {
+          addInstance(
+            "topiary",
+            side * 5.72, 0.87, roomZ + zOffset,
+            0.49, 0.49, 0.49
+          );
+
+          addInstance(
+            "trunk",
+            side * 5.72, 0.39, roomZ + zOffset,
+            0.13, 0.48, 0.13
+          );
+        }
+      }
+    }
+
+    // Cypress trees along the outer promenade.
+    for (const side of [-1, 1]) {
+      for (const z of [-45, -30, -15, 0, 15, 30, 45]) {
+        addInstance(
+          "cypress",
+          side * 13.55, 2.25, z,
+          0.60, 3.95, 0.60
+        );
+
+        addInstance(
+          "cypress",
+          side * 13.55, 3.42, z,
+          0.42, 2.35, 0.42
+        );
+
+        addInstance(
+          "trunk",
+          side * 13.55, 0.46, z,
+          0.16, 0.90, 0.16
+        );
+      }
+
+      // Stone benches against the outer hedge.
+      for (const z of [-40, -20, 0, 20, 40]) {
+        addInstance(
+          "bench",
+          side * 13.98, 0.60, z,
+          0.68, 0.20, 2.35
+        );
+
+        addInstance(
+          "benchLeg",
+          side * 13.98, 0.30, z - 0.78,
+          0.48, 0.60, 0.24
+        );
+
+        addInstance(
+          "benchLeg",
+          side * 13.98, 0.30, z + 0.78,
+          0.48, 0.60, 0.24
+        );
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Canal stonework
+    // -------------------------------------------------------------------------
+
+    addBox(
+      5.45, 0.18, canalLength,
+      0, 0.035, 0,
+      materials.soil,
+      false
+    );
+
+    for (const side of [-1, 1]) {
+      addBox(
+        0.46, 0.31, canalLength,
+        side * 2.82, 0.12, 0,
+        materials.stone
+      );
+
+      for (let z = -56; z <= 56; z += 4) {
+        addInstance(
+          "joint",
+          side * 2.82, 0.285, z,
+          0.465, 0.012, 0.035
+        );
+      }
+    }
+
+    for (const z of [-58, 58]) {
+      addBox(
+        6.1, 0.31, 0.46,
+        0, 0.12, z,
+        materials.stone
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Low-profile arched footbridges
+    // -------------------------------------------------------------------------
+
+    const bridgeShape = new THREE.Shape();
+    bridgeShape.moveTo(-3.45, 0);
+    bridgeShape.lineTo(3.45, 0);
+    bridgeShape.lineTo(3.45, 0.15);
+    bridgeShape.quadraticCurveTo(0, 0.60, -3.45, 0.15);
+    bridgeShape.closePath();
+
+    const bridgeGeometry = new THREE.ExtrudeGeometry(bridgeShape, {
+      depth: 1.25,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      bevelSize: 0.035,
+      bevelThickness: 0.035,
+      curveSegments: 24,
+      steps: 1
+    });
+
+    for (const z of [-10, 10]) {
+      const bridge = new THREE.Mesh(bridgeGeometry, materials.stone);
+      bridge.position.set(0, 0.16, z - 0.625);
+      bridge.castShadow = true;
+      bridge.receiveShadow = true;
+      scene.add(bridge);
+    }
+
+    // -------------------------------------------------------------------------
+    // Terminal salon and classical urn
+    // -------------------------------------------------------------------------
+
+    const terminalCourt = new THREE.Mesh(
+      new THREE.CylinderGeometry(5.45, 5.45, 0.16, 64),
+      materials.path
+    );
+    terminalCourt.position.set(0, 0.01, -64);
+    terminalCourt.receiveShadow = true;
+    scene.add(terminalCourt);
+
+    addBox(
+      2.35, 0.12, 7,
+      0, 0.04, -61.3,
+      materials.path,
+      false
+    );
+
+    const hedgeRing = new THREE.Mesh(
+      new THREE.TorusGeometry(4.72, 0.22, 8, 72),
+      materials.hedge
+    );
+    hedgeRing.rotation.x = Math.PI / 2;
+    hedgeRing.position.set(0, 0.25, -64);
+    hedgeRing.castShadow = true;
+    hedgeRing.receiveShadow = true;
+    scene.add(hedgeRing);
+
+    const urnProfile = [
+      new THREE.Vector2(0.00, 0.00),
+      new THREE.Vector2(0.42, 0.00),
+      new THREE.Vector2(0.50, 0.10),
+      new THREE.Vector2(0.36, 0.25),
+      new THREE.Vector2(0.28, 0.54),
+      new THREE.Vector2(0.47, 0.73),
+      new THREE.Vector2(0.43, 0.94),
+      new THREE.Vector2(0.27, 1.05),
+      new THREE.Vector2(0.34, 1.15),
+      new THREE.Vector2(0.25, 1.23)
+    ];
+
+    const urnGeometry = new THREE.LatheGeometry(urnProfile, 32);
+    const terminalUrn = new THREE.Mesh(urnGeometry, materials.stone);
+    terminalUrn.position.set(0, 0.10, -64);
+    terminalUrn.scale.setScalar(1.25);
+    terminalUrn.castShadow = true;
+    terminalUrn.receiveShadow = true;
+    scene.add(terminalUrn);
+
+    // Small urns mark the outer ends of the transverse paths.
+    for (const z of [-10, 10]) {
+      for (const side of [-1, 1]) {
+        const urn = new THREE.Mesh(urnGeometry, materials.stone);
+        urn.position.set(side * 11.55, 0.10, z);
+        urn.scale.setScalar(0.62);
+        urn.castShadow = true;
+        urn.receiveShadow = true;
+        scene.add(urn);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Low outer walls
+    // -------------------------------------------------------------------------
+
+    for (const side of [-1, 1]) {
+      addBox(
+        0.48, 0.62, 119,
+        side * 15.35, 0.25, 0,
+        materials.stone
+      );
+    }
+
+    for (const z of [-59.0, 59.0]) {
+      for (const side of [-1, 1]) {
+        addBox(
+          11.9, 0.48, 0.48,
+          side * 9.25, 0.19, z,
+          materials.stone
+        );
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Commit instanced objects
+    // -------------------------------------------------------------------------
+
+    createInstances(unitBox, materials.hedge, instanceSets.tallHedge);
+    createInstances(unitBox, materials.hedge, instanceSets.lowHedge);
+    createInstances(unitBox, materials.joint, instanceSets.joint, false);
+
+    createInstances(
+      new THREE.SphereGeometry(1, 12, 8),
+      materials.topiary,
+      instanceSets.topiary
+    );
+
+    createInstances(
+      new THREE.CylinderGeometry(1, 1, 1, 8),
+      materials.soil,
+      instanceSets.trunk
+    );
+
+    createInstances(
+      new THREE.ConeGeometry(1, 1, 12),
+      materials.cypress,
+      instanceSets.cypress
+    );
+
+    createInstances(unitBox, materials.stone, instanceSets.bench);
+    createInstances(unitBox, materials.stone, instanceSets.benchLeg);
+
+    const flowerGeometry = new THREE.IcosahedronGeometry(1, 1);
+    flowerMatrices.forEach((matrices, index) => {
+      createInstances(
+        flowerGeometry,
+        flowerMaterials[index],
+        matrices,
+        false
+      );
+    });
+
+    // -------------------------------------------------------------------------
+    // Planar reflection water, implemented directly with the Three.js core
+    // -------------------------------------------------------------------------
+
+    const reflectionTarget = new THREE.WebGLRenderTarget(1024, 1024, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
+      depthBuffer: true,
+      stencilBuffer: false
+    });
+
+    reflectionTarget.texture.generateMipmaps = false;
+
+    const waterMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: reflectionTarget.texture },
+        color: { value: new THREE.Color(0x315f5d) },
+        textureMatrix: { value: new THREE.Matrix4() },
+        time: { value: 0 }
+      },
+      vertexShader: `
+        uniform mat4 textureMatrix;
+        varying vec4 vReflectionCoord;
+
+        void main() {
+          vReflectionCoord = textureMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * modelViewMatrix *
+                        vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec3 color;
+        uniform float time;
+
+        varying vec4 vReflectionCoord;
+
+        void main() {
+          vec4 coord = vReflectionCoord;
+
+          vec2 ripple = vec2(
+            sin(coord.y * 0.085 + time * 0.65) +
+            sin(coord.x * 0.19 - time * 0.38),
+            cos(coord.x * 0.075 - time * 0.52) +
+            sin(coord.y * 0.16 + time * 0.34)
+          );
+
+          coord.xy += ripple * 0.00115 * coord.w;
+
+          vec3 reflection = texture2DProj(tDiffuse, coord).rgb;
+          float glint = pow(
+            0.5 + 0.5 * sin(coord.x * 0.10 + coord.y * 0.055 + time),
+            18.0
+          );
+
+          vec3 water = mix(color * 0.75, reflection, 0.80);
+          water += glint * vec3(0.055, 0.075, 0.065);
+
+          gl_FragColor = vec4(water, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }
+      `
+    });
+
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.2, canalLength),
+      waterMaterial
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.165;
+    water.receiveShadow = false;
+    scene.add(water);
+
+    const reflectorWorldPosition = new THREE.Vector3();
+    const cameraWorldPosition = new THREE.Vector3();
+    const reflectionNormal = new THREE.Vector3();
+    const view = new THREE.Vector3();
+    const target = new THREE.Vector3();
+    const lookAtPosition = new THREE.Vector3();
+    const rotationMatrix = new THREE.Matrix4();
+    const textureMatrix = new THREE.Matrix4();
+    const clipPlane = new THREE.Vector4();
+    const q = new THREE.Vector4();
+    const reflectorPlane = new THREE.Plane();
+    const virtualCamera = new THREE.PerspectiveCamera();
+
+    water.onBeforeRender = function (activeRenderer, activeScene, activeCamera) {
+      reflectorWorldPosition.setFromMatrixPosition(this.matrixWorld);
+      cameraWorldPosition.setFromMatrixPosition(activeCamera.matrixWorld);
+
+      rotationMatrix.extractRotation(this.matrixWorld);
+      reflectionNormal.set(0, 0, 1).applyMatrix4(rotationMatrix);
+
+      view.subVectors(reflectorWorldPosition, cameraWorldPosition);
+
+      if (view.dot(reflectionNormal) > 0) return;
+
+      view.reflect(reflectionNormal).negate().add(reflectorWorldPosition);
+
+      rotationMatrix.extractRotation(activeCamera.matrixWorld);
+      lookAtPosition.set(0, 0, -1)
+        .applyMatrix4(rotationMatrix)
+        .add(cameraWorldPosition);
+
+      target.subVectors(reflectorWorldPosition, lookAtPosition);
+      target.reflect(reflectionNormal).negate().add(reflectorWorldPosition);
+
+      virtualCamera.position.copy(view);
+      virtualCamera.up.set(0, 1, 0)
+        .applyMatrix4(rotationMatrix)
+        .reflect(reflectionNormal);
+      virtualCamera.lookAt(target);
+      virtualCamera.near = activeCamera.near;
+      virtualCamera.far = activeCamera.far;
+      virtualCamera.updateMatrixWorld();
+      virtualCamera.projectionMatrix.copy(activeCamera.projectionMatrix);
+
+      textureMatrix.set(
+        0.5, 0.0, 0.0, 0.5,
+        0.0, 0.5, 0.0, 0.5,
+        0.0, 0.0, 0.5, 0.5,
+        0.0, 0.0, 0.0, 1.0
+      );
+      textureMatrix.multiply(virtualCamera.projectionMatrix);
+      textureMatrix.multiply(virtualCamera.matrixWorldInverse);
+      textureMatrix.multiply(this.matrixWorld);
+      waterMaterial.uniforms.textureMatrix.value.copy(textureMatrix);
+
+      // Oblique near-plane clipping removes geometry below the water.
+      reflectorPlane.setFromNormalAndCoplanarPoint(
+        reflectionNormal,
+        reflectorWorldPosition
+      );
+      reflectorPlane.applyMatrix4(virtualCamera.matrixWorldInverse);
+
+      clipPlane.set(
+        reflectorPlane.normal.x,
+        reflectorPlane.normal.y,
+        reflectorPlane.normal.z,
+        reflectorPlane.constant
+      );
+
+      const projectionMatrix = virtualCamera.projectionMatrix;
+
+      q.x = (Math.sign(clipPlane.x) + projectionMatrix.elements[8]) /
+        projectionMatrix.elements[0];
+      q.y = (Math.sign(clipPlane.y) + projectionMatrix.elements[9]) /
+        projectionMatrix.elements[5];
+      q.z = -1.0;
+      q.w = (1.0 + projectionMatrix.elements[10]) /
+        projectionMatrix.elements[14];
+
+      clipPlane.multiplyScalar(2.0 / clipPlane.dot(q));
+
+      projectionMatrix.elements[2] = clipPlane.x;
+      projectionMatrix.elements[6] = clipPlane.y;
+      projectionMatrix.elements[10] = clipPlane.z + 1.0;
+      projectionMatrix.elements[14] = clipPlane.w;
+
+      const previousTarget = activeRenderer.getRenderTarget();
+      const previousAutoUpdate = activeRenderer.shadowMap.autoUpdate;
+      const previousNeedsUpdate = activeRenderer.shadowMap.needsUpdate;
+
+      this.visible = false;
+      activeRenderer.shadowMap.autoUpdate = false;
+      activeRenderer.shadowMap.needsUpdate = false;
+
+      activeRenderer.setRenderTarget(reflectionTarget);
+      activeRenderer.render(activeScene, virtualCamera);
+
+      this.visible = true;
+      activeRenderer.shadowMap.autoUpdate = previousAutoUpdate;
+      activeRenderer.shadowMap.needsUpdate = previousNeedsUpdate;
+      activeRenderer.setRenderTarget(previousTarget);
+    };
+
+    // -------------------------------------------------------------------------
+    // Direct camera controls
+    // -------------------------------------------------------------------------
+
+    class GardenControls {
+      constructor(activeCamera, element) {
+        this.camera = activeCamera;
+        this.element = element;
+
+        this.target = new THREE.Vector3(0, 0, -2);
+        this.goalTarget = this.target.clone();
+
+        this.radius = 82;
+        this.goalRadius = this.radius;
+
+        this.theta = 0.72;
+        this.goalTheta = this.theta;
+
+        this.phi = 0.86;
+        this.goalPhi = this.phi;
+
+        this.pointers = new Map();
+        this.lastPinchDistance = 0;
+        this.dragMode = "orbit";
+
+        this.forward = new THREE.Vector3();
+        this.right = new THREE.Vector3();
+        this.up = new THREE.Vector3(0, 1, 0);
+
+        this.bindEvents();
+        this.update(1);
+      }
+
+      bindEvents() {
+        this.element.addEventListener("contextmenu", event => {
+          event.preventDefault();
+        });
+
+        this.element.addEventListener("pointerdown", event => {
+          this.element.setPointerCapture(event.pointerId);
+          this.pointers.set(event.pointerId, {
+            x: event.clientX,
+            y: event.clientY
+          });
+
+          if (this.pointers.size === 2) {
+            this.dragMode = "pinch";
+            this.lastPinchDistance = this.getPinchDistance();
+          } else {
+            this.dragMode =
+              event.button === 2 || event.shiftKey ? "pan" : "orbit";
+          }
+        });
+
+        this.element.addEventListener("pointermove", event => {
+          const pointer = this.pointers.get(event.pointerId);
+          if (!pointer) return;
+
+          const dx = event.clientX - pointer.x;
+          const dy = event.clientY - pointer.y;
+
+          pointer.x = event.clientX;
+          pointer.y = event.clientY;
+
+          if (this.pointers.size === 2) {
+            const distance = this.getPinchDistance();
+
+            if (this.lastPinchDistance > 0 && distance > 0) {
+              this.goalRadius = THREE.MathUtils.clamp(
+                this.goalRadius * (this.lastPinchDistance / distance),
+                20,
+                145
+              );
+            }
+
+            this.lastPinchDistance = distance;
+            return;
+          }
+
+          if (this.dragMode === "pan") {
+            this.pan(dx, dy);
+          } else {
+            this.goalTheta -= dx * 0.005;
+            this.goalPhi = THREE.MathUtils.clamp(
+              this.goalPhi - dy * 0.0045,
+              0.14,
+              1.42
+            );
+          }
+        });
+
+        const releasePointer = event => {
+          this.pointers.delete(event.pointerId);
+
+          if (this.pointers.size < 2) {
+            this.lastPinchDistance = 0;
+          }
+
+          if (this.pointers.size === 0) {
+            this.dragMode = "orbit";
+          }
+        };
+
+        this.element.addEventListener("pointerup", releasePointer);
+        this.element.addEventListener("pointercancel", releasePointer);
+
+        this.element.addEventListener(
+          "wheel",
+          event => {
+            event.preventDefault();
+
+            this.goalRadius = THREE.MathUtils.clamp(
+              this.goalRadius * Math.exp(event.deltaY * 0.001),
+              20,
+              145
+            );
+          },
+          { passive: false }
+        );
+
+        window.addEventListener("keydown", event => {
+          const key = event.key;
+
+          if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-"].includes(key)) {
+            event.preventDefault();
+          }
+
+          if (key === "ArrowLeft") this.goalTheta += 0.08;
+          if (key === "ArrowRight") this.goalTheta -= 0.08;
+          if (key === "ArrowUp") {
+            this.goalPhi = THREE.MathUtils.clamp(this.goalPhi - 0.06, 0.14, 1.42);
+          }
+          if (key === "ArrowDown") {
+            this.goalPhi = THREE.MathUtils.clamp(this.goalPhi + 0.06, 0.14, 1.42);
+          }
+          if (key === "+" || key === "=") {
+            this.goalRadius = Math.max(20, this.goalRadius * 0.9);
+          }
+          if (key === "-") {
+            this.goalRadius = Math.min(145, this.goalRadius * 1.1);
+          }
+        });
+      }
+
+      getPinchDistance() {
+        const values = [...this.pointers.values()];
+        if (values.length < 2) return 0;
+
+        return Math.hypot(
+          values[0].x - values[1].x,
+          values[0].y - values[1].y
+        );
+      }
+
+      pan(dx, dy) {
+        this.camera.getWorldDirection(this.forward);
+        this.forward.y = 0;
+        this.forward.normalize();
+
+        this.right.crossVectors(this.forward, this.up).normalize();
+
+        const scale = this.radius * 0.00145;
+        this.goalTarget.addScaledVector(this.right, -dx * scale);
+        this.goalTarget.addScaledVector(this.forward, dy * scale);
+
+        this.goalTarget.x = THREE.MathUtils.clamp(
+          this.goalTarget.x, -30, 30
+        );
+        this.goalTarget.z = THREE.MathUtils.clamp(
+          this.goalTarget.z, -72, 72
+        );
+      }
+
+      setView(name) {
+        const views = {
+          perspective: {
+            target: [0, 0, -2],
+            radius: 82,
+            theta: 0.72,
+            phi: 0.86
+          },
+          plan: {
+            target: [0, 0, 0],
+            radius: 106,
+            theta: 0,
+            phi: 0.15
+          },
+          axis: {
+            target: [0, 0, -10],
+            radius: 96,
+            theta: 0,
+            phi: 1.25
+          }
+        };
+
+        const view = views[name];
+        if (!view) return;
+
+        this.goalTarget.set(...view.target);
+        this.goalRadius = view.radius;
+        this.goalTheta = view.theta;
+        this.goalPhi = view.phi;
+      }
+
+      update(delta) {
+        const smoothing = 1 - Math.exp(-delta * 7.5);
+
+        this.target.lerp(this.goalTarget, smoothing);
+        this.radius = THREE.MathUtils.lerp(
+          this.radius, this.goalRadius, smoothing
+        );
+        this.phi = THREE.MathUtils.lerp(
+          this.phi, this.goalPhi, smoothing
+        );
+
+        const angleDifference =
+          THREE.MathUtils.euclideanModulo(
+            this.goalTheta - this.theta + Math.PI,
+            Math.PI * 2
+          ) - Math.PI;
+
+        this.theta += angleDifference * smoothing;
+
+        const sinPhiRadius = Math.sin(this.phi) * this.radius;
+
+        this.camera.position.set(
+          this.target.x + sinPhiRadius * Math.sin(this.theta),
+          this.target.y + Math.cos(this.phi) * this.radius,
+          this.target.z + sinPhiRadius * Math.cos(this.theta)
+        );
+
+        this.camera.lookAt(this.target);
+      }
+    }
+
+    const controls = new GardenControls(camera, canvas);
+
+    document.querySelectorAll("[data-view]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-view]").forEach(item => {
+          item.classList.remove("active");
+        });
+
+        button.classList.add("active");
+        controls.setView(button.dataset.view);
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // Resize and animation
+    // -------------------------------------------------------------------------
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+    let elapsed = 0;
+    let firstFrame = true;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+      elapsed += delta;
+
+      controls.update(delta);
+      waterMaterial.uniforms.time.value = elapsed;
+
+      renderer.render(scene, camera);
+
+      if (firstFrame) {
+        firstFrame = false;
+        requestAnimationFrame(() => loading.classList.add("hidden"));
+      }
+    }
+
+    animate();
+  </script>
+</body>
+</html>

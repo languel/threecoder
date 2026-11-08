@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emberworks — Traditional Glassblowing Workshop</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f5ead8;
+      --muted: #a9aaa3;
+      --glass: rgba(20, 24, 26, 0.78);
+      --line: rgba(255, 255, 255, 0.13);
+      --orange: #ff7a32;
+      --aqua: #71d7d0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #15191c;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 20;
+      color: var(--ink);
+      background: #15191c;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-size: 12px;
+      transition: opacity 0.45s ease;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .brand {
+      position: absolute;
+      top: 24px;
+      left: 26px;
+      width: min(390px, calc(100vw - 52px));
+      padding: 17px 19px 16px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--orange);
+      border-radius: 3px;
+      background: linear-gradient(120deg, rgba(20, 24, 26, 0.92), rgba(20, 24, 26, 0.65));
+      box-shadow: 0 14px 45px rgba(0, 0, 0, 0.26);
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      color: var(--orange);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 6px 0 5px;
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(23px, 3vw, 34px);
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0.015em;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .legend {
+      position: absolute;
+      left: 26px;
+      bottom: 25px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px 16px;
+      max-width: min(570px, calc(100vw - 52px));
+      padding: 12px 15px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      color: #d3d2c9;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .swatch {
+      width: 8px;
+      height: 8px;
+      display: inline-block;
+      border-radius: 1px;
+      box-shadow: 0 0 9px currentColor;
+    }
+
+    .swatch.fire { color: #ff6a21; background: #ff6a21; }
+    .swatch.heat { color: #ffd06a; background: #ffd06a; }
+    .swatch.glass { color: #66d6cf; background: #66d6cf; }
+    .swatch.bay { color: #b8a35a; background: #b8a35a; }
+
+    .controls {
+      position: absolute;
+      right: 25px;
+      bottom: 25px;
+      width: 225px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 3px;
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+
+    .view-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+      padding: 8px 4px;
+      color: #dad8ce;
+      background: rgba(255, 255, 255, 0.045);
+      font: inherit;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    button:hover,
+    button.active {
+      color: #fff3df;
+      border-color: rgba(255, 122, 50, 0.65);
+      background: rgba(255, 122, 50, 0.14);
+    }
+
+    .help {
+      margin-top: 10px;
+      color: #858985;
+      font-size: 9px;
+      line-height: 1.5;
+      letter-spacing: 0.035em;
+    }
+
+    .scene-label {
+      position: absolute;
+      z-index: 4;
+      padding: 5px 8px 4px;
+      border: 1px solid rgba(255, 255, 255, 0.17);
+      border-radius: 2px;
+      color: #eee7d8;
+      background: rgba(17, 20, 22, 0.78);
+      box-shadow: 0 5px 18px rgba(0, 0, 0, 0.22);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+      transform: translate(-50%, -100%);
+      backdrop-filter: blur(5px);
+    }
+
+    .scene-label::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      width: 1px;
+      height: 12px;
+      background: linear-gradient(rgba(255,255,255,0.35), transparent);
+    }
+
+    .scene-label.hot {
+      border-color: rgba(255, 122, 50, 0.42);
+      color: #ffd1a7;
+    }
+
+    @media (max-width: 700px) {
+      .brand { top: 14px; left: 14px; width: calc(100vw - 28px); }
+      .brand p { display: none; }
+      .legend { left: 14px; bottom: 14px; max-width: calc(100vw - 28px); }
+      .controls { right: 14px; bottom: 91px; width: 190px; }
+      .scene-label { font-size: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Constructing the workshop</div>
+
+  <div class="hud">
+    <section class="brand">
+      <div class="eyebrow">A voxel study · hot craft</div>
+      <h1>Emberworks</h1>
+      <p>Traditional glassblowing workshop. The furnace, reheating chamber,
+        annealing line, and shared extraction duct form one connected hot zone.</p>
+    </section>
+
+    <section class="legend">
+      <span><i class="swatch fire"></i> Main furnace</span>
+      <span><i class="swatch heat"></i> Reheating chamber</span>
+      <span><i class="swatch glass"></i> Hot glass</span>
+      <span><i class="swatch bay"></i> Turning bay</span>
+    </section>
+
+    <nav class="controls" aria-label="Camera views">
+      <div class="view-buttons">
+        <button class="active" data-view="overview">Overview</button>
+        <button data-view="bench">Bench</button>
+        <button data-view="hot">Hot line</button>
+      </div>
+      <div class="help">
+        Drag to orbit · wheel to zoom<br />
+        Shift-drag or right-drag to pan
+      </div>
+    </nav>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x15191c);
+    scene.fog = new THREE.Fog(0x15191c, 21, 43);
+
+    const camera = new THREE.PerspectiveCamera(
+      40,
+      innerWidth / innerHeight,
+      0.1,
+      100
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.prepend(renderer.domElement);
+
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const dummy = new THREE.Object3D();
+
+    const material = (color, options = {}) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.86,
+        metalness: 0.04,
+        flatShading: true,
+        ...options
+      });
+
+    const M = {
+      stone: material(0x505451, { roughness: 0.98 }),
+      stoneDark: material(0x343a39, { roughness: 1 }),
+      stoneLight: material(0x686a63, { roughness: 0.95 }),
+      brick: material(0x684a3b, { roughness: 0.95 }),
+      brickDark: material(0x4d3931, { roughness: 0.98 }),
+      brickPale: material(0x80604a, { roughness: 0.92 }),
+      iron: material(0x252c2e, { roughness: 0.65, metalness: 0.58 }),
+      ironLight: material(0x4a5251, { roughness: 0.58, metalness: 0.62 }),
+      steel: material(0x89918d, { roughness: 0.42, metalness: 0.76 }),
+      black: material(0x090b0b, { roughness: 1 }),
+      wood: material(0x775238, { roughness: 0.93 }),
+      woodLight: material(0x9a7147, { roughness: 0.9 }),
+      woodDark: material(0x48372e, { roughness: 0.96 }),
+      brass: material(0x9c7740, { roughness: 0.55, metalness: 0.5 }),
+      canvas: material(0x675d49, { roughness: 1 }),
+      shirt: material(0x385a62, { roughness: 0.9 }),
+      pants: material(0x293238, { roughness: 0.95 }),
+      skin: material(0xb98260, { roughness: 0.92 }),
+      hair: material(0x2d2522, { roughness: 1 }),
+      yellow: material(0xb8a35a, { roughness: 0.78 }),
+      hotA: material(0xff5d1f, {
+        emissive: 0xff2b00,
+        emissiveIntensity: 2.8,
+        roughness: 0.48
+      }),
+      hotB: material(0xffc25a, {
+        emissive: 0xff6b10,
+        emissiveIntensity: 3.5,
+        roughness: 0.36
+      }),
+      ember: material(0x721f11, {
+        emissive: 0xff3200,
+        emissiveIntensity: 1.3,
+        roughness: 1
+      }),
+      glass: material(0x69d5cf, {
+        emissive: 0x0a4c49,
+        emissiveIntensity: 0.7,
+        transparent: true,
+        opacity: 0.68,
+        roughness: 0.16,
+        metalness: 0.08,
+        depthWrite: false
+      }),
+      hotGlass: material(0xffb254, {
+        emissive: 0xff3d08,
+        emissiveIntensity: 1.7,
+        transparent: true,
+        opacity: 0.78,
+        roughness: 0.22,
+        depthWrite: false
+      }),
+      steam: material(0xc9d5d3, {
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+        roughness: 1
+      })
+    };
+
+    function box(parent, x, y, z, w, h, d, mat, rotationY = 0) {
+      const mesh = new THREE.Mesh(unitBox, mat);
+      mesh.position.set(x, y, z);
+      mesh.scale.set(w, h, d);
+      mesh.rotation.y = rotationY;
+      mesh.castShadow = !mat.transparent;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function instances(items, mat, castShadow = true) {
+      const mesh = new THREE.InstancedMesh(unitBox, mat, items.length);
+      items.forEach((item, index) => {
+        dummy.position.set(...item.p);
+        dummy.scale.set(...item.s);
+        dummy.rotation.set(0, item.r || 0, 0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+        if (item.c) mesh.setColorAt(index, new THREE.Color(item.c));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    // Lighting establishes the depth and keeps the block silhouettes readable.
+    scene.add(new THREE.HemisphereLight(0xc7dde0, 0x3b2c23, 1.65));
+
+    const key = new THREE.DirectionalLight(0xffe3bd, 3.7);
+    key.position.set(8, 13, 8);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -14;
+    key.shadow.camera.right = 14;
+    key.shadow.camera.top = 13;
+    key.shadow.camera.bottom = -12;
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 38;
+    key.shadow.bias = -0.00035;
+    scene.add(key);
+
+    const fill = new THREE.DirectionalLight(0x8eb8c9, 1.15);
+    fill.position.set(-9, 7, 5);
+    scene.add(fill);
+
+    // Floor: a field of separated cubic slabs.
+    const floorItems = [];
+    const floorColors = [0x444846, 0x494d49, 0x3f4442, 0x4d504a, 0x454947];
+    for (let x = -8; x <= 8.01; x += 1.6) {
+      for (let z = -5.2; z <= 6.81; z += 1.6) {
+        const color = floorColors[Math.floor(Math.random() * floorColors.length)];
+        floorItems.push({
+          p: [x, -0.13, z],
+          s: [1.5, 0.24, 1.5],
+          c: color
+        });
+      }
+    }
+    instances(
+      floorItems,
+      material(0xffffff, { vertexColors: true, roughness: 1 }),
+      false
+    );
+
+    // Brick walls, assembled as individual instanced cubic units.
+    const wallItems = [];
+    const wallColors = [0x51443c, 0x5a4a40, 0x493f38, 0x665248];
+    for (let row = 0; row < 11; row++) {
+      for (let col = 0; col < 18; col++) {
+        wallItems.push({
+          p: [-8.22 + col * 0.98, 0.23 + row * 0.49, -5.42],
+          s: [0.91, 0.43, 0.4],
+          c: wallColors[(row + col) % wallColors.length]
+        });
+      }
+      for (let col = 0; col < 13; col++) {
+        wallItems.push({
+          p: [-8.72, 0.23 + row * 0.49, -5.18 + col * 0.98],
+          s: [0.4, 0.43, 0.91],
+          c: wallColors[(row * 2 + col) % wallColors.length]
+        });
+      }
+    }
+    instances(
+      wallItems,
+      material(0xffffff, { vertexColors: true, roughness: 1 }),
+      true
+    );
+
+    // Ceiling beams reinforce the workshop enclosure.
+    for (const z of [-4.2, -0.6, 3.0, 6.1]) {
+      box(scene, 0, 6.18, z, 17.7, 0.24, 0.26, M.woodDark);
+    }
+    box(scene, -8.35, 3.1, 0.4, 0.3, 6.0, 0.3, M.iron);
+    box(scene, 8.25, 3.1, 0.4, 0.3, 6.0, 0.3, M.iron);
+
+    const fireBits = [];
+    const steamBits = [];
+    const hotLights = [];
+
+    function flame(parent, x, y, z, w, h, d, bright = false) {
+      const mesh = box(parent, x, y, z, w, h, d, bright ? M.hotB : M.hotA);
+      mesh.userData.baseY = y;
+      mesh.userData.baseScaleY = h;
+      mesh.userData.phase = Math.random() * Math.PI * 2;
+      fireBits.push(mesh);
+      return mesh;
+    }
+
+    function pointLight(color, intensity, distance, x, y, z) {
+      const light = new THREE.PointLight(color, intensity, distance, 2);
+      light.position.set(x, y, z);
+      scene.add(light);
+      hotLights.push({ light, base: intensity, phase: Math.random() * 7 });
+      return light;
+    }
+
+    // Main furnace, with a deep square chamber and a block-built facade.
+    const furnace = new THREE.Group();
+    furnace.position.set(-5, 0, -3.72);
+    scene.add(furnace);
+
+    box(furnace, 0, 0.22, 0, 4.1, 0.44, 3.15, M.stoneDark);
+    box(furnace, 0, 1.78, -1.18, 3.62, 2.72, 0.42, M.brickDark);
+    box(furnace, -1.55, 1.78, 0, 0.5, 2.72, 2.35, M.brick);
+    box(furnace, 1.55, 1.78, 0, 0.5, 2.72, 2.35, M.brick);
+    box(furnace, 0, 3.11, 0, 3.7, 0.5, 2.38, M.stoneDark);
+    box(furnace, 0, 1.25, 0.77, 2.24, 1.63, 0.3, M.black);
+
+    for (let ix = -3; ix <= 3; ix++) {
+      for (let iy = 0; iy < 5; iy++) {
+        const x = ix * 0.5;
+        const y = 0.58 + iy * 0.48;
+        if (Math.abs(x) < 1.03 && y < 1.98) continue;
+        const mat = (ix + iy) % 3 === 0 ? M.brickPale : M.brick;
+        box(furnace, x, y, 1.13, 0.44, 0.42, 0.36, mat);
+      }
+    }
+
+    for (let i = 0; i < 7; i++) {
+      box(furnace, -0.85 + i * 0.28, 0.64, 0.82, 0.22, 0.22, 0.24, M.ember);
+    }
+    flame(furnace, -0.48, 1.0, 0.66, 0.42, 0.72, 0.32, true);
+    flame(furnace, 0.08, 0.98, 0.62, 0.36, 0.95, 0.31, false);
+    flame(furnace, 0.5, 0.88, 0.67, 0.32, 0.6, 0.27, true);
+
+    // Hinged refractory door.
+    box(furnace, 2.22, 1.3, 1.14, 1.12, 2.05, 0.23, M.iron, -0.48);
+    box(furnace, 1.76, 1.31, 1.2, 0.16, 0.64, 0.15, M.steel);
+    box(furnace, 0, 3.63, 0.12, 3.65, 0.28, 2.1, M.iron);
+    box(furnace, 0, 4.22, -0.48, 0.66, 1.02, 0.66, M.ironLight);
+    pointLight(0xff5a19, 34, 7.5, -5, 1.3, -2.2);
+
+    // Reheating chamber / glory hole.
+    const reheat = new THREE.Group();
+    reheat.position.set(-0.5, 0, -3.95);
+    scene.add(reheat);
+
+    box(reheat, 0, 0.2, 0, 2.95, 0.4, 2.35, M.stoneDark);
+    box(reheat, 0, 1.42, -0.88, 2.45, 2.42, 0.4, M.brickDark);
+    box(reheat, -1.02, 1.42, 0, 0.38, 2.42, 1.82, M.brick);
+    box(reheat, 1.02, 1.42, 0, 0.38, 2.42, 1.82, M.brick);
+    box(reheat, 0, 2.56, 0, 2.55, 0.4, 1.88, M.stoneDark);
+    box(reheat, 0, 1.22, 0.58, 1.52, 1.28, 0.3, M.black);
+
+    for (let ix = -2; ix <= 2; ix++) {
+      for (let iy = 0; iy < 4; iy++) {
+        const x = ix * 0.47;
+        const y = 0.52 + iy * 0.48;
+        if (Math.abs(x) < 0.77 && y < 1.72) continue;
+        box(reheat, x, y, 0.9, 0.42, 0.42, 0.35, (ix + iy) % 2 ? M.brick : M.brickPale);
+      }
+    }
+
+    flame(reheat, -0.28, 0.95, 0.45, 0.31, 0.68, 0.25, true);
+    flame(reheat, 0.15, 0.93, 0.4, 0.26, 0.88, 0.24, false);
+    box(reheat, 0, 2.9, 0, 2.72, 0.24, 1.75, M.iron);
+    box(reheat, 0, 3.36, -0.22, 0.48, 0.72, 0.48, M.ironLight);
+    pointLight(0xff9c43, 24, 5.5, -0.5, 1.35, -2.8);
+
+    // Annealing oven line: three connected chambers with warm doors.
+    box(scene, 4.45, 0.22, -3.63, 5.25, 0.44, 2.75, M.stoneDark);
+    const ovenX = [2.75, 4.25, 5.75];
+
+    ovenX.forEach((x, ovenIndex) => {
+      const oven = new THREE.Group();
+      oven.position.set(x, 0, -3.63);
+      scene.add(oven);
+
+      box(oven, 0, 1.45, -0.91, 1.34, 2.25, 0.34, M.brickDark);
+      box(oven, -0.57, 1.45, 0, 0.2, 2.25, 1.95, M.brick);
+      box(oven, 0.57, 1.45, 0, 0.2, 2.25, 1.95, M.brick);
+      box(oven, 0, 2.52, 0, 1.43, 0.28, 2.02, M.stoneDark);
+      box(oven, 0, 1.2, 0.78, 0.87, 1.3, 0.22, M.black);
+
+      for (let ix = -1; ix <= 1; ix++) {
+        for (let iy = 0; iy < 4; iy++) {
+          const bx = ix * 0.43;
+          const by = 0.53 + iy * 0.47;
+          if (Math.abs(bx) < 0.46 && by < 1.72) continue;
+          box(oven, bx, by, 0.98, 0.38, 0.41, 0.32, (ix + iy + ovenIndex) % 2 ? M.brick : M.brickPale);
+        }
+      }
+
+      box(oven, 0, 0.73, 0.75, 0.72, 0.16, 0.2, M.ember);
+      flame(oven, 0, 1.1, 0.62, 0.48, 0.38, 0.18, true);
+
+      // Doors alternate between ajar and nearly closed.
+      const angle = ovenIndex === 1 ? 0.7 : ovenIndex === 2 ? -0.64 : 0.12;
+      box(oven, 0.75, 1.2, 1.05, 0.85, 1.85, 0.2, M.iron, angle);
+      box(oven, 0.5, 1.2, 1.15, 0.14, 0.48, 0.13, M.steel, angle);
+    });
+
+    pointLight(0xff7134, 13, 4.5, 4.25, 1.2, -2.3);
+
+    // Shared overhead extraction duct and branches to every hot zone.
+    for (let i = 0; i < 13; i++) {
+      const x = -5.35 + i * 0.98;
+      box(scene, x, 5.28, -3.72, 0.92, 0.52, 0.65, M.ironLight);
+      box(scene, x, 5.28, -3.72, 0.11, 0.61, 0.74, M.iron);
+    }
+
+    box(scene, -5, 4.72, -3.72, 0.62, 0.9, 0.62, M.ironLight);
+    box(scene, -0.5, 4.33, -3.95, 0.48, 1.45, 0.48, M.ironLight);
+
+    // Annealing manifold, riser, and connection into the main duct.
+    for (let i = 0; i < 5; i++) {
+      box(scene, 2.45 + i * 0.92, 3.06, -3.63, 0.86, 0.38, 0.5, M.ironLight);
+    }
+    [2.75, 4.25, 5.75].forEach((x) => {
+      box(scene, x, 2.77, -3.63, 0.38, 0.58, 0.42, M.iron);
+    });
+    box(scene, 6.55, 4.15, -3.63, 0.55, 2.15, 0.58, M.ironLight);
+    box(scene, 7.28, 5.28, -3.72, 1.0, 1.0, 0.92, M.iron);
+    for (let i = 0; i < 5; i++) {
+      box(scene, 7.81, 4.95 + i * 0.16, -3.72, 0.12, 0.055, 0.7, M.steel);
+    }
+
+    // Working bench, built from individual timber planks and iron framing.
+    const bench = new THREE.Group();
+    bench.position.set(0, 0, 1.45);
+    scene.add(bench);
+
+    for (let i = 0; i < 7; i++) {
+      box(bench, -2.7 + i * 0.9, 1.35, 0, 0.84, 0.23, 1.5, i % 2 ? M.woodLight : M.wood);
+    }
+    box(bench, 0, 1.14, 0, 6.5, 0.2, 1.6, M.iron);
+    for (const x of [-2.58, 0, 2.58]) {
+      for (const z of [-0.55, 0.55]) {
+        box(bench, x, 0.58, z, 0.24, 1.18, 0.24, M.iron);
+        box(bench, x, 0.1, z, 0.42, 0.18, 0.42, M.ironLight);
+      }
+    }
+    box(bench, 0, 0.48, 0, 5.25, 0.15, 1.05, M.woodDark);
+    box(bench, 1.92, 1.49, 0.03, 1.04, 0.08, 0.78, M.steel);
+
+    // Bench tools.
+    box(bench, -2.05, 1.5, 0.34, 1.15, 0.05, 0.08, M.iron);
+    box(bench, -2.05, 1.5, 0.12, 1.15, 0.05, 0.08, M.iron);
+    box(bench, -1.95, 1.53, 0.25, 0.14, 0.06, 0.46, M.brass);
+    box(bench, 0.35, 1.5, 0.38, 0.62, 0.07, 0.11, M.woodDark);
+    box(bench, 0.35, 1.5, -0.1, 0.12, 0.07, 0.72, M.steel);
+
+    // Finished aqua glass vessel on the bench.
+    box(bench, 1.35, 1.58, -0.08, 0.58, 0.23, 0.58, M.glass);
+    box(bench, 1.35, 1.84, -0.08, 0.39, 0.31, 0.39, M.glass);
+    box(bench, 1.35, 2.05, -0.08, 0.21, 0.16, 0.21, M.glass);
+
+    // A small amber piece beside it.
+    box(bench, 2.35, 1.61, 0.32, 0.38, 0.28, 0.38, M.hotGlass);
+    box(bench, 2.35, 1.81, 0.32, 0.2, 0.14, 0.2, M.hotGlass);
+
+    // Voxel glassblower standing behind the bench, aligned with the reheater.
+    const worker = new THREE.Group();
+    worker.position.set(-0.5, 0, 2.55);
+    scene.add(worker);
+
+    box(worker, -0.19, 0.14, -0.13, 0.28, 0.23, 0.55, M.woodDark);
+    box(worker, 0.19, 0.14, -0.13, 0.28, 0.23, 0.55, M.woodDark);
+    box(worker, -0.18, 0.62, 0, 0.31, 0.78, 0.38, M.pants);
+    box(worker, 0.18, 0.62, 0, 0.31, 0.78, 0.38, M.pants);
+    box(worker, 0, 1.2, 0, 0.82, 0.78, 0.48, M.shirt);
+    box(worker, 0, 1.08, -0.255, 0.66, 0.78, 0.08, M.canvas);
+    box(worker, 0, 1.93, -0.02, 0.59, 0.58, 0.56, M.skin);
+    box(worker, 0, 2.19, -0.01, 0.63, 0.16, 0.59, M.hair);
+    box(worker, 0, 1.9, -0.33, 0.16, 0.16, 0.14, M.skin);
+    box(worker, -0.13, 2.0, -0.307, 0.15, 0.11, 0.035, M.black);
+    box(worker, 0.13, 2.0, -0.307, 0.15, 0.11, 0.035, M.black);
+    box(worker, 0, 1.73, -0.35, 0.18, 0.08, 0.12, M.skin);
+
+    // Arms reach toward the blowpipe.
+    box(worker, -0.51, 1.37, -0.21, 0.22, 0.64, 0.24, M.shirt, -0.15);
+    box(worker, 0.51, 1.37, -0.21, 0.22, 0.64, 0.24, M.shirt, 0.15);
+    box(worker, -0.44, 1.15, -0.48, 0.18, 0.18, 0.52, M.skin);
+    box(worker, 0.44, 1.15, -0.48, 0.18, 0.18, 0.52, M.skin);
+
+    // Long segmented blowpipe, pointing directly into the reheat chamber.
+    for (let i = 0; i < 12; i++) {
+      const z = -0.2 - i * 0.45;
+      const mat = z < -3.5 ? M.steel : M.iron;
+      box(worker, 0, 1.73, z, 0.095, 0.095, 0.43, mat);
+      if (i % 3 === 0) {
+        box(worker, 0, 1.73, z, 0.13, 0.13, 0.07, M.ironLight);
+      }
+    }
+    box(worker, 0, 1.73, 0.01, 0.14, 0.14, 0.5, M.woodDark);
+
+    // Cubic hot glass around the working portion of the pipe.
+    box(worker, 0, 1.73, -1.2, 0.2, 0.2, 0.22, M.hotGlass);
+    box(worker, -0.12, 1.75, -1.34, 0.24, 0.27, 0.25, M.glass);
+    box(worker, 0.12, 1.75, -1.34, 0.24, 0.27, 0.25, M.glass);
+    box(worker, 0, 1.92, -1.48, 0.24, 0.19, 0.24, M.glass);
+    box(worker, 0, 1.55, -1.48, 0.24, 0.17, 0.24, M.glass);
+
+    // Turning bay: a deliberately unobstructed marked space.
+    const turnCenter = new THREE.Vector2(-0.5, -0.3);
+    const turnRadius = 2.28;
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2;
+      const x = turnCenter.x + Math.cos(a) * turnRadius;
+      const z = turnCenter.y + Math.sin(a) * turnRadius;
+      box(scene, x, 0.025, z, 0.31, 0.055, 0.13, M.yellow, -a - Math.PI / 2);
+    }
+
+    // Spare long blowpipes, parallel to the active pipe.
+    const pipeXs = [3.05, 3.45, 3.85];
+    pipeXs.forEach((x, pipeIndex) => {
+      for (let i = 0; i < 11; i++) {
+        const z = -1.45 + i * 0.5;
+        box(scene, x, 0.39, z, 0.105, 0.105, 0.48, i > 7 ? M.woodDark : M.iron);
+        if (i % 3 === 0) {
+          box(scene, x, 0.39, z, 0.14, 0.14, 0.08, M.ironLight);
+        }
+      }
+      box(scene, x, 0.25, 0.1, 0.34, 0.14, 5.55, M.iron);
+      box(scene, x, 0.3, 3.78, 0.18, 0.18, 0.76, M.wood);
+    });
+
+    // Quench bucket built from square blocks.
+    box(scene, 2.55, 0.11, 2.05, 0.78, 0.16, 0.78, M.iron);
+    box(scene, 2.2, 0.48, 2.05, 0.12, 0.72, 0.78, M.ironLight);
+    box(scene, 2.9, 0.48, 2.05, 0.12, 0.72, 0.78, M.ironLight);
+    box(scene, 2.55, 0.48, 1.71, 0.78, 0.72, 0.12, M.ironLight);
+    box(scene, 2.55, 0.48, 2.39, 0.78, 0.72, 0.12, M.ironLight);
+    box(scene, 2.55, 0.78, 2.05, 0.68, 0.07, 0.68, M.glass);
+
+    for (let i = 0; i < 7; i++) {
+      const steam = box(
+        scene,
+        2.55 + (Math.random() - 0.5) * 0.16,
+        0.92 + i * 0.22,
+        2.05 + (Math.random() - 0.5) * 0.16,
+        0.13 + i * 0.025,
+        0.16 + i * 0.03,
+        0.13 + i * 0.025,
+        M.steam
+      );
+      steam.userData.baseY = steam.position.y;
+      steam.userData.phase = Math.random() * Math.PI * 2;
+      steamBits.push(steam);
+    }
+
+    // Tool rack and hanging paddles.
+    box(scene, 6.85, 2.2, 0.1, 0.18, 0.16, 4.0, M.woodDark);
+    box(scene, 6.85, 3.35, 0.1, 0.18, 0.16, 4.0, M.woodDark);
+    for (const z of [-1.15, 0.05, 1.25]) {
+      box(scene, 6.84, 2.74, z, 0.13, 1.2, 0.13, M.wood);
+      box(scene, 6.72, 2.12, z, 0.28, 0.34, 0.09, M.steel);
+    }
+
+    // Crates and material bins against the left wall.
+    for (let i = 0; i < 4; i++) {
+      const x = -7.4 + (i % 2) * 1.0;
+      const y = 0.42 + Math.floor(i / 2) * 0.85;
+      const z = 1.15;
+      box(scene, x, y, z, 0.88, 0.72, 0.9, M.woodDark);
+      for (const side of [-0.38, 0.38]) {
+        box(scene, x + side, y, z + 0.46, 0.1, 0.72, 0.06, M.wood);
+        box(scene, x + side, y, z - 0.46, 0.1, 0.72, 0.06, M.wood);
+      }
+    }
+
+    // Small stool and stacked color blocks for workshop scale.
+    box(scene, -3.2, 0.65, 2.1, 0.65, 0.16, 0.65, M.wood);
+    for (const x of [-3.44, -2.96]) {
+      for (const z of [1.9, 2.3]) {
+        box(scene, x, 0.32, z, 0.1, 0.64, 0.1, M.iron);
+      }
+    }
+
+    // Projected HTML labels.
+    const labels = [];
+    function addLabel(text, position, hot = false) {
+      const el = document.createElement("div");
+      el.className = "scene-label" + (hot ? " hot" : "");
+      el.textContent = text;
+      document.body.appendChild(el);
+      labels.push({ el, position: new THREE.Vector3(...position) });
+    }
+
+    addLabel("Main furnace", [-5, 3.95, -2.5], true);
+    addLabel("Reheating chamber", [-0.5, 3.55, -3.05], true);
+    addLabel("Annealing ovens", [4.35, 3.18, -2.25], true);
+    addLabel("Working bench", [1.4, 1.65, 2.1], false);
+
+    // Custom orbit/pan/zoom camera controls; no external controls module.
+    const orbit = {
+      theta: 0.72,
+      phi: 1.0,
+      radius: 21,
+      target: new THREE.Vector3(0, 1.25, -0.45)
+    };
+
+    const desired = {
+      theta: orbit.theta,
+      phi: orbit.phi,
+      radius: orbit.radius,
+      target: orbit.target.clone()
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(orbit.phi);
+      camera.position.set(
+        orbit.target.x + orbit.radius * sinPhi * Math.sin(orbit.theta),
+        orbit.target.y + orbit.radius * Math.cos(orbit.phi),
+        orbit.target.z + orbit.radius * sinPhi * Math.cos(orbit.theta)
+      );
+      camera.lookAt(orbit.target);
+    }
+    updateCamera();
+
+    let dragging = false;
+    let panning = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    renderer.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      panning = event.button === 2 || event.shiftKey;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      if (panning) {
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+        forward.y = 0;
+        forward.normalize();
+        const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+        const scale = orbit.radius * 0.00145;
+        orbit.target.addScaledVector(right, -dx * scale);
+        orbit.target.addScaledVector(forward, dy * scale);
+        orbit.target.x = THREE.MathUtils.clamp(orbit.target.x, -9, 9);
+        orbit.target.z = THREE.MathUtils.clamp(orbit.target.z, -7, 8);
+      } else {
+        orbit.theta -= dx * 0.006;
+        orbit.phi = THREE.MathUtils.clamp(orbit.phi - dy * 0.005, 0.35, 1.42);
+      }
+    });
+
+    const endDrag = () => {
+      dragging = false;
+      panning = false;
+    };
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      orbit.radius = THREE.MathUtils.clamp(
+        orbit.radius * Math.exp(event.deltaY * 0.001),
+        8,
+        34
+      );
+    }, { passive: false });
+
+    const views = {
+      overview: {
+        theta: 0.72, phi: 1.0, radius: 21,
+        target: new THREE.Vector3(0, 1.25, -0.45)
+      },
+      bench: {
+        theta: 0.54, phi: 1.12, radius: 12,
+        target: new THREE.Vector3(-0.25, 1.35, 1.35)
+      },
+      hot: {
+        theta: 0.18, phi: 1.18, radius: 14.5,
+        target: new THREE.Vector3(-0.25, 1.5, -3.0)
+      }
+    };
+
+    document.querySelectorAll("[data-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-view]").forEach((b) => b.classList.remove("active"));
+        button.classList.add("active");
+        const view = views[button.dataset.view];
+        desired.theta = view.theta;
+        desired.phi = view.phi;
+        desired.radius = view.radius;
+        desired.target.copy(view.target);
+      });
+    });
+
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+    }
+    addEventListener("resize", resize);
+
+    const clock = new THREE.Clock();
+    const projected = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+
+      // Smooth camera transitions for the three view buttons.
+      const damping = 1 - Math.pow(0.0008, Math.min(clock.getDelta(), 0.04));
+      orbit.theta = THREE.MathUtils.lerp(orbit.theta, desired.theta, damping);
+      orbit.phi = THREE.MathUtils.lerp(orbit.phi, desired.phi, damping);
+      orbit.radius = THREE.MathUtils.lerp(orbit.radius, desired.radius, damping);
+      orbit.target.lerp(desired.target, damping);
+      updateCamera();
+
+      // Flame blocks pulse independently without losing their cubic form.
+      fireBits.forEach((mesh, index) => {
+        const phase = mesh.userData.phase;
+        const pulse = 0.86 + Math.sin(t * 8.5 + phase) * 0.11;
+        mesh.scale.y = mesh.userData.baseScaleY * pulse;
+        mesh.position.y = mesh.userData.baseY + Math.sin(t * 6.4 + phase) * 0.035;
+        mesh.rotation.y = Math.sin(t * 2.2 + index) * 0.035;
+      });
+
+      M.hotA.emissiveIntensity = 2.7 + Math.sin(t * 7.2) * 0.28;
+      M.hotB.emissiveIntensity = 3.35 + Math.sin(t * 9.1 + 1.4) * 0.4;
+
+      hotLights.forEach(({ light, base, phase }) => {
+        light.intensity = base * (0.92 + Math.sin(t * 6.5 + phase) * 0.08);
+      });
+
+      steamBits.forEach((mesh, index) => {
+        const cycle = (t * 0.22 + index / steamBits.length) % 1;
+        mesh.position.y = 0.94 + cycle * 1.35;
+        mesh.position.x += Math.sin(t * 1.5 + index) * 0.0007;
+        mesh.scale.setScalar(0.7 + cycle * 1.1);
+      });
+
+      // Update projected labels.
+      labels.forEach(({ el, position }) => {
+        projected.copy(position).project(camera);
+        const visible = projected.z > -1 && projected.z < 1;
+        el.style.display = visible ? "block" : "none";
+        el.style.left = `${(projected.x * 0.5 + 0.5) * innerWidth}px`;
+        el.style.top = `${(-projected.y * 0.5 + 0.5) * innerHeight}px`;
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+    requestAnimationFrame(() => document.getElementById("loading").classList.add("hidden"));
+  </script>
+</body>
+</html>

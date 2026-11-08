@@ -1,0 +1,56 @@
+[
+  {
+    "id": "T01_glassblowing_workshop",
+    "title": "Glassblowing Workshop",
+    "prompt": "Build a self-contained HTML scene with Three.js from cdnjs featuring a traditional glassblowing workshop. Furnace, reheating chamber and annealing ovens surround a working bench; long blowpipes align with clear turning space and overhead ventilation joins the hot zones. Render it as a deliberate 3D voxel model built from visible cubic blocks, with clear depth, readable silhouettes, and solid spatial relationships.",
+    "rel_path": "/benchmarks/training_set/T01_glassblowing_workshop.html",
+    "lines": 942,
+    "bytes": 31627,
+    "chars": 31627
+  },
+  {
+    "id": "T02_formal_garden_canal",
+    "title": "Formal Garden & Canal",
+    "prompt": "Make a standalone HTML scene with Three.js from cdnjs that depicts a formal garden with a reflecting canal. A long narrow water channel divides clipped planting rooms; small bridges and side paths connect the rooms without interrupting the central axis.",
+    "rel_path": "/benchmarks/training_set/T02_formal_garden_canal.html",
+    "lines": 1398,
+    "bytes": 39486,
+    "chars": 39486
+  },
+  {
+    "id": "T03_prayer_wheel_bank",
+    "title": "Prayer Wheel Bank",
+    "prompt": "Please create one self-contained HTML file with Three.js from cdnjs showing prayer wheel bank with rotating brass cylinders. A prayer wheel bank is a row of nine graduated brass cylinders mounted on a common horizontal axle between two timber end frames.",
+    "rel_path": "/benchmarks/training_set/T03_prayer_wheel_bank.html",
+    "lines": 964,
+    "bytes": 27639,
+    "chars": 27639
+  },
+  {
+    "id": "T04_mountain_locomotive",
+    "title": "Mountain Rack Locomotive",
+    "prompt": "Please create one self-contained HTML file with Three.js from cdnjs showing a mountain rack locomotive cutaway. Animate the scene so the rack wheel turns in contact with the center rail as the wheels rotate.",
+    "rel_path": "/benchmarks/training_set/T04_mountain_locomotive.html",
+    "lines": 1447,
+    "bytes": 36068,
+    "chars": 36068
+  },
+  {
+    "id": "T05_timber_market_town",
+    "title": "Timber-Framed Market Town",
+    "prompt": "Build a self-contained HTML scene with Three.js from cdnjs featuring timber-framed market town quarter with jettied houses and covered arcade. Eleven jettied timber houses line two converging streets that open into a market square with a timber-framed hall.",
+    "rel_path": "/benchmarks/training_set/T05_timber_market_town.html",
+    "lines": 1123,
+    "bytes": 38864,
+    "chars": 38864
+  },
+  {
+    "id": "T06_bohr_oxygen_atom",
+    "title": "Bohr-Style Oxygen Atom",
+    "prompt": "Please create one self-contained HTML file with Three.js from cdnjs showing bohr-style oxygen atom model. A compact cluster of eight red proton spheres and eight neutral gray neutron spheres forms the nucleus inside two thin, concentric orbit rings. The rings are tilted at right angles and carry two inner and six outer electron spheres.",
+    "rel_path": "/benchmarks/training_set/T06_bohr_oxygen_atom.html",
+    "lines": 917,
+    "bytes": 21406,
+    "chars": 21406
+  }
+]

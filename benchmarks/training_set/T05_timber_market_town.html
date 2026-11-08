@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timber Market Town</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #29231d;
+      --paper: rgba(248, 239, 218, 0.92);
+      --accent: #8b3f28;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #a9c3c2;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+    }
+
+    #scene {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #scene:active { cursor: grabbing; }
+
+    .panel {
+      position: fixed;
+      z-index: 5;
+      pointer-events: none;
+      background: var(--paper);
+      border: 1px solid rgba(68, 49, 33, 0.32);
+      box-shadow: 0 8px 28px rgba(31, 28, 22, 0.16);
+      backdrop-filter: blur(8px);
+    }
+
+    #title {
+      top: 18px;
+      left: 18px;
+      max-width: min(390px, calc(100vw - 36px));
+      padding: 14px 17px 13px;
+      border-radius: 5px 18px 5px 5px;
+    }
+
+    #title h1 {
+      margin: 0 0 4px;
+      font-size: clamp(20px, 3vw, 30px);
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    #title p {
+      margin: 7px 0 0;
+      font: 12px/1.45 system-ui, sans-serif;
+      color: #685b4b;
+    }
+
+    #title strong { color: var(--accent); }
+
+    #controls {
+      right: 18px;
+      top: 18px;
+      display: flex;
+      gap: 7px;
+      pointer-events: auto;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(68, 49, 33, 0.34);
+      border-radius: 5px;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 9px 12px;
+      font: 600 12px system-ui, sans-serif;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(31, 28, 22, 0.11);
+    }
+
+    button:hover { background: #fff8e8; }
+    button:active { transform: translateY(1px); }
+
+    #hint {
+      left: 18px;
+      bottom: 18px;
+      padding: 9px 12px;
+      border-radius: 5px;
+      font: 11px/1.4 system-ui, sans-serif;
+      color: #625648;
+    }
+
+    #selection {
+      right: 18px;
+      bottom: 18px;
+      max-width: min(300px, calc(100vw - 36px));
+      padding: 11px 14px;
+      border-radius: 12px 5px 5px 5px;
+      font: 12px/1.45 system-ui, sans-serif;
+      transition: opacity 0.25s;
+    }
+
+    #selection b {
+      display: block;
+      margin-bottom: 2px;
+      font: 600 15px Georgia, serif;
+      color: var(--accent);
+    }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      background: #a9c3c2;
+      color: #40372d;
+      font: 18px Georgia, serif;
+      letter-spacing: 0.04em;
+      transition: opacity 0.5s;
+    }
+
+    #loading.done { opacity: 0; pointer-events: none; }
+
+    @media (max-width: 650px) {
+      #title { top: 10px; left: 10px; padding: 11px 13px; }
+      #title p { display: none; }
+      #controls { top: 10px; right: 10px; }
+      button { padding: 8px 9px; }
+      #hint { display: none; }
+      #selection { right: 10px; bottom: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-label="Interactive three-dimensional timber-framed market town"></canvas>
+
+  <section id="title" class="panel">
+    <h1>Old Market Quarter</h1>
+    <p><strong>11 jettied timber houses</strong> line two converging streets, with a covered arcade and a market hall opening into the square.</p>
+  </section>
+
+  <nav id="controls" class="panel" aria-label="Camera controls">
+    <button id="reset" type="button">Reset</button>
+    <button id="overhead" type="button">Overhead</button>
+  </nav>
+
+  <div id="hint" class="panel">Drag to orbit · Scroll to zoom · Right-drag to pan · Click a house</div>
+
+  <div id="selection" class="panel" aria-live="polite">
+    <b>Market quarter</b>
+    Select one of the eleven timber houses to identify its trade.
+  </div>
+
+  <div id="loading">Raising the timber frames…</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const canvas = document.querySelector("#scene");
+    const loading = document.querySelector("#loading");
+    const selection = document.querySelector("#selection");
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xa9c3c2);
+    scene.fog = new THREE.Fog(0xa9c3c2, 40, 88);
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 180);
+
+    const controls = {
+      target: new THREE.Vector3(0, 1.5, -1.3),
+      theta: 0.57,
+      phi: 0.88,
+      radius: 42,
+      targetTheta: 0.57,
+      targetPhi: 0.88,
+      targetRadius: 42
+    };
+
+    const hemi = new THREE.HemisphereLight(0xd9edf0, 0x77654d, 2.15);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xffe2b0, 3.25);
+    sun.position.set(-17, 28, 19);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -32;
+    sun.shadow.camera.right = 32;
+    sun.shadow.camera.top = 30;
+    sun.shadow.camera.bottom = -30;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 75;
+    sun.shadow.bias = -0.00025;
+    sun.shadow.normalBias = 0.025;
+    scene.add(sun);
+
+    const rim = new THREE.DirectionalLight(0xb7dce5, 0.8);
+    rim.position.set(22, 12, -24);
+    scene.add(rim);
+
+    let seed = 73421;
+    function random() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    }
+
+    const clamp = THREE.MathUtils.clamp;
+    const lerp = THREE.MathUtils.lerp;
+
+    function makeTexture(kind) {
+      const c = document.createElement("canvas");
+      c.width = c.height = 256;
+      const ctx = c.getContext("2d");
+
+      if (kind === "plaster") {
+        ctx.fillStyle = "#eee8d7";
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 1800; i++) {
+          const value = 185 + Math.floor(random() * 55);
+          ctx.fillStyle = `rgba(${value},${value - 5},${value - 13},${0.025 + random() * 0.065})`;
+          const s = 1 + random() * 4;
+          ctx.fillRect(random() * 256, random() * 256, s, s);
+        }
+      }
+
+      if (kind === "stone") {
+        ctx.fillStyle = "#77736a";
+        ctx.fillRect(0, 0, 256, 256);
+        for (let row = 0; row < 8; row++) {
+          for (let col = -1; col < 6; col++) {
+            const x = col * 50 + (row % 2) * 25;
+            const y = row * 32;
+            const v = 125 + Math.floor(random() * 40);
+            ctx.fillStyle = `rgb(${v},${v - 3},${v - 8})`;
+            ctx.fillRect(x + 2, y + 2, 46, 28);
+          }
+        }
+      }
+
+      if (kind === "cobble") {
+        ctx.fillStyle = "#77756d";
+        ctx.fillRect(0, 0, 256, 256);
+        for (let row = 0; row < 12; row++) {
+          for (let col = -1; col < 9; col++) {
+            const x = col * 33 + (row % 2) * 16;
+            const y = row * 25;
+            const v = 105 + Math.floor(random() * 55);
+            ctx.fillStyle = `rgb(${v},${v - 2},${v - 7})`;
+            ctx.beginPath();
+            ctx.roundRect(x + 1, y + 1, 29, 21, 5);
+            ctx.fill();
+          }
+        }
+      }
+
+      if (kind === "roof") {
+        ctx.fillStyle = "#6f3c2d";
+        ctx.fillRect(0, 0, 256, 256);
+        for (let row = 0; row < 10; row++) {
+          for (let col = -1; col < 9; col++) {
+            const x = col * 31 + (row % 2) * 15;
+            const y = row * 28;
+            const v = 83 + Math.floor(random() * 42);
+            ctx.fillStyle = `rgb(${v + 28},${v - 15},${v - 29})`;
+            ctx.fillRect(x + 1, y + 1, 28, 24);
+            ctx.fillStyle = "rgba(30,20,16,.18)";
+            ctx.fillRect(x, y + 23, 30, 3);
+          }
+        }
+      }
+
+      if (kind === "ground") {
+        ctx.fillStyle = "#7b8058";
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 3400; i++) {
+          const green = 80 + Math.floor(random() * 50);
+          ctx.fillStyle = `rgba(${green - 25},${green},${green - 38},.3)`;
+          ctx.fillRect(random() * 256, random() * 256, 2, 3);
+        }
+      }
+
+      if (kind === "awning") {
+        ctx.fillStyle = "#f3e6c8";
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = "#9a3f2d";
+        for (let x = 0; x < 256; x += 64) ctx.fillRect(x, 0, 32, 256);
+      }
+
+      const texture = new THREE.CanvasTexture(c);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      return texture;
+    }
+
+    const plasterTexture = makeTexture("plaster");
+    const stoneTexture = makeTexture("stone");
+    const cobbleTexture = makeTexture("cobble");
+    const roofTexture = makeTexture("roof");
+    const groundTexture = makeTexture("ground");
+    const awningTexture = makeTexture("awning");
+
+    const materials = {
+      wood: new THREE.MeshStandardMaterial({ color: 0x38291f, roughness: 0.9 }),
+      darkWood: new THREE.MeshStandardMaterial({ color: 0x241b16, roughness: 0.94 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0xaaa79b, map: stoneTexture, roughness: 1 }),
+      glass: new THREE.MeshStandardMaterial({
+        color: 0x354e59, roughness: 0.24, metalness: 0.12
+      }),
+      iron: new THREE.MeshStandardMaterial({ color: 0x272724, roughness: 0.7, metalness: 0.35 }),
+      brass: new THREE.MeshStandardMaterial({ color: 0xb58a3a, roughness: 0.42, metalness: 0.55 }),
+      timberRoof: new THREE.MeshStandardMaterial({ color: 0xffffff, map: roofTexture, roughness: 0.93 })
+    };
+
+    function box(parent, w, h, d, x, y, z, material, cast = true) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = cast;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function beam(parent, a, b, thickness, material = materials.wood) {
+      const start = new THREE.Vector3(...a);
+      const end = new THREE.Vector3(...b);
+      const direction = end.clone().sub(start);
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(thickness, direction.length(), thickness),
+        material
+      );
+      mesh.position.copy(start).add(end).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function cylinder(parent, rt, rb, h, x, y, z, material, segments = 12) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(rt, rb, h, segments),
+        material
+      );
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function makeTextTexture(text, background = "#e9d8b4", ink = "#4b2d20") {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 128;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(9, 9, c.width - 18, c.height - 18);
+      ctx.fillStyle = ink;
+      ctx.font = "bold 48px Georgia";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, c.width / 2, c.height / 2 + 2);
+      const texture = new THREE.CanvasTexture(c);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function sign(parent, text, w, h, x, y, z, bg, ink) {
+      const texture = makeTextTexture(text, bg, ink);
+      const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        roughness: 0.85,
+        side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function windowFront(parent, x, y, z, w = 0.75, h = 0.95, shutter = 0x496554) {
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0xe4dac0, roughness: 0.8 });
+      const shutterMat = new THREE.MeshStandardMaterial({ color: shutter, roughness: 0.85 });
+
+      box(parent, w, h, 0.08, x, y, z, materials.glass, false);
+      box(parent, w + 0.16, 0.09, 0.13, x, y + h / 2, z + 0.035, frameMat);
+      box(parent, w + 0.16, 0.09, 0.13, x, y - h / 2, z + 0.035, frameMat);
+      box(parent, 0.09, h + 0.12, 0.13, x - w / 2, y, z + 0.035, frameMat);
+      box(parent, 0.09, h + 0.12, 0.13, x + w / 2, y, z + 0.035, frameMat);
+      box(parent, 0.055, h, 0.15, x, y, z + 0.06, frameMat);
+      box(parent, w, 0.05, 0.15, x, y, z + 0.06, frameMat);
+
+      box(parent, w * 0.48, h * 0.92, 0.08, x - w * 0.77, y, z + 0.02, shutterMat);
+      box(parent, w * 0.48, h * 0.92, 0.08, x + w * 0.77, y, z + 0.02, shutterMat);
+    }
+
+    function roundWindow(parent, x, y, z) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.27, 0.065, 8, 20),
+        materials.darkWood
+      );
+      ring.position.set(x, y, z);
+      parent.add(ring);
+
+      const glass = new THREE.Mesh(
+        new THREE.CircleGeometry(0.235, 20),
+        materials.glass
+      );
+      glass.position.set(x, y, z - 0.01);
+      parent.add(glass);
+
+      box(parent, 0.035, 0.47, 0.06, x, y, z + 0.025, materials.wood);
+      box(parent, 0.47, 0.035, 0.06, x, y, z + 0.025, materials.wood);
+    }
+
+    function roof(parent, w, d, base, rise, gableMaterial) {
+      const half = w / 2;
+      const slopeLength = Math.hypot(half, rise);
+      const angle = Math.atan2(rise, half);
+
+      const left = box(
+        parent, slopeLength, 0.14, d + 0.7,
+        -half / 2, base + rise / 2, 0,
+        materials.timberRoof
+      );
+      left.rotation.z = angle;
+
+      const right = box(
+        parent, slopeLength, 0.14, d + 0.7,
+        half / 2, base + rise / 2, 0,
+        materials.timberRoof
+      );
+      right.rotation.z = Math.PI - angle;
+
+      function gable(z) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute([
+          -half, base, z,
+           half, base, z,
+           0, base + rise, z
+        ], 3));
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(geometry, gableMaterial);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        parent.add(mesh);
+      }
+
+      gable(d / 2 + 0.32);
+      gable(-d / 2 - 0.32);
+
+      box(parent, w + 0.75, 0.13, 0.14, 0, base + 0.02, d / 2 + 0.36, materials.darkWood);
+    }
+
+    const houseGroups = [];
+    const houseNames = [
+      "The Old Bakery", "Bellrope Books", "The Green Dragon",
+      "Cooper & Son", "The Wool House", "Rose and Crown",
+      "The Covered Arcade", "Merchant's Rest", "The Brass Kettle",
+      "Apothecary Lane", "The Candlemaker"
+    ];
+
+    function buildHouse({ x, z, yaw, width = 3.45, depth = 3.4, color, name, arcade = false }) {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+      group.rotation.y = yaw;
+      group.userData.houseName = name;
+      scene.add(group);
+      houseGroups.push(group);
+
+      const plaster = new THREE.MeshStandardMaterial({
+        color,
+        map: plasterTexture,
+        roughness: 0.94
+      });
+      const shutterColors = [0x4d6654, 0x7a3e30, 0x384f66, 0x75613d];
+      const shutter = shutterColors[houseGroups.length % shutterColors.length];
+
+      const lowerFront = depth / 2;
+      const upperDepth = depth + 0.42;
+      const upperCenterZ = 0.18;
+      const upperFront = upperDepth / 2 + upperCenterZ;
+
+      box(group, width + 0.12, 0.32, depth + 0.08, 0, 0.16, 0, materials.stone);
+      box(group, width, 2.65, depth, 0, 1.48, 0, plaster);
+      box(group, width + 0.12, 2.45, upperDepth, 0, 3.92, upperCenterZ, plaster);
+
+      // Jettied bressumer and supporting brackets.
+      box(group, width + 0.26, 0.22, 0.18, 0, 2.72, upperFront + 0.02, materials.darkWood);
+      for (const bx of [-width * 0.32, width * 0.32]) {
+        beam(
+          group,
+          [bx, 2.18, lowerFront + 0.03],
+          [bx, 2.77, upperFront + 0.02],
+          0.16,
+          materials.wood
+        );
+      }
+
+      // Lower-storey framing.
+      box(group, width + 0.12, 0.15, 0.16, 0, 0.38, lowerFront + 0.03, materials.wood);
+      box(group, width + 0.12, 0.17, 0.16, 0, 2.64, lowerFront + 0.03, materials.wood);
+      for (const bx of [-width * 0.48, 0, width * 0.48]) {
+        box(group, 0.12, 2.45, 0.16, bx, 1.48, lowerFront + 0.035, materials.wood);
+      }
+
+      // Upper-storey framing and diagonal braces.
+      for (const by of [2.82, 5.08]) {
+        box(group, width + 0.22, 0.15, 0.16, 0, by, upperFront + 0.04, materials.wood);
+      }
+      for (const bx of [-width * 0.44, -width * 0.14, width * 0.14, width * 0.44]) {
+        box(group, 0.115, 2.28, 0.16, bx, 3.94, upperFront + 0.045, materials.wood);
+      }
+      beam(group, [-width * 0.43, 2.92, upperFront + 0.07], [-width * 0.27, 3.62, upperFront + 0.07], 0.11);
+      beam(group, [width * 0.43, 2.92, upperFront + 0.07], [width * 0.27, 3.62, upperFront + 0.07], 0.11);
+
+      // Side framing.
+      for (const side of [-1, 1]) {
+        const sx = side * (width / 2 + 0.02);
+        box(group, 0.12, 0.15, depth, sx, 2.66, 0, materials.wood);
+        box(group, 0.12, 0.15, depth, sx, 0.38, 0, materials.wood);
+        for (const sz of [-depth * 0.31, depth * 0.31]) {
+          box(group, 0.12, 2.4, 0.12, sx, 1.48, sz, materials.wood);
+        }
+        box(group, 0.12, 2.35, 0.12, sx, 3.94, upperCenterZ, materials.wood);
+      }
+
+      // Door and ground-floor windows.
+      box(group, 0.93, 1.85, 0.12, 0, 1.1, lowerFront + 0.10, materials.darkWood);
+      box(group, 0.07, 1.85, 0.08, 0, 1.1, lowerFront + 0.18, materials.wood);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), materials.brass);
+      knob.position.set(0.31, 1.12, lowerFront + 0.22);
+      group.add(knob);
+
+      windowFront(group, -width * 0.285, 1.58, lowerFront + 0.12, 0.66, 0.87, shutter);
+      windowFront(group, width * 0.285, 1.58, lowerFront + 0.12, 0.66, 0.87, shutter);
+
+      // Upper windows and flower box.
+      windowFront(group, -width * 0.285, 3.92, upperFront + 0.12, 0.70, 0.92, shutter);
+      windowFront(group, width * 0.285, 3.92, upperFront + 0.12, 0.70, 0.92, shutter);
+
+      const planter = box(group, 0.9, 0.22, 0.32, -width * 0.285, 3.28, upperFront + 0.27, materials.wood);
+      planter.castShadow = true;
+      const flowerMat = new THREE.MeshStandardMaterial({ color: 0xb84e58, roughness: 0.85 });
+      for (let i = 0; i < 6; i++) {
+        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 5), flowerMat);
+        flower.position.set(
+          -width * 0.285 - 0.35 + i * 0.14,
+          3.45 + random() * 0.05,
+          upperFront + 0.28
+        );
+        group.add(flower);
+      }
+
+      roof(group, width + 0.22, depth, 5.14, 1.9, plaster);
+      roundWindow(group, 0, 5.93, upperFront + 0.37);
+
+      // Chimney and small roof finials.
+      box(group, 0.46, 1.5, 0.48, width * 0.27, 6.15, -0.35, materials.stone);
+      box(group, 0.58, 0.15, 0.6, width * 0.27, 6.95, -0.35, materials.stone);
+
+      sign(group, name, Math.min(width - 0.3, 2.6), 0.34, 0, 2.36, lowerFront + 0.15);
+
+      // A timber lean-to arcade attached to the eastern street.
+      if (arcade) {
+        const arcadeZ = lowerFront + 0.72;
+        for (const px of [-width * 0.37, width * 0.37]) {
+          box(group, 0.16, 2.75, 0.16, px, 1.38, arcadeZ + 0.32, materials.darkWood);
+          beam(
+            group,
+            [px, 2.15, arcadeZ + 0.32],
+            [px, 2.88, lowerFront + 0.02],
+            0.13
+          );
+        }
+        box(group, width + 0.95, 0.15, 1.52, 0, 2.96, arcadeZ, materials.timberRoof);
+        box(group, width + 1.0, 0.18, 0.16, 0, 2.87, arcadeZ + 0.75, materials.darkWood);
+      }
+
+      return group;
+    }
+
+    // Ground and two streets converging at the market square.
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: groundTexture,
+      roughness: 1
+    });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.08;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const roadMap = cobbleTexture.clone();
+    roadMap.repeat.set(5, 12);
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0xb7b2a6,
+      map: roadMap,
+      roughness: 1
+    });
+
+    function buildRoad(start, end) {
+      const direction = end.clone().sub(start);
+      const length = direction.length();
+      const midpoint = start.clone().add(end).multiplyScalar(0.5);
+      const yaw = Math.atan2(direction.x, direction.z);
+
+      const road = new THREE.Group();
+      road.position.copy(midpoint);
+      road.rotation.y = yaw;
+      scene.add(road);
+
+      box(road, 6.0, 0.10, length + 0.4, 0, 0.015, 0, roadMat, false);
+      box(road, 0.18, 0.18, length + 0.4, -3.12, 0.10, 0, materials.stone, false);
+      box(road, 0.18, 0.18, length + 0.4, 3.12, 0.10, 0, materials.stone, false);
+    }
+
+    const westStart = new THREE.Vector3(-15, 0, 12);
+    const eastStart = new THREE.Vector3(15, 0, 12);
+    const convergence = new THREE.Vector3(0, 0, -1);
+
+    buildRoad(westStart, convergence);
+    buildRoad(eastStart, convergence);
+
+    const squareMap = cobbleTexture.clone();
+    squareMap.repeat.set(4, 3);
+    const squareMat = new THREE.MeshStandardMaterial({
+      color: 0xc1baaa,
+      map: squareMap,
+      roughness: 1
+    });
+    box(scene, 13.5, 0.12, 11.0, 0, 0.055, -6.25, squareMat, false);
+
+    // Low stone border around the square.
+    box(scene, 13.8, 0.20, 0.25, 0, 0.12, -0.72, materials.stone, false);
+    box(scene, 0.25, 0.20, 11.2, -6.75, 0.12, -6.25, materials.stone, false);
+    box(scene, 0.25, 0.20, 11.2, 6.75, 0.12, -6.25, materials.stone, false);
+
+    function placeOnStreet(start, end, t, sideSign, options) {
+      const direction = end.clone().sub(start).normalize();
+      const normal = new THREE.Vector3(-direction.z, 0, direction.x);
+      const point = start.clone().lerp(end, t);
+      const side = normal.multiplyScalar(sideSign);
+      const center = point.clone().add(side.multiplyScalar(5.15));
+      const front = side.clone().multiplyScalar(-1);
+      const yaw = Math.atan2(front.x, front.z);
+
+      return buildHouse({
+        ...options,
+        x: center.x,
+        z: center.z,
+        yaw
+      });
+    }
+
+    const plasterColors = [
+      0xe7d6b5, 0xd8c7aa, 0xe2d6bd, 0xcbb899, 0xded0b3,
+      0xe6d6bc, 0xd5c6a9, 0xe4d1ad, 0xd9c7aa, 0xe7d9bf, 0xcdbb9e
+    ];
+
+    // Exactly eleven jettied houses: five on the west street, six on the east.
+    const westSpecs = [
+      [0.12, -1, false], [0.42, -1, false], [0.72, -1, false],
+      [0.18,  1, false], [0.48,  1, false]
+    ];
+
+    const eastSpecs = [
+      [0.10,  1, true], [0.35, 1, true], [0.60, 1, true], [0.84, 1, true],
+      [0.20, -1, false], [0.48, -1, false]
+    ];
+
+    let houseIndex = 0;
+    for (const [t, side, arcade] of westSpecs) {
+      placeOnStreet(westStart, convergence, t, side, {
+        width: 3.35 + random() * 0.35,
+        depth: 3.3 + random() * 0.25,
+        color: plasterColors[houseIndex],
+        name: houseNames[houseIndex],
+        arcade
+      });
+      houseIndex++;
+    }
+
+    for (const [t, side, arcade] of eastSpecs) {
+      placeOnStreet(eastStart, convergence, t, side, {
+        width: 3.35 + random() * 0.35,
+        depth: 3.3 + random() * 0.25,
+        color: plasterColors[houseIndex],
+        name: houseNames[houseIndex],
+        arcade
+      });
+      houseIndex++;
+    }
+
+    if (houseGroups.length !== 11) {
+      throw new Error(`Expected 11 houses, created ${houseGroups.length}.`);
+    }
+
+    // The large open timber-framed market hall at the rear of the square.
+    function buildMarketHall() {
+      const hall = new THREE.Group();
+      hall.position.set(0, 0, -8.25);
+      scene.add(hall);
+
+      const hallPlaster = new THREE.MeshStandardMaterial({
+        color: 0xe5d5b7,
+        map: plasterTexture,
+        roughness: 0.92
+      });
+
+      box(hall, 9.8, 0.35, 5.8, 0, 0.18, 0, materials.stone);
+
+      // Open lower arcade.
+      for (const x of [-4.45, -2.2, 0, 2.2, 4.45]) {
+        box(hall, 0.23, 2.75, 0.23, x, 1.72, 2.55, materials.darkWood);
+        beam(hall, [x, 2.35, 2.55], [x, 2.92, 1.65], 0.14);
+      }
+      for (const x of [-4.45, -2.2, 0, 2.2, 4.45]) {
+        box(hall, 0.23, 2.75, 0.23, x, 1.72, -2.55, materials.darkWood);
+      }
+      box(hall, 9.3, 0.23, 0.23, 0, 2.96, 2.55, materials.darkWood);
+      box(hall, 9.3, 0.23, 0.23, 0, 2.96, -2.55, materials.darkWood);
+      box(hall, 0.23, 0.23, 5.3, -4.45, 2.96, 0, materials.darkWood);
+      box(hall, 0.23, 0.23, 5.3, 4.45, 2.96, 0, materials.darkWood);
+
+      // Back and side infill.
+      box(hall, 8.75, 2.7, 0.18, 0, 1.65, -2.54, hallPlaster);
+      box(hall, 0.18, 2.7, 4.95, -4.42, 1.65, 0, hallPlaster);
+      box(hall, 0.18, 2.7, 4.95, 4.42, 1.65, 0, hallPlaster);
+
+      for (const x of [-3.3, -1.1, 1.1, 3.3]) {
+        box(hall, 0.16, 2.7, 0.16, x, 1.65, -2.41, materials.wood);
+      }
+      box(hall, 8.7, 0.16, 0.16, 0, 2.75, -2.40, materials.wood);
+
+      // Upper timber-framed storey.
+      box(hall, 8.75, 2.18, 4.95, 0, 4.03, 0, hallPlaster);
+      for (const y of [3.03, 5.02]) {
+        box(hall, 8.9, 0.16, 0.18, 0, y, 2.53, materials.wood);
+        box(hall, 8.9, 0.16, 0.18, 0, y, -2.53, materials.wood);
+      }
+      for (const x of [-4.35, -2.18, 0, 2.18, 4.35]) {
+        box(hall, 0.16, 2.05, 0.18, x, 4.03, 2.54, materials.wood);
+        box(hall, 0.16, 2.05, 0.18, x, 4.03, -2.54, materials.wood);
+      }
+
+      for (const x of [-3.25, -1.08, 1.08, 3.25]) {
+        windowFront(hall, x, 4.05, 2.65, 0.85, 1.0, 0x4b5f50);
+      }
+
+      roof(hall, 8.95, 4.95, 5.12, 2.2, hallPlaster);
+      sign(hall, "MARKET HALL", 3.4, 0.65, 0, 2.55, 2.68, "#d9bd83", "#4c2d20");
+
+      // Steps and interior trestle.
+      box(hall, 4.2, 0.13, 1.0, 0, 0.08, 3.25, materials.stone, false);
+      box(hall, 3.5, 0.18, 0.8, 0, 0.85, -0.7, materials.wood);
+      for (const x of [-1.3, 1.3]) {
+        box(hall, 0.15, 0.85, 0.55, x, 0.43, -0.7, materials.darkWood);
+      }
+    }
+
+    buildMarketHall();
+
+    // Market stalls.
+    function buildStall(x, z, rotation = 0) {
+      const stall = new THREE.Group();
+      stall.position.set(x, 0, z);
+      stall.rotation.y = rotation;
+      scene.add(stall);
+
+      const awningMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        map: awningTexture,
+        roughness: 0.9
+      });
+
+      for (const px of [-1.1, 1.1]) {
+        for (const pz of [-0.65, 0.65]) {
+          box(stall, 0.12, 2.25, 0.12, px, 1.12, pz, materials.wood);
+        }
+      }
+      box(stall, 2.55, 0.18, 1.7, 0, 2.25, 0, awningMat);
+      box(stall, 2.3, 0.16, 0.9, 0, 1.02, 0, materials.wood);
+      box(stall, 2.1, 0.55, 0.12, 0, 0.57, 0, materials.wood);
+
+      const produceColors = [0xb74634, 0xd5a331, 0x718d3f, 0xa8672d];
+      for (let i = 0; i < 12; i++) {
+        const produce = new THREE.Mesh(
+          new THREE.SphereGeometry(0.12 + random() * 0.04, 8, 6),
+          new THREE.MeshStandardMaterial({
+            color: produceColors[i % produceColors.length],
+            roughness: 0.8
+          })
+        );
+        produce.position.set(
+          -0.85 + (i % 6) * 0.34,
+          1.18,
+          -0.25 + Math.floor(i / 6) * 0.48
+        );
+        produce.castShadow = true;
+        stall.add(produce);
+      }
+    }
+
+    buildStall(-4.2, -3.1, 0.08);
+    buildStall(4.15, -3.25, -0.08);
+    buildStall(-4.25, -7.3, 0.05);
+    buildStall(4.2, -7.2, -0.05);
+
+    // Fountain at the mouth of the square.
+    const fountain = new THREE.Group();
+    fountain.position.set(0, 0, -2.6);
+    scene.add(fountain);
+    const fountainStone = new THREE.MeshStandardMaterial({ color: 0xb1ad9e, roughness: 0.95 });
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x5c99a1, roughness: 0.18, metalness: 0.1,
+      transparent: true, opacity: 0.82
+    });
+    cylinder(fountain, 1.35, 1.5, 0.35, 0, 0.24, 0, fountainStone, 28);
+    cylinder(fountain, 1.12, 1.12, 0.12, 0, 0.46, 0, waterMat, 28);
+    cylinder(fountain, 0.22, 0.34, 1.3, 0, 1.0, 0, fountainStone, 14);
+    cylinder(fountain, 0.58, 0.18, 0.18, 0, 1.72, 0, fountainStone, 20);
+
+    // Benches.
+    function buildBench(x, z, rotation = 0) {
+      const bench = new THREE.Group();
+      bench.position.set(x, 0, z);
+      bench.rotation.y = rotation;
+      scene.add(bench);
+      box(bench, 1.8, 0.13, 0.48, 0, 0.65, 0, materials.wood);
+      box(bench, 1.8, 0.45, 0.12, 0, 1.0, -0.22, materials.wood);
+      box(bench, 0.14, 0.62, 0.38, -0.65, 0.3, 0, materials.iron);
+      box(bench, 0.14, 0.62, 0.38, 0.65, 0.3, 0, materials.iron);
+    }
+    buildBench(-2.65, -4.15, 0.1);
+    buildBench(2.65, -4.15, -0.1);
+
+    // Street lamps.
+    const lampGlass = new THREE.MeshStandardMaterial({
+      color: 0xffd98b, emissive: 0xffb94d, emissiveIntensity: 1.2,
+      roughness: 0.35
+    });
+    function buildLamp(x, z) {
+      const lamp = new THREE.Group();
+      lamp.position.set(x, 0, z);
+      scene.add(lamp);
+      cylinder(lamp, 0.07, 0.11, 3.1, 0, 1.55, 0, materials.iron, 10);
+      box(lamp, 0.38, 0.08, 0.38, 0, 3.15, 0, materials.iron);
+      box(lamp, 0.25, 0.38, 0.25, 0, 3.38, 0, lampGlass);
+      box(lamp, 0.35, 0.12, 0.35, 0, 3.62, 0, materials.iron);
+    }
+    buildLamp(-2.8, -0.9);
+    buildLamp(2.8, -0.9);
+    buildLamp(-5.65, -5.0);
+    buildLamp(5.65, -5.0);
+
+    // Trees and distant rolling landscape.
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x594332, roughness: 1 });
+    const leafMats = [
+      new THREE.MeshStandardMaterial({ color: 0x536d3b, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0x6d7e42, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ color: 0x475f3a, roughness: 1 })
+    ];
+
+    function buildTree(x, z, scale = 1) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(scale);
+      scene.add(tree);
+      cylinder(tree, 0.18, 0.27, 2.4, 0, 1.2, 0, trunkMat, 8);
+      const crown = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.45, 1),
+        leafMats[Math.floor(random() * leafMats.length)]
+      );
+      crown.position.y = 3.0;
+      crown.scale.set(1, 1.15, 0.9);
+      crown.castShadow = true;
+      crown.receiveShadow = true;
+      tree.add(crown);
+    }
+
+    [
+      [-19, 9, 1.1], [-21, 1, 1.25], [-18, -9, 1.0],
+      [19, 9, 1.15], [21, 1, 1.3], [18, -10, 1.05],
+      [-11, -17, 1.2], [9, -18, 1.25], [0, -21, 1.1]
+    ].forEach(args => buildTree(...args));
+
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x75856a, roughness: 1 });
+    for (const [x, z, sx, sy] of [
+      [-28, -30, 17, 6], [0, -38, 22, 8], [28, -30, 18, 7],
+      [-38, 5, 15, 5], [38, 4, 16, 5]
+    ]) {
+      const hill = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), hillMat);
+      hill.position.set(x, -0.5, z);
+      hill.scale.set(sx, sy, sx * 0.65);
+      hill.receiveShadow = true;
+      scene.add(hill);
+    }
+
+    // A small town sign at the convergence.
+    const townSign = new THREE.Group();
+    townSign.position.set(-0.25, 0, 0.05);
+    scene.add(townSign);
+    box(townSign, 0.14, 2.25, 0.14, 0, 1.12, 0, materials.wood);
+    sign(townSign, "MARKET", 1.75, 0.48, 0, 2.1, 0.08);
+
+    // Custom orbit, pan, zoom, touch, and keyboard camera controls.
+    const pointerState = {
+      pointers: new Map(),
+      dragged: false,
+      lastX: 0,
+      lastY: 0,
+      pinchDistance: 0
+    };
+
+    function panCamera(dx, dy) {
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+      const amount = controls.radius * 0.00115;
+      controls.target.addScaledVector(right, -dx * amount);
+      controls.target.addScaledVector(up, dy * amount);
+      controls.target.x = clamp(controls.target.x, -18, 18);
+      controls.target.z = clamp(controls.target.z, -18, 18);
+      controls.target.y = clamp(controls.target.y, 0, 7);
+    }
+
+    canvas.addEventListener("contextmenu", event => event.preventDefault());
+
+    canvas.addEventListener("pointerdown", event => {
+      canvas.setPointerCapture(event.pointerId);
+      pointerState.pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+        button: event.button
+      });
+      pointerState.dragged = false;
+      pointerState.lastX = event.clientX;
+      pointerState.lastY = event.clientY;
+
+      if (pointerState.pointers.size === 2) {
+        const [a, b] = [...pointerState.pointers.values()];
+        pointerState.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      }
+    });
+
+    canvas.addEventListener("pointermove", event => {
+      if (!pointerState.pointers.has(event.pointerId)) return;
+
+      const old = pointerState.pointers.get(event.pointerId);
+      pointerState.pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+        button: old.button
+      });
+
+      if (pointerState.pointers.size >= 2) {
+        const [a, b] = [...pointerState.pointers.values()];
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pointerState.pinchDistance > 0) {
+          controls.targetRadius = clamp(
+            controls.targetRadius * pointerState.pinchDistance / distance,
+            12, 75
+          );
+        }
+        pointerState.pinchDistance = distance;
+        pointerState.dragged = true;
+        return;
+      }
+
+      const dx = event.clientX - pointerState.lastX;
+      const dy = event.clientY - pointerState.lastY;
+      pointerState.lastX = event.clientX;
+      pointerState.lastY = event.clientY;
+
+      if (Math.abs(dx) + Math.abs(dy) > 1) pointerState.dragged = true;
+
+      if (old.button === 2 || event.shiftKey) {
+        panCamera(dx, dy);
+      } else {
+        controls.targetTheta -= dx * 0.005;
+        controls.targetPhi = clamp(controls.targetPhi - dy * 0.005, 0.12, 1.43);
+      }
+    });
+
+    canvas.addEventListener("pointerup", event => {
+      const wasClick = !pointerState.dragged && pointerState.pointers.size === 1;
+      pointerState.pointers.delete(event.pointerId);
+      if (pointerState.pointers.size < 2) pointerState.pinchDistance = 0;
+
+      if (wasClick) selectHouse(event);
+    });
+
+    canvas.addEventListener("pointercancel", event => {
+      pointerState.pointers.delete(event.pointerId);
+      pointerState.dragged = true;
+    });
+
+    canvas.addEventListener("wheel", event => {
+      event.preventDefault();
+      controls.targetRadius = clamp(
+        controls.targetRadius * Math.exp(event.deltaY * 0.001),
+        12, 75
+      );
+    }, { passive: false });
+
+    addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft") controls.targetTheta += 0.08;
+      if (event.key === "ArrowRight") controls.targetTheta -= 0.08;
+      if (event.key === "ArrowUp") controls.targetPhi = clamp(controls.targetPhi - 0.06, 0.12, 1.43);
+      if (event.key === "ArrowDown") controls.targetPhi = clamp(controls.targetPhi + 0.06, 0.12, 1.43);
+      if (event.key === "+" || event.key === "=") controls.targetRadius = clamp(controls.targetRadius - 2, 12, 75);
+      if (event.key === "-") controls.targetRadius = clamp(controls.targetRadius + 2, 12, 75);
+      if (event.key.toLowerCase() === "r") resetCamera();
+    });
+
+    function resetCamera() {
+      controls.target.set(0, 1.5, -1.3);
+      controls.targetTheta = 0.57;
+      controls.targetPhi = 0.88;
+      controls.targetRadius = 42;
+    }
+
+    document.querySelector("#reset").addEventListener("click", resetCamera);
+    document.querySelector("#overhead").addEventListener("click", () => {
+      controls.target.set(0, 0.6, -2.2);
+      controls.targetTheta = 0.001;
+      controls.targetPhi = 0.12;
+      controls.targetRadius = 44;
+    });
+
+    // Click picking for the eleven houses.
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function selectHouse(event) {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(houseGroups, true);
+      if (!hits.length) {
+        selection.innerHTML = "<b>Market quarter</b>Select one of the eleven timber houses to identify its trade.";
+        return;
+      }
+
+      let object = hits[0].object;
+      while (object && !object.userData.houseName) object = object.parent;
+      if (!object) return;
+
+      const index = houseGroups.indexOf(object) + 1;
+      selection.innerHTML = `<b>${object.userData.houseName}</b>Jettied timber house ${index} of 11. Its upper storey projects over the cobbled street.`;
+    }
+
+    function updateCamera() {
+      controls.theta = lerp(controls.theta, controls.targetTheta, 0.1);
+      controls.phi = lerp(controls.phi, controls.targetPhi, 0.1);
+      controls.radius = lerp(controls.radius, controls.targetRadius, 0.1);
+
+      const sinPhi = Math.sin(controls.phi);
+      camera.position.set(
+        controls.target.x + controls.radius * sinPhi * Math.sin(controls.theta),
+        controls.target.y + controls.radius * Math.cos(controls.phi),
+        controls.target.z + controls.radius * sinPhi * Math.cos(controls.theta)
+      );
+      camera.lookAt(controls.target);
+    }
+
+    function resize() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    }
+    addEventListener("resize", resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      updateCamera();
+      renderer.render(scene, camera);
+    }
+
+    updateCamera();
+    animate();
+    loading.classList.add("done");
+    setTimeout(() => loading.remove(), 600);
+  </script>
+</body>
+</html>

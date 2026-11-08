@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nine-Wheel Brass Prayer Bank</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --gold: #d9ae59;
+      --gold-light: #f5d58d;
+      --panel: rgba(24, 18, 13, 0.78);
+      --border: rgba(218, 176, 96, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 48% 32%, #443225 0%, #201812 43%, #0c0907 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .header {
+      position: fixed;
+      top: 24px;
+      left: 28px;
+      z-index: 5;
+      max-width: min(440px, calc(100vw - 56px));
+      pointer-events: none;
+      color: #f6ead2;
+      text-shadow: 0 2px 15px rgba(0, 0, 0, 0.75);
+    }
+
+    .eyebrow {
+      margin-bottom: 8px;
+      color: var(--gold-light);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 500;
+      line-height: 1.03;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      max-width: 390px;
+      margin: 12px 0 0;
+      color: rgba(244, 231, 207, 0.68);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .controls {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: max-content;
+      max-width: calc(100vw - 24px);
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--panel);
+      box-shadow:
+        0 16px 50px rgba(0, 0, 0, 0.45),
+        inset 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transform: translateX(-50%);
+    }
+
+    button {
+      min-height: 38px;
+      padding: 0 14px;
+      border: 1px solid rgba(224, 188, 113, 0.2);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.045);
+      color: #f4e7cd;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        transform 160ms ease;
+    }
+
+    button:hover {
+      border-color: rgba(240, 202, 123, 0.55);
+      background: rgba(218, 174, 89, 0.13);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      border-color: rgba(229, 187, 104, 0.48);
+      background: linear-gradient(180deg, rgba(203, 158, 73, 0.28), rgba(151, 102, 35, 0.18));
+    }
+
+    .speed {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 168px;
+      padding: 0 9px;
+      color: rgba(244, 231, 207, 0.7);
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    input[type="range"] {
+      width: 92px;
+      accent-color: var(--gold);
+      cursor: pointer;
+    }
+
+    .hint {
+      position: fixed;
+      right: 24px;
+      bottom: 26px;
+      z-index: 5;
+      color: rgba(239, 224, 196, 0.48);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    .status {
+      position: fixed;
+      top: 22px;
+      right: 22px;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border: 1px solid rgba(221, 179, 95, 0.2);
+      border-radius: 999px;
+      background: rgba(21, 15, 10, 0.52);
+      color: rgba(246, 231, 197, 0.66);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #e0ad51;
+      box-shadow: 0 0 12px rgba(224, 173, 81, 0.8);
+    }
+
+    @media (max-width: 720px) {
+      .header {
+        top: 18px;
+        left: 18px;
+      }
+
+      .subtitle,
+      .hint,
+      .status {
+        display: none;
+      }
+
+      .controls {
+        bottom: 12px;
+        gap: 5px;
+        padding: 7px;
+      }
+
+      button {
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 11px;
+      }
+
+      .speed {
+        min-width: 118px;
+        padding: 0 4px;
+      }
+
+      input[type="range"] {
+        width: 64px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="eyebrow">Interactive Brass Study</div>
+    <h1>Nine-Wheel Prayer Bank</h1>
+    <p class="subtitle">
+      Nine graduated brass cylinders turn on a shared timber-framed axle.
+      Drag to orbit, scroll to inspect the engraving and metalwork.
+    </p>
+  </header>
+
+  <div class="status">
+    <span class="status-dot"></span>
+    <span>Common axle</span>
+  </div>
+
+  <nav class="controls" aria-label="Scene controls">
+    <button id="pause" class="primary" type="button">Pause</button>
+
+    <label class="speed" for="speed">
+      Speed
+      <input id="speed" type="range" min="0.1" max="2.2" step="0.1" value="0.65" />
+    </label>
+
+    <button id="mantras" type="button">Hide Mantras</button>
+    <button id="reset" type="button">Reset View</button>
+  </nav>
+
+  <div class="hint">DRAG TO ORBIT · SCROLL TO ZOOM · DOUBLE-CLICK TO RESET</div>
+
+  <script type="module">
+    import * as THREE from "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x17110d, 0.034);
+
+    const camera = new THREE.PerspectiveCamera(
+      39,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      80
+    );
+
+    // ---------------------------------------------------------------------
+    // Environment lighting: generated locally using only Three.js core.
+    // ---------------------------------------------------------------------
+    const environmentScene = new THREE.Scene();
+    environmentScene.background = new THREE.Color(0x18130f);
+
+    function addEnvironmentPanel(position, scale, color) {
+      const material = new THREE.MeshBasicMaterial({ color });
+      material.color.multiplyScalar(2.2);
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+      panel.position.copy(position);
+      panel.scale.set(scale.x, scale.y, 1);
+      panel.lookAt(0, 0, 0);
+      environmentScene.add(panel);
+    }
+
+    addEnvironmentPanel(
+      new THREE.Vector3(4, 5, 5),
+      new THREE.Vector2(3.5, 6),
+      new THREE.Color(0xffe4b5)
+    );
+    addEnvironmentPanel(
+      new THREE.Vector3(-5, 2, 1),
+      new THREE.Vector2(2, 5),
+      new THREE.Color(0xb9d2df)
+    );
+    addEnvironmentPanel(
+      new THREE.Vector3(0, 7, -3),
+      new THREE.Vector2(6, 3),
+      new THREE.Color(0xffcf82)
+    );
+    addEnvironmentPanel(
+      new THREE.Vector3(0, -4, 2),
+      new THREE.Vector2(7, 3),
+      new THREE.Color(0x4a3020)
+    );
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const environmentTarget = pmrem.fromScene(environmentScene, 0.04);
+    scene.environment = environmentTarget.texture;
+    pmrem.dispose();
+
+    const hemisphere = new THREE.HemisphereLight(0xffe9c9, 0x332019, 1.5);
+    scene.add(hemisphere);
+
+    const keyLight = new THREE.DirectionalLight(0xffdfaa, 4.2);
+    keyLight.position.set(5.5, 9, 7);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.left = -8;
+    keyLight.shadow.camera.right = 8;
+    keyLight.shadow.camera.top = 8;
+    keyLight.shadow.camera.bottom = -5;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 25;
+    keyLight.shadow.bias = -0.00035;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xa9c9df, 1.55);
+    fillLight.position.set(-6, 4, -5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.PointLight(0xffa83d, 28, 14, 2);
+    rimLight.position.set(1.5, 3.5, -4.5);
+    scene.add(rimLight);
+
+    // ---------------------------------------------------------------------
+    // Procedural textures.
+    // ---------------------------------------------------------------------
+    function makeMantraTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1536;
+      canvas.height = 384;
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, "#a4a4a4");
+      gradient.addColorStop(0.18, "#e2e2e2");
+      gradient.addColorStop(0.5, "#bdbdbd");
+      gradient.addColorStop(0.8, "#eeeeee");
+      gradient.addColorStop(1, "#a7a7a7");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "rgba(35, 25, 12, 0.5)";
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(0, 13);
+      ctx.lineTo(canvas.width, 13);
+      ctx.moveTo(0, canvas.height - 13);
+      ctx.lineTo(canvas.width, canvas.height - 13);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(45, 32, 15, 0.24)";
+      ctx.lineWidth = 2;
+      for (let y = 33; y < canvas.height; y += 42) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      const phrase = "ॐ मणि पद्मे हूँ";
+      ctx.font = "34px Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(27, 20, 12, 0.84)";
+      ctx.shadowColor = "rgba(255, 255, 255, 0.42)";
+      ctx.shadowOffsetY = 2;
+
+      for (let i = 0; i < 12; i++) {
+        ctx.fillText(phrase, 64 + i * 128, canvas.height * 0.5);
+      }
+
+      ctx.shadowBlur = 0;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      return texture;
+    }
+
+    function makeCapTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d");
+      const center = 256;
+
+      const gradient = ctx.createRadialGradient(
+        center - 45,
+        center - 55,
+        15,
+        center,
+        center,
+        250
+      );
+      gradient.addColorStop(0, "#f1f1f1");
+      gradient.addColorStop(0.55, "#bdbdbd");
+      gradient.addColorStop(1, "#777777");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.strokeStyle = "rgba(35, 24, 10, 0.62)";
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(center, center, 220, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.lineWidth = 3;
+      for (const radius of [195, 176, 90]) {
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 36; i++) {
+        const angle = (i / 36) * Math.PI * 2;
+        const inner = i % 3 === 0 ? 191 : 199;
+        const outer = 211;
+        ctx.beginPath();
+        ctx.moveTo(
+          center + Math.cos(angle) * inner,
+          center + Math.sin(angle) * inner
+        );
+        ctx.lineTo(
+          center + Math.cos(angle) * outer,
+          center + Math.sin(angle) * outer
+        );
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(30, 21, 10, 0.86)";
+      ctx.font = "108px Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("ॐ", center, center + 4);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      return texture;
+    }
+
+    function makeWoodTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 1024;
+      const ctx = canvas.getContext("2d");
+
+      const gradient = ctx.createLinearGradient(0, 0, 512, 0);
+      gradient.addColorStop(0, "#3b2114");
+      gradient.addColorStop(0.22, "#74452a");
+      gradient.addColorStop(0.45, "#56311e");
+      gradient.addColorStop(0.72, "#7b4a2d");
+      gradient.addColorStop(1, "#3b2114");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 1024);
+
+      for (let i = 0; i < 115; i++) {
+        const x = Math.random() * 512;
+        const width = 0.5 + Math.random() * 3;
+        ctx.strokeStyle = `rgba(24, 10, 5, ${0.06 + Math.random() * 0.22})`;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+
+        for (let y = 0; y <= 1024; y += 24) {
+          const wave = Math.sin(y * 0.015 + i) * (4 + (i % 7));
+          if (y === 0) ctx.moveTo(x + wave, y);
+          else ctx.lineTo(x + wave, y);
+        }
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 7; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 1024;
+        const radius = 12 + Math.random() * 24;
+
+        for (let ring = radius; ring > 2; ring -= 4) {
+          ctx.strokeStyle = "rgba(25, 10, 4, 0.17)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(x, y, ring, ring * 0.38, 0.1, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      return texture;
+    }
+
+    const mantraTexture = makeMantraTexture();
+    const capTexture = makeCapTexture();
+    const woodTexture = makeWoodTexture();
+
+    // ---------------------------------------------------------------------
+    // Materials.
+    // ---------------------------------------------------------------------
+    const brassMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd5a13b,
+      map: mantraTexture,
+      metalness: 0.93,
+      roughness: 0.24,
+      envMapIntensity: 1.25
+    });
+
+    const brassCapMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe0b554,
+      map: capTexture,
+      metalness: 0.94,
+      roughness: 0.2,
+      envMapIntensity: 1.35
+    });
+
+    const polishedBrass = new THREE.MeshStandardMaterial({
+      color: 0xf0bd56,
+      metalness: 0.95,
+      roughness: 0.16,
+      envMapIntensity: 1.5
+    });
+
+    const darkMetal = new THREE.MeshStandardMaterial({
+      color: 0x302b27,
+      metalness: 0.86,
+      roughness: 0.29,
+      envMapIntensity: 0.9
+    });
+
+    const woodMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      map: woodTexture,
+      metalness: 0.02,
+      roughness: 0.66
+    });
+
+    const darkWoodMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8f5736,
+      map: woodTexture,
+      metalness: 0.01,
+      roughness: 0.72
+    });
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x28231e,
+      metalness: 0.04,
+      roughness: 0.92
+    });
+
+    // ---------------------------------------------------------------------
+    // Ground and plinth.
+    // ---------------------------------------------------------------------
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(50, 50),
+      new THREE.MeshStandardMaterial({
+        color: 0x17120e,
+        metalness: 0.02,
+        roughness: 0.95
+      })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.03;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const plinth = new THREE.Mesh(
+      new THREE.BoxGeometry(8.2, 0.18, 2.75),
+      stoneMaterial
+    );
+    plinth.position.set(0, 0.07, 0);
+    plinth.castShadow = true;
+    plinth.receiveShadow = true;
+    scene.add(plinth);
+
+    // ---------------------------------------------------------------------
+    // Nine graduated brass cylinders on a common horizontal axle.
+    // ---------------------------------------------------------------------
+    const axleY = 1.28;
+    const wheelAssembly = new THREE.Group();
+    wheelAssembly.position.y = axleY;
+    scene.add(wheelAssembly);
+
+    const wheelSpacing = 0.66;
+    const wheelThickness = 0.49;
+
+    for (let i = 0; i < 9; i++) {
+      const radius = 0.72 + i * 0.045;
+      const thickness = wheelThickness + i * 0.006;
+      const x = (i - 4) * wheelSpacing;
+
+      const wheel = new THREE.Group();
+      wheel.position.x = x;
+      wheelAssembly.add(wheel);
+
+      const geometry = new THREE.CylinderGeometry(
+        radius,
+        radius,
+        thickness,
+        72,
+        1,
+        false
+      );
+      geometry.rotateZ(Math.PI / 2);
+
+      const cylinder = new THREE.Mesh(
+        geometry,
+        [brassMaterial, brassCapMaterial, brassCapMaterial]
+      );
+      cylinder.castShadow = true;
+      cylinder.receiveShadow = true;
+      wheel.add(cylinder);
+
+      // Raised rims at both ends.
+      for (const side of [-1, 1]) {
+        const rim = new THREE.Mesh(
+          new THREE.TorusGeometry(radius * 0.985, 0.026, 12, 80),
+          polishedBrass
+        );
+        rim.rotation.y = Math.PI / 2;
+        rim.position.x = side * (thickness * 0.5 + 0.012);
+        rim.castShadow = true;
+        wheel.add(rim);
+      }
+
+      // Small radial key marks make the rotation clearly visible.
+      for (const side of [-1, 1]) {
+        const marker = new THREE.Mesh(
+          new THREE.BoxGeometry(0.028, radius * 0.52, 0.045),
+          polishedBrass
+        );
+        marker.position.set(
+          side * (thickness * 0.5 + 0.035),
+          radius * 0.36,
+          0
+        );
+        marker.castShadow = true;
+        wheel.add(marker);
+      }
+
+      // Center hub collar.
+      const hub = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.16, radius * 0.16, thickness + 0.06, 32),
+        polishedBrass
+      );
+      hub.geometry.rotateZ(Math.PI / 2);
+      hub.castShadow = true;
+      wheel.add(hub);
+    }
+
+    // The steel axle runs through every cylinder and both end frames.
+    const axle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, 7.35, 32),
+      darkMetal
+    );
+    axle.geometry.rotateZ(Math.PI / 2);
+    axle.position.y = axleY;
+    axle.castShadow = true;
+    scene.add(axle);
+
+    // A narrow key strip rotates with the wheel assembly.
+    const axleKey = new THREE.Mesh(
+      new THREE.BoxGeometry(6.15, 0.025, 0.028),
+      polishedBrass
+    );
+    axleKey.position.y = axleY + 0.085;
+    wheelAssembly.add(axleKey);
+
+    // ---------------------------------------------------------------------
+    // Timber end frames.
+    // ---------------------------------------------------------------------
+    function addBeamBetween(a, b, thickness, material) {
+      const direction = new THREE.Vector3().subVectors(b, a);
+      const length = direction.length();
+      const geometry = new THREE.BoxGeometry(thickness, length, thickness);
+      const beam = new THREE.Mesh(geometry, material);
+      beam.position.copy(a).add(b).multiplyScalar(0.5);
+      beam.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.normalize()
+      );
+      beam.castShadow = true;
+      beam.receiveShadow = true;
+      scene.add(beam);
+      return beam;
+    }
+
+    const frameX = 3.42;
+    const framePostZ = 0.82;
+
+    for (const x of [-frameX, frameX]) {
+      // Two upright posts.
+      for (const z of [-framePostZ, framePostZ]) {
+        const post = new THREE.Mesh(
+          new THREE.BoxGeometry(0.34, 2.86, 0.34),
+          woodMaterial
+        );
+        post.position.set(x, 1.45, z);
+        post.castShadow = true;
+        post.receiveShadow = true;
+        scene.add(post);
+
+        const foot = new THREE.Mesh(
+          new THREE.BoxGeometry(0.56, 0.18, 0.58),
+          darkWoodMaterial
+        );
+        foot.position.set(x, 0.17, z);
+        foot.castShadow = true;
+        foot.receiveShadow = true;
+        scene.add(foot);
+      }
+
+      // Top rail and lower rail.
+      const topRail = new THREE.Mesh(
+        new THREE.BoxGeometry(0.38, 0.34, 2.05),
+        woodMaterial
+      );
+      topRail.position.set(x, 2.87, 0);
+      topRail.castShadow = true;
+      topRail.receiveShadow = true;
+      scene.add(topRail);
+
+      const lowerRail = new THREE.Mesh(
+        new THREE.BoxGeometry(0.31, 0.28, 1.92),
+        darkWoodMaterial
+      );
+      lowerRail.position.set(x, 0.38, 0);
+      lowerRail.castShadow = true;
+      lowerRail.receiveShadow = true;
+      scene.add(lowerRail);
+
+      // Diagonal timber braces.
+      addBeamBetween(
+        new THREE.Vector3(x, 2.08, -framePostZ),
+        new THREE.Vector3(x, 2.82, -0.18),
+        0.19,
+        darkWoodMaterial
+      );
+      addBeamBetween(
+        new THREE.Vector3(x, 2.08, framePostZ),
+        new THREE.Vector3(x, 2.82, 0.18),
+        0.19,
+        darkWoodMaterial
+      );
+
+      // Bearing block and iron collar around the axle.
+      const bearing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.42, 0.44),
+        darkWoodMaterial
+      );
+      bearing.position.set(x, axleY, 0);
+      bearing.castShadow = true;
+      scene.add(bearing);
+
+      const collar = new THREE.Mesh(
+        new THREE.TorusGeometry(0.17, 0.045, 12, 40),
+        darkMetal
+      );
+      collar.rotation.y = Math.PI / 2;
+      collar.position.set(x + (x < 0 ? -0.23 : 0.23), axleY, 0);
+      collar.castShadow = true;
+      scene.add(collar);
+
+      // Decorative wooden pegs.
+      for (const z of [-framePostZ, framePostZ]) {
+        const peg = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.055, 0.055, 0.38, 16),
+          darkWoodMaterial
+        );
+        peg.rotation.z = Math.PI / 2;
+        peg.position.set(x, 2.87, z);
+        peg.castShadow = true;
+        scene.add(peg);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Custom camera controls — no addons are used.
+    // ---------------------------------------------------------------------
+    const target = new THREE.Vector3(0, 1.35, 0);
+    const spherical = new THREE.Spherical(11.6, 1.23, 0.56);
+    const desiredSpherical = spherical.clone();
+    const desiredTarget = target.clone();
+
+    let dragging = false;
+    let previousX = 0;
+    let previousY = 0;
+    let pointerId = null;
+
+    function updateCamera() {
+      camera.position.setFromSpherical(spherical).add(target);
+      camera.lookAt(target);
+    }
+
+    function resetCamera() {
+      desiredSpherical.set(11.6, 1.23, 0.56);
+      desiredTarget.set(0, 1.35, 0);
+    }
+
+    renderer.domElement.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      pointerId = event.pointerId;
+      previousX = event.clientX;
+      previousY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", (event) => {
+      if (!dragging || event.pointerId !== pointerId) return;
+
+      const dx = event.clientX - previousX;
+      const dy = event.clientY - previousY;
+      previousX = event.clientX;
+      previousY = event.clientY;
+
+      desiredSpherical.theta -= dx * 0.005;
+      desiredSpherical.phi = THREE.MathUtils.clamp(
+        desiredSpherical.phi - dy * 0.005,
+        0.38,
+        1.47
+      );
+    });
+
+    function endDrag(event) {
+      if (event.pointerId !== pointerId) return;
+      dragging = false;
+      if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+      pointerId = null;
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        desiredSpherical.radius = THREE.MathUtils.clamp(
+          desiredSpherical.radius * Math.exp(event.deltaY * 0.001),
+          6.4,
+          18
+        );
+      },
+      { passive: false }
+    );
+
+    renderer.domElement.addEventListener("dblclick", resetCamera);
+
+    // ---------------------------------------------------------------------
+    // UI controls.
+    // ---------------------------------------------------------------------
+    const pauseButton = document.getElementById("pause");
+    const speedInput = document.getElementById("speed");
+    const mantraButton = document.getElementById("mantras");
+    const resetButton = document.getElementById("reset");
+
+    let isPaused = false;
+    let speed = Number(speedInput.value);
+    let mantrasVisible = true;
+
+    pauseButton.addEventListener("click", () => {
+      isPaused = !isPaused;
+      pauseButton.textContent = isPaused ? "Resume" : "Pause";
+    });
+
+    speedInput.addEventListener("input", () => {
+      speed = Number(speedInput.value);
+    });
+
+    mantraButton.addEventListener("click", () => {
+      mantrasVisible = !mantrasVisible;
+      brassMaterial.map = mantrasVisible ? mantraTexture : null;
+      brassMaterial.needsUpdate = true;
+      mantraButton.textContent = mantrasVisible ? "Hide Mantras" : "Show Mantras";
+    });
+
+    resetButton.addEventListener("click", resetCamera);
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        pauseButton.click();
+      }
+      if (event.key.toLowerCase() === "r") {
+        resetCamera();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ---------------------------------------------------------------------
+    // Animation.
+    // ---------------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      if (!isPaused) {
+        wheelAssembly.rotation.x += delta * speed;
+      }
+
+      const damping = 1 - Math.exp(-delta * 9);
+      spherical.radius = THREE.MathUtils.lerp(
+        spherical.radius,
+        desiredSpherical.radius,
+        damping
+      );
+      spherical.phi = THREE.MathUtils.lerp(
+        spherical.phi,
+        desiredSpherical.phi,
+        damping
+      );
+      spherical.theta = THREE.MathUtils.lerp(
+        spherical.theta,
+        desiredSpherical.theta,
+        damping
+      );
+      target.lerp(desiredTarget, damping);
+
+      updateCamera();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    updateCamera();
+    animate();
+  </script>
+</body>
+</html>

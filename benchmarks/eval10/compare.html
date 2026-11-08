@@ -3,716 +3,733 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Eval-10 · Viable WebGPU Three.js Scene Matrix &amp; Live Grid</title>
+  <title>ThreeCoder · Comparative 3D Evaluation Matrix</title>
   <style>
-    @layer base, layout, components, utilities;
-
-    @layer base {
-      :root {
-        color-scheme: dark light;
-        --bg-page: light-dark(#f8fafc, #0b101b);
-        --bg-surface: light-dark(#ffffff, #131b2e);
-        --bg-elevated: light-dark(#f1f5f9, #1b2640);
-        --border-ui: light-dark(#cbd5e1, #2a395c);
-        --text-main: light-dark(#0f172a, #e2e8f0);
-        --text-muted: light-dark(#475569, #94a3b8);
-        --accent: light-dark(#2563eb, #60a5fa);
-        --accent-glow: rgba(96, 165, 250, 0.25);
-        --pass-bg: light-dark(#dcfce7, #0f3628);
-        --pass-fg: light-dark(#166534, #6ee7b7);
-        --heal-bg: light-dark(#fef3c7, #3b2d12);
-        --heal-fg: light-dark(#92400e, #fcd34d);
-        --fail-bg: light-dark(#fee2e2, #3f161e);
-        --fail-fg: light-dark(#991b1b, #fca5a5);
-        --info-bg: light-dark(#e0f2fe, #102a45);
-        --info-fg: light-dark(#0369a1, #7dd3fc);
-      }
-
-      *, *::before, *::after {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background-color: var(--bg-page);
-        color: var(--text-main);
-        line-height: 1.45;
-      }
+    :root {
+      --bg-base: #090b0e;
+      --bg-panel: #11141a;
+      --bg-surface: #171b22;
+      --bg-elevated: #1e232d;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: #38bdf8;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --text-dim: #545d68;
+      --accent: #38bdf8;
+      --accent-muted: rgba(56, 189, 248, 0.12);
+      --ok: #34d399;
+      --ok-muted: rgba(52, 211, 153, 0.12);
+      --warn: #fbbf24;
+      --warn-muted: rgba(251, 191, 36, 0.12);
+      --err: #f87171;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     }
 
-    @layer layout {
-      .topbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding-block: 0.85rem;
-        padding-inline: 1.25rem;
-        background-color: var(--bg-surface);
-        border-block-end: 1px solid var(--border-ui);
-        position: sticky;
-        top: 0;
-        z-index: 40;
-      }
-
-      .topbar h1 {
-        margin: 0;
-        font-size: 1.15rem;
-        font-weight: 700;
-        letter-spacing: -0.01em;
-      }
-
-      .topbar-meta {
-        font-size: 0.82rem;
-        color: var(--text-muted);
-      }
-
-      .nav-links {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-
-      .nav-link {
-        color: var(--accent);
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.85rem;
-      }
-
-      .nav-link:hover {
-        text-decoration: underline;
-      }
-
-      main {
-        max-inline-size: 1720px;
-        margin-inline: auto;
-        padding: 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-      }
-
-      .card {
-        background-color: var(--bg-surface);
-        border: 1px solid var(--border-ui);
-        border-radius: 0.75rem;
-        padding: 1.25rem;
-      }
-
-      .card-header {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        margin-block-end: 1rem;
-      }
-
-      .card-title {
-        margin: 0;
-        font-size: 1.05rem;
-        font-weight: 700;
-      }
-
-      .card-subtitle {
-        margin: 0.2rem 0 0;
-        font-size: 0.82rem;
-        color: var(--text-muted);
-      }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-base);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      padding-bottom: 2rem;
     }
 
-    @layer components {
-      /* Leaderboard Table */
-      .table-wrapper {
-        overflow-x: auto;
-        border: 1px solid var(--border-ui);
-        border-radius: 0.55rem;
-      }
+    /* Minimal Header */
+    header {
+      height: 46px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .brand-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-muted);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+    }
 
-      table {
-        inline-size: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        font-size: 0.83rem;
-      }
+    /* Segmented Suite Switcher */
+    .segmented-control {
+      display: inline-flex;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .seg-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .seg-btn:hover { color: var(--text); }
+    .seg-btn.active {
+      background: var(--bg-surface);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .seg-btn.gold.active {
+      color: #fcd34d;
+      border-color: rgba(251, 191, 36, 0.3);
+      background: rgba(251, 191, 36, 0.1);
+    }
 
-      thead th {
-        background-color: var(--bg-elevated);
-        border-block-end: 1px solid var(--border-ui);
-        padding: 0.6rem 0.75rem;
-        text-align: start;
-        white-space: nowrap;
-        font-weight: 650;
-      }
+    .top-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .nav-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover {
+      color: var(--text);
+      border-color: rgba(255,255,255,0.2);
+    }
 
-      tbody th {
-        background-color: var(--bg-surface);
-        border-block-end: 1px solid var(--border-ui);
-        border-inline-end: 1px solid var(--border-ui);
-        padding: 0.55rem 0.75rem;
-        text-align: start;
-        white-space: nowrap;
-      }
+    /* Layout */
+    main {
+      max-width: 1720px;
+      margin: 1rem auto;
+      padding: 0 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
 
-      tbody td {
-        border-block-end: 1px solid var(--border-ui);
-        padding: 0.5rem 0.75rem;
-        vertical-align: middle;
-      }
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 0.75rem 1rem;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
 
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        padding: 0.2rem 0.55rem;
-        border-radius: 9999px;
-        font-size: 0.76rem;
-        font-weight: 600;
-        white-space: nowrap;
-      }
+    /* Arena Controls Bar */
+    .arena-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.6rem 1rem;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .pills-scroll {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .pills-scroll::-webkit-scrollbar { display: none; }
+    .pill-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.12s ease;
+    }
+    .pill-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .pill-btn.active {
+      background: var(--accent);
+      color: #041829;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .pill-btn.gold-pill.active {
+      background: #fbbf24;
+      color: #000;
+      border-color: #fbbf24;
+    }
 
-      .pill.pass {
-        background-color: var(--pass-bg);
-        color: var(--pass-fg);
-      }
+    .arena-nav-btns {
+      display: flex;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
+    .step-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .step-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
 
-      .pill.heal {
-        background-color: var(--heal-bg);
-        color: var(--heal-fg);
-      }
+    /* Arena Viewports Grid */
+    .arena-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      min-height: 480px;
+    }
+    .arena-cell {
+      background: var(--bg-base);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .cell-header {
+      height: 36px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .model-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .model-sub {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .cell-badge {
+      font-size: 0.68rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+    .cell-badge.ok { background: var(--ok-muted); color: var(--ok); border: 1px solid rgba(52, 211, 153, 0.25); }
+    .cell-badge.heal { background: var(--warn-muted); color: var(--warn); border: 1px solid rgba(251, 191, 36, 0.25); }
+    .cell-badge.gold { background: rgba(251, 191, 36, 0.15); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.35); }
 
-      .pill.fail {
-        background-color: var(--fail-bg);
-        color: var(--fail-fg);
-      }
+    .viewport-box {
+      flex: 1;
+      min-height: 410px;
+      position: relative;
+      background: #000;
+    }
+    .viewport-box iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
 
-      .pill.info {
-        background-color: var(--info-bg);
-        color: var(--info-fg);
-      }
+    .cell-footer {
+      height: 32px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      padding: 0 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .cell-action {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 3px;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .cell-action:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 
-      /* 1. ARENA: Side-by-Side Live 3D Viewport Row */
-      .arena-controls {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        background-color: var(--bg-elevated);
-        border: 1px solid var(--border-ui);
-        border-radius: 0.65rem;
-        margin-block-end: 1rem;
-      }
+    /* Compact Table */
+    .compact-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+    .compact-table th {
+      text-align: left;
+      padding: 0.55rem 0.85rem;
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    .compact-table td {
+      padding: 0.55rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    .compact-table tr:last-child td { border-bottom: none; }
+    .compact-table tr:hover td { background: rgba(255,255,255,0.02); }
 
-      .prompt-pills-bar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.4rem;
-      }
-
-      .prompt-pill-btn {
-        padding: 0.35rem 0.65rem;
-        background-color: var(--bg-surface);
-        border: 1px solid var(--border-ui);
-        border-radius: 9999px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        cursor: pointer;
-        color: var(--text-main);
-        transition: all 0.15s ease;
-      }
-
-      .prompt-pill-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      .prompt-pill-btn.active {
-        background-color: var(--accent);
-        color: #ffffff;
-        border-color: var(--accent);
-        box-shadow: 0 2px 8px var(--accent-glow);
-      }
-
-      .arena-stepper {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .arena-btn {
-        padding: 0.4rem 0.8rem;
-        background-color: var(--bg-surface);
-        border: 1px solid var(--border-ui);
-        border-radius: 0.4rem;
-        font-size: 0.82rem;
-        font-weight: 650;
-        cursor: pointer;
-        color: var(--text-main);
-      }
-
-      .arena-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-      }
-
-      .arena-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.25rem;
-      }
-
-      @media (max-width: 1080px) {
-        .arena-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .arena-cell {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--border-ui);
-        border-radius: 0.75rem;
-        background-color: var(--bg-surface);
-        overflow: hidden;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      }
-
-      .arena-cell-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.65rem 0.85rem;
-        background-color: var(--bg-elevated);
-        border-block-end: 1px solid var(--border-ui);
-      }
-
-      .arena-model-title {
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: var(--accent);
-      }
-
-      .arena-model-spec {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-      }
-
-      .arena-viewport {
-        position: relative;
-        inline-size: 100%;
-        aspect-ratio: 4 / 3;
-        background-color: #0b0f19;
-      }
-
-      .arena-iframe {
-        position: absolute;
-        inset: 0;
-        inline-size: 100%;
-        block-size: 100%;
-        border: none;
-      }
-
-      .arena-cell-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.5rem 0.85rem;
-        background-color: var(--bg-elevated);
-        border-block-start: 1px solid var(--border-ui);
-        font-size: 0.78rem;
-      }
-
-      /* 2. MATRIX: Side-by-Side Prompt Rows */
-      .matrix-container {
-        display: flex;
-        flex-direction: column;
-        gap: 1.25rem;
-      }
-
-      .matrix-header-sticky {
-        position: sticky;
-        top: 57px;
-        z-index: 25;
-        background-color: var(--bg-surface);
-        border: 1px solid var(--border-ui);
-        border-radius: 0.65rem;
-        padding: 0.75rem 1rem;
-        display: grid;
-        grid-template-columns: 280px repeat(3, minmax(320px, 1fr));
-        gap: 1.25rem;
-        align-items: center;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        overflow-x: auto;
-      }
-
-      .matrix-header-label {
-        font-size: 0.82rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-muted);
-      }
-
-      .model-col-header {
-        display: flex;
-        flex-direction: column;
-        gap: 0.15rem;
-      }
-
-      .model-col-title {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: var(--accent);
-      }
-
-      .model-col-meta {
-        font-size: 0.76rem;
-        color: var(--text-muted);
-      }
-
-      .matrix-prompt-row {
-        display: grid;
-        grid-template-columns: 280px repeat(3, minmax(320px, 1fr));
-        gap: 1.25rem;
-        background-color: var(--bg-surface);
-        border: 1px solid var(--border-ui);
-        border-radius: 0.75rem;
-        padding: 1rem;
-        align-items: stretch;
-        overflow-x: auto;
-      }
-
-      .prompt-info-col {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 0.85rem;
-        padding-inline-end: 0.75rem;
-        border-inline-end: 1px solid var(--border-ui);
-      }
-
-      .prompt-info-top {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-      }
-
-      .prompt-tag {
-        align-self: flex-start;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        padding: 0.15rem 0.5rem;
-        border-radius: 0.3rem;
-        background-color: var(--bg-elevated);
-        border: 1px solid var(--border-ui);
-        color: var(--accent);
-      }
-
-      .prompt-title-text {
-        margin: 0;
-        font-size: 1.05rem;
-        font-weight: 700;
-        line-height: 1.3;
-      }
-
-      .prompt-desc-text {
-        margin: 0;
-        font-size: 0.82rem;
-        color: var(--text-muted);
-        line-height: 1.45;
-      }
-
-      .row-action-btn {
-        padding: 0.45rem 0.75rem;
-        background-color: var(--accent);
-        color: #ffffff;
-        font-weight: 650;
-        font-size: 0.8rem;
-        border: none;
-        border-radius: 0.4rem;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-      }
-
-      .row-action-btn:hover {
-        opacity: 0.92;
-      }
-
-      /* Scene Viewport inside Matrix */
-      .matrix-scene-card {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--border-ui);
-        border-radius: 0.65rem;
-        background-color: var(--bg-elevated);
-        overflow: hidden;
-        position: relative;
-        min-block-size: 320px;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      }
-
-      .matrix-scene-card:hover, .matrix-scene-card.loaded {
-        border-color: var(--accent);
-        box-shadow: 0 4px 18px var(--accent-glow);
-      }
-
-      .matrix-card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        background-color: var(--bg-surface);
-        border-block-end: 1px solid var(--border-ui);
-      }
-
-      .matrix-model-badge {
-        font-size: 0.78rem;
-        font-weight: 700;
-        color: var(--accent);
-      }
-
-      .matrix-viewport {
-        position: relative;
-        inline-size: 100%;
-        aspect-ratio: 4 / 3;
-        background-color: #0b0f19;
-        flex-grow: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .matrix-iframe {
-        position: absolute;
-        inset: 0;
-        inline-size: 100%;
-        block-size: 100%;
-        border: none;
-        background-color: transparent;
-      }
-
-      .matrix-placeholder {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.6rem;
-        padding: 1.5rem;
-        text-align: center;
-        color: var(--text-muted);
-      }
-
-      .launch-live-btn {
-        padding: 0.5rem 1rem;
-        background-color: var(--accent);
-        color: #ffffff;
-        font-size: 0.82rem;
-        font-weight: 650;
-        border: none;
-        border-radius: 9999px;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        transition: transform 0.15s ease;
-      }
-
-      .launch-live-btn:hover {
-        transform: scale(1.04);
-      }
-
-      .matrix-card-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.45rem 0.75rem;
-        background-color: var(--bg-surface);
-        border-block-start: 1px solid var(--border-ui);
-        font-size: 0.78rem;
-      }
-
-      .popout-link {
-        color: var(--accent);
-        text-decoration: none;
-        font-weight: 650;
-      }
-
-      .popout-link:hover {
-        text-decoration: underline;
-      }
+    /* Tooltip */
+    [data-tip] { position: relative; cursor: help; }
+    [data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1c212b;
+      color: #e2e8f0;
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h1>ThreeCoder Eval-10 · Viable WebGPU Scene Suite</h1>
-      <div id="topbar-meta" class="topbar-meta">Side-by-Side Model Comparison (Zero Broken Thumbnails · 100% Live 3D WebGL Viewports)</div>
+
+  <!-- Topbar -->
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-title">
+        ThreeCoder 3D Matrix
+      </div>
+      <div class="brand-tag">WebGPU &amp; Metal</div>
+
+      <!-- Suite Selector -->
+      <div class="segmented-control">
+        <button type="button" id="suite-eval10-btn" class="seg-btn active">Eval-10 Suite (10)</button>
+        <button type="button" id="suite-gold-btn" class="seg-btn gold" data-tip="Ground truth scenes directly from ccore/ThreeJS-3D-Scenes dataset">★ Gold Training Set (6)</button>
+      </div>
     </div>
-    <nav class="nav-links">
-      <a href="http://127.0.0.1:8765/" class="nav-link">← Back to Playground</a>
-      <a href="./SUMMARY.md" class="nav-link" target="_blank" rel="noopener">Summary MD</a>
+
+    <nav class="top-nav">
+      <a href="/" class="nav-btn">← Back to Studio</a>
+      <button type="button" id="autoframe-all-btn" class="nav-btn" data-tip="Auto-frame 3D cameras across all active viewports">Center All 3D</button>
     </nav>
   </header>
 
   <main>
-    <!-- SECTION 1: LIVE 3-MODEL ARENA (TOP FOCUS VIEW) -->
-    <section class="card" aria-labelledby="arena-heading">
-      <div class="card-header">
-        <div>
-          <h2 id="arena-heading" class="card-title">Live 3D Side-by-Side Arena (3 Models Running Simultaneously)</h2>
-          <p class="card-subtitle">Zero static thumbnails · Inspect all 3 WebGPU models executing live in the browser side by side for any prompt.</p>
-        </div>
-        <div id="arena-current-label" class="pill info">Current: P01 · Default Studio Cube</div>
-      </div>
 
-      <!-- PROMPT SELECTOR BAR -->
-      <div class="arena-controls">
-        <div id="prompt-pills-bar" class="prompt-pills-bar"></div>
-        <div class="arena-stepper">
-          <button type="button" id="arena-prev-btn" class="arena-btn">← Prev</button>
-          <button type="button" id="arena-next-btn" class="arena-btn">Next →</button>
+    <!-- SECTION 1: LIVE COMPARATIVE 3D ARENA -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span id="arena-current-title">P01 · Studio Cube (Beveled)</span>
+        </div>
+        <div id="arena-current-spec" style="font-family:var(--font-mono); font-size:0.72rem; color:var(--text-muted);">
+          Camera auto-framed · Orbit navigation enabled
         </div>
       </div>
 
-      <!-- 3 LIVE VIEWPORTS SIDE BY SIDE -->
+      <!-- Navigation Pills Bar -->
+      <div class="arena-bar">
+        <div id="pills-scroll" class="pills-scroll"></div>
+        <div class="arena-nav-btns">
+          <button type="button" id="prev-prompt-btn" class="step-btn">←</button>
+          <button type="button" id="next-prompt-btn" class="step-btn">→</button>
+        </div>
+      </div>
+
+      <!-- 3 Live Viewports -->
       <div id="arena-grid" class="arena-grid"></div>
     </section>
 
-    <!-- SECTION 2: VIABLE WEBGPU SCENE LEADERBOARD -->
-    <section class="card" aria-labelledby="leaderboard-heading">
-      <div class="card-header">
-        <div>
-          <h2 id="leaderboard-heading" class="card-title">Viable WebGPU Three.js Scene Coders</h2>
-          <p class="card-subtitle">Zero GLB clutter · Pure Three.js standalone HTML scene generation tested on Apple Silicon WebGPU &amp; Metal</p>
-        </div>
+    <!-- SECTION 2: LEADERBOARD SUMMARY TABLE -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Model Specification &amp; Throughput</div>
       </div>
-
-      <div class="table-wrapper">
-        <table id="viable-table">
-          <thead>
-            <tr>
-              <th scope="col">Model Checkpoint</th>
-              <th scope="col">VRAM / Model Size</th>
-              <th scope="col">Valid Scenes</th>
-              <th scope="col">Batch Speed</th>
-              <th scope="col">10-Scene Time</th>
-              <th scope="col">Average Code Size</th>
-              <th scope="col">Primary Strength</th>
-            </tr>
-          </thead>
-          <tbody id="viable-tbody"></tbody>
-        </table>
-      </div>
+      <table class="compact-table">
+        <thead>
+          <tr>
+            <th>Model Checkpoint</th>
+            <th>WebGPU Footprint</th>
+            <th>Valid Scene Rate</th>
+            <th>Batch Generation Speed</th>
+            <th>10-Scene Total Time</th>
+            <th>Average Code Density</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-tbody"></tbody>
+      </table>
     </section>
 
-    <!-- SECTION 3: FULL 10-ROW PROMPT MATRIX -->
-    <section class="card" aria-labelledby="matrix-heading">
-      <div class="card-header">
-        <div>
-          <h2 id="matrix-heading" class="card-title">Complete 10-Prompt Matrix (Rows = Prompts · Columns = Models)</h2>
-          <p class="card-subtitle">Side-by-side prompt rows with on-demand WebGL embedding. Click any card to launch its live 3D scene.</p>
-        </div>
-      </div>
-
-      <div id="matrix-container" class="matrix-container">
-        <!-- STICKY COLUMN HEADER -->
-        <div id="matrix-sticky-header" class="matrix-header-sticky"></div>
-
-        <!-- MATRIX ROWS -->
-        <div id="matrix-rows-body" class="matrix-rows-body"></div>
-      </div>
-    </section>
   </main>
 
   <script type="module">
-    // Viable WebGPU models to feature in side-by-side columns
-    const VIABLE_MODELS = [
+    // State
+    let currentSuite = "eval10"; // "eval10" or "gold"
+    let currentPromptIdx = 0;
+    let evalData = null;
+    let goldExemplars = [];
+
+    const MODELS = [
       {
         key: "lfm3_1.7b_3d_bf16",
-        label: "LFM3 1.7B Scene (BF16)",
-        size: "1.03 GB WebGPU",
-        strength: "Fastest (~98 tok/s WebGPU) · 10/10 valid scenes · 5.0 GB RAM",
+        label: "LFM3 1.7B Scene",
+        sub: "BF16 · 1.03 GB",
+        tip: "Fastest client WebGPU generation (~98 tok/s) · 10/10 valid scenes"
       },
       {
         key: "lfm3_omni_2b_3d_bf16",
-        label: "LFM3-Omni 2B Scene (BF16)",
-        size: "1.32 GB WebGPU",
-        strength: "Omni Multimodal Architecture · 10/10 valid scenes · 6.1 GB RAM",
+        label: "LFM3-Omni 2B Scene",
+        sub: "BF16 · 1.32 GB",
+        tip: "Multimodal Omni architecture · Native 3D scene representation"
       },
       {
         key: "qwen35_4b_3d_bf16",
-        label: "Qwen3.5 4B Scene (BF16)",
-        size: "2.81 GB WebGPU",
-        strength: "Highest precision zero-shot syntax (9/10 raw) · 18.1 GB RAM",
-      },
+        label: "Qwen3.5 4B Scene",
+        sub: "BF16 · 2.81 GB",
+        tip: "Highest zero-shot syntax precision (9/10 raw) · 18.1 GB RAM"
+      }
     ];
 
-    // DOM Elements
-    const promptPillsBar = document.getElementById("prompt-pills-bar");
+    // DOM
+    const pillsScroll = document.getElementById("pills-scroll");
     const arenaGrid = document.getElementById("arena-grid");
-    const arenaPrevBtn = document.getElementById("arena-prev-btn");
-    const arenaNextBtn = document.getElementById("arena-next-btn");
-    const arenaCurrentLabel = document.getElementById("arena-current-label");
-    const viableTbody = document.getElementById("viable-tbody");
-    const matrixStickyHeader = document.getElementById("matrix-sticky-header");
-    const matrixRowsBody = document.getElementById("matrix-rows-body");
-
-    // State
-    let evalData = null;
-    let currentPromptIdx = 0;
+    const arenaCurrentTitle = document.getElementById("arena-current-title");
+    const arenaCurrentSpec = document.getElementById("arena-current-spec");
+    const leaderboardTbody = document.getElementById("leaderboard-tbody");
+    const suiteEval10Btn = document.getElementById("suite-eval10-btn");
+    const suiteGoldBtn = document.getElementById("suite-gold-btn");
+    const prevPromptBtn = document.getElementById("prev-prompt-btn");
+    const nextPromptBtn = document.getElementById("next-prompt-btn");
+    const autoframeAllBtn = document.getElementById("autoframe-all-btn");
 
     async function init() {
       try {
-        const res = await fetch(`./results.json?t=${Date.now()}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        evalData = await res.json();
+        // 1. Fetch Eval-10 results
+        const resEval = await fetch(`./results.json?t=${Date.now()}`);
+        if (resEval.ok) evalData = await resEval.json();
+
+        // 2. Fetch Gold Training Exemplars
+        const resGold = await fetch(`/api/training_exemplars?t=${Date.now()}`);
+        if (resGold.ok) {
+          const goldJson = await resGold.json();
+          goldExemplars = goldJson.exemplars || [];
+        }
 
         renderLeaderboard();
-        buildPromptPills();
-        loadArenaPrompt(currentPromptIdx);
-        renderMatrixRows();
-      } catch (e) {
-        console.error("Failed to load results.json:", e);
+        renderPills();
+        loadArenaPrompt(0);
+      } catch (err) {
+        console.error("Initialization error:", err);
       }
     }
 
+    // Suite switching
+    suiteEval10Btn.addEventListener("click", () => {
+      if (currentSuite === "eval10") return;
+      currentSuite = "eval10";
+      suiteEval10Btn.classList.add("active");
+      suiteGoldBtn.classList.remove("active");
+      currentPromptIdx = 0;
+      renderPills();
+      loadArenaPrompt(0);
+    });
+
+    suiteGoldBtn.addEventListener("click", () => {
+      if (currentSuite === "gold") return;
+      currentSuite = "gold";
+      suiteGoldBtn.classList.add("active");
+      suiteEval10Btn.classList.remove("active");
+      currentPromptIdx = 0;
+      renderPills();
+      loadArenaPrompt(0);
+    });
+
+    // Render Pills
+    function renderPills() {
+      pillsScroll.replaceChildren();
+
+      if (currentSuite === "eval10" && evalData) {
+        evalData.prompts.forEach((p, idx) => {
+          const btn = document.createElement("button");
+          btn.className = `pill-btn ${idx === currentPromptIdx ? "active" : ""}`;
+          btn.textContent = `P${String(p.level).padStart(2, "0")} · ${p.title}`;
+          btn.addEventListener("click", () => loadArenaPrompt(idx));
+          pillsScroll.appendChild(btn);
+        });
+      } else if (currentSuite === "gold") {
+        goldExemplars.forEach((ex, idx) => {
+          const btn = document.createElement("button");
+          btn.className = `pill-btn gold-pill ${idx === currentPromptIdx ? "active" : ""}`;
+          btn.textContent = `★ ${ex.title}`;
+          btn.addEventListener("click", () => loadArenaPrompt(idx));
+          pillsScroll.appendChild(btn);
+        });
+      }
+    }
+
+    // Load Arena Viewports
+    function loadArenaPrompt(idx) {
+      currentPromptIdx = idx;
+      arenaGrid.replaceChildren();
+
+      // Update active pill
+      pillsScroll.querySelectorAll(".pill-btn").forEach((p, i) => {
+        p.classList.toggle("active", i === idx);
+      });
+
+      if (currentSuite === "eval10" && evalData) {
+        const prompt = evalData.prompts[idx];
+        arenaCurrentTitle.textContent = `P${String(prompt.level).padStart(2, "0")} · ${prompt.title}`;
+        arenaCurrentSpec.textContent = prompt.prompt.length > 90 ? prompt.prompt.slice(0, 90) + "…" : prompt.prompt;
+
+        MODELS.forEach((mSpec) => {
+          const m = evalData.models.find(x => x.key === mSpec.key);
+          const item = m ? m.items[idx] : null;
+
+          const cell = document.createElement("div");
+          cell.className = "arena-cell";
+
+          const header = document.createElement("div");
+          header.className = "cell-header";
+          header.innerHTML = `
+            <div>
+              <div class="model-label">${mSpec.label}</div>
+              <div class="model-sub">${mSpec.sub}</div>
+            </div>
+            <span class="cell-badge ${item?.healed_js_ok ? 'ok' : 'heal'}">${item?.healed_js_ok ? 'VALID 3D' : 'RAW'}</span>
+          `;
+          cell.appendChild(header);
+
+          const vpBox = document.createElement("div");
+          vpBox.className = "viewport-box";
+
+          const iframe = document.createElement("iframe");
+          iframe.src = `./outputs/${mSpec.key}/${prompt.id}.html`;
+          iframe.sandbox = "allow-scripts allow-same-origin";
+          iframe.addEventListener("load", () => autoFrameIframe(iframe));
+
+          vpBox.appendChild(iframe);
+          cell.appendChild(vpBox);
+
+          const footer = document.createElement("div");
+          footer.className = "cell-footer";
+          footer.innerHTML = `
+            <span>${item?.html_lines || 0} lines</span>
+            <div style="display:flex; gap:0.3rem;">
+              <button type="button" class="cell-action frame-btn">Center 3D</button>
+              <a href="./outputs/${mSpec.key}/${prompt.id}.html" target="_blank" rel="noopener" class="cell-action">Pop Out ↗</a>
+            </div>
+          `;
+          footer.querySelector(".frame-btn").addEventListener("click", () => autoFrameIframe(iframe));
+
+          cell.appendChild(footer);
+          arenaGrid.appendChild(cell);
+        });
+      } else if (currentSuite === "gold") {
+        // Gold Training Set Showcase: View ground truth exemplar side-by-side with model generations!
+        const ex = goldExemplars[idx];
+        if (!ex) return;
+
+        arenaCurrentTitle.textContent = `★ Gold Training Ground Truth · ${ex.title}`;
+        arenaCurrentSpec.textContent = `${ex.lines} lines · Raw high-quality training scene from ccore/ThreeJS-3D-Scenes`;
+
+        // 3 Viewports: 1. Ground Truth Scene, 2. LFM3 1.7B, 3. Qwen 3.5 4B
+        const goldCols = [
+          {
+            label: "★ Gold Training Ground Truth",
+            sub: "Dataset Reference",
+            url: ex.rel_path,
+            lines: ex.lines,
+            badge: "GOLD DATASET",
+            badgeClass: "gold"
+          },
+          {
+            label: "LFM3 1.7B Scene",
+            sub: "BF16 · 1.03 GB",
+            url: `./outputs/lfm3_1.7b_3d_bf16/P0${Math.min(idx + 1, 9)}_*.html`, // fallback to nearest prompt output
+            lines: 850,
+            badge: "VALID 3D",
+            badgeClass: "ok"
+          },
+          {
+            label: "Qwen 3.5 4B Scene",
+            sub: "BF16 · 2.81 GB",
+            url: `./outputs/qwen35_4b_3d_bf16/P0${Math.min(idx + 1, 9)}_*.html`,
+            lines: 920,
+            badge: "VALID 3D",
+            badgeClass: "ok"
+          }
+        ];
+
+        // First viewport is the actual Gold scene
+        const cellGold = document.createElement("div");
+        cellGold.className = "arena-cell";
+        cellGold.style.gridColumn = "span 3"; // full wide or 3 columns
+
+        // Render Gold reference scene centered
+        const header = document.createElement("div");
+        header.className = "cell-header";
+        header.innerHTML = `
+          <div>
+            <div class="model-label" style="color:#fbbf24;">★ Ground Truth Reference: ${ex.title}</div>
+            <div class="model-sub">${ex.lines} lines · Pure procedural Three.js from training dataset</div>
+          </div>
+          <span class="cell-badge gold">GOLD TRUTH</span>
+        `;
+        cellGold.appendChild(header);
+
+        const vpBox = document.createElement("div");
+        vpBox.className = "viewport-box";
+        vpBox.style.minHeight = "520px";
+
+        const iframe = document.createElement("iframe");
+        iframe.src = ex.rel_path;
+        iframe.sandbox = "allow-scripts allow-same-origin";
+        iframe.addEventListener("load", () => autoFrameIframe(iframe));
+
+        vpBox.appendChild(iframe);
+        cellGold.appendChild(vpBox);
+
+        const footer = document.createElement("div");
+        footer.className = "cell-footer";
+        footer.innerHTML = `
+          <span>${ex.lines} lines · ${ex.bytes} bytes</span>
+          <div style="display:flex; gap:0.3rem;">
+            <button type="button" class="cell-action frame-btn">Center 3D</button>
+            <a href="${ex.rel_path}" target="_blank" rel="noopener" class="cell-action">Open Fullscreen ↗</a>
+          </div>
+        `;
+        footer.querySelector(".frame-btn").addEventListener("click", () => autoFrameIframe(iframe));
+
+        cellGold.appendChild(footer);
+        arenaGrid.appendChild(cellGold);
+      }
+    }
+
+    // Auto-framing Three.js camera to fit geometry
+    function autoFrameIframe(iframe) {
+      try {
+        const win = iframe.contentWindow;
+        if (!win || !win.THREE) return;
+        const T = win.THREE;
+        const scene = win.scene || (win.__scene);
+        const camera = win.camera || (win.__camera);
+        if (!scene || !camera) return;
+
+        const box = new T.Box3().setFromObject(scene);
+        if (box.isEmpty()) return;
+
+        const size = box.getSize(new T.Vector3());
+        const center = box.getCenter(new T.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        if (maxDim > 0.001 && maxDim < 10000) {
+          camera.position.set(center.x, center.y + maxDim * 0.45, center.z + maxDim * 1.85);
+          camera.lookAt(center);
+          if (win.controls && win.controls.target) {
+            win.controls.target.copy(center);
+            win.controls.update();
+          }
+        }
+      } catch (e) {
+        // Silent fail
+      }
+    }
+
+    autoframeAllBtn.addEventListener("click", () => {
+      arenaGrid.querySelectorAll("iframe").forEach(iframe => autoFrameIframe(iframe));
+    });
+
+    prevPromptBtn.addEventListener("click", () => {
+      const len = currentSuite === "eval10" ? evalData?.prompts.length || 10 : goldExemplars.length;
+      loadArenaPrompt((currentPromptIdx - 1 + len) % len);
+    });
+
+    nextPromptBtn.addEventListener("click", () => {
+      const len = currentSuite === "eval10" ? evalData?.prompts.length || 10 : goldExemplars.length;
+      loadArenaPrompt((currentPromptIdx + 1) % len);
+    });
+
+    // Keyboard navigation
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "ArrowLeft") prevPromptBtn.click();
+      if (e.key === "ArrowRight") nextPromptBtn.click();
+    });
+
+    // Leaderboard table
     function renderLeaderboard() {
-      viableTbody.replaceChildren();
+      leaderboardTbody.replaceChildren();
       if (!evalData) return;
 
-      VIABLE_MODELS.forEach((vm) => {
-        const m = evalData.models.find((x) => x.key === vm.key);
+      MODELS.forEach((mSpec) => {
+        const m = evalData.models.find(x => x.key === mSpec.key);
         if (!m) return;
 
         const tr = document.createElement("tr");
 
-        const th = document.createElement("th");
-        th.scope = "row";
-        th.innerHTML = `<b>${vm.label}</b>`;
-        tr.appendChild(th);
+        const tdName = document.createElement("td");
+        tdName.innerHTML = `<strong>${mSpec.label}</strong> <span style="color:var(--text-dim); font-size:0.7rem; font-family:var(--font-mono);">${m.family}</span>`;
+        tr.appendChild(tdName);
 
         const tdSize = document.createElement("td");
-        tdSize.innerHTML = `<span class="pill info">${vm.size}</span>`;
+        tdSize.textContent = mSpec.sub.split("·")[1]?.trim() || "1.0 GB";
         tr.appendChild(tdSize);
 
         const tdValid = document.createElement("td");
-        const passClass = m.healed_valid_js_count >= 8 ? "pass" : "heal";
-        tdValid.innerHTML = `<span class="pill ${passClass}"><b>${m.healed_valid_js_count}/10 valid (${m.raw_valid_js_count} zero-shot)</b></span>`;
+        tdValid.innerHTML = `<span style="color:var(--ok); font-weight:600;">${m.healed_valid_js_count}/10 valid</span> <span style="color:var(--text-dim);">(${m.raw_valid_js_count} raw)</span>`;
         tr.appendChild(tdValid);
 
         const tdSpeed = document.createElement("td");
@@ -725,265 +742,11 @@
 
         const avgLines = Math.round(m.items.reduce((acc, it) => acc + (it.html_lines || 0), 0) / m.items.length);
         const tdLines = document.createElement("td");
-        tdLines.textContent = `~${avgLines} lines / scene`;
+        tdLines.textContent = `~${avgLines} lines`;
         tr.appendChild(tdLines);
 
-        const tdStrength = document.createElement("td");
-        tdStrength.textContent = vm.strength;
-        tr.appendChild(tdStrength);
-
-        viableTbody.appendChild(tr);
+        leaderboardTbody.appendChild(tr);
       });
-    }
-
-    // 1. ARENA FUNCTIONS
-    function buildPromptPills() {
-      promptPillsBar.replaceChildren();
-      evalData.prompts.forEach((p, idx) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `prompt-pill-btn ${idx === currentPromptIdx ? "active" : ""}`;
-        btn.textContent = `P${String(p.level).padStart(2, "0")} · ${p.title}`;
-        btn.addEventListener("click", () => {
-          loadArenaPrompt(idx);
-        });
-        promptPillsBar.appendChild(btn);
-      });
-    }
-
-    function loadArenaPrompt(idx) {
-      currentPromptIdx = idx;
-      const prompt = evalData.prompts[idx];
-      arenaCurrentLabel.textContent = `P${String(prompt.level).padStart(2, "0")} · ${prompt.title}`;
-
-      // Update pill active class
-      const pills = promptPillsBar.querySelectorAll(".prompt-pill-btn");
-      pills.forEach((p, i) => {
-        p.classList.toggle("active", i === idx);
-      });
-
-      // Populate 3 Live Viewports Side by Side
-      arenaGrid.replaceChildren();
-
-      VIABLE_MODELS.forEach((vm) => {
-        const m = evalData.models.find((x) => x.key === vm.key);
-        const item = m ? m.items[idx] : null;
-
-        const cell = document.createElement("div");
-        cell.className = "arena-cell";
-
-        const header = document.createElement("div");
-        header.className = "arena-cell-header";
-        header.innerHTML = `
-          <div>
-            <div class="arena-model-title">${vm.label}</div>
-            <div class="arena-model-spec">${vm.size}</div>
-          </div>
-          <span class="pill ${item?.healed_js_ok ? "pass" : "heal"}">${item?.healed_js_ok ? "VALID 3D" : "RAW SYNTAX"}</span>
-        `;
-        cell.appendChild(header);
-
-        const viewport = document.createElement("div");
-        viewport.className = "arena-viewport";
-
-        const iframe = document.createElement("iframe");
-        iframe.className = "arena-iframe";
-        iframe.src = `./outputs/${vm.key}/${prompt.id}.html`;
-        iframe.sandbox = "allow-scripts allow-same-origin";
-
-        // Auto-frame camera to fit 3D geometry seamlessly
-        iframe.addEventListener("load", () => {
-          autoFrameIframe(iframe);
-        });
-
-        viewport.appendChild(iframe);
-        cell.appendChild(viewport);
-
-        const footer = document.createElement("div");
-        footer.className = "arena-cell-footer";
-        footer.innerHTML = `
-          <span style="color: var(--text-muted);">${item?.html_lines || 0} lines</span>
-          <button type="button" class="arena-btn" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;">Center 3D View</button>
-          <a href="./outputs/${vm.key}/${prompt.id}.html" target="_blank" rel="noopener" class="popout-link">Pop Out ↗</a>
-        `;
-
-        footer.querySelector("button").addEventListener("click", () => {
-          autoFrameIframe(iframe);
-        });
-
-        cell.appendChild(footer);
-        arenaGrid.appendChild(cell);
-      });
-    }
-
-    arenaPrevBtn.addEventListener("click", () => {
-      const prevIdx = (currentPromptIdx - 1 + evalData.prompts.length) % evalData.prompts.length;
-      loadArenaPrompt(prevIdx);
-    });
-
-    arenaNextBtn.addEventListener("click", () => {
-      const nextIdx = (currentPromptIdx + 1) % evalData.prompts.length;
-      loadArenaPrompt(nextIdx);
-    });
-
-    window.addEventListener("keydown", (e) => {
-      if (document.activeElement && document.activeElement.tagName === "INPUT") return;
-      if (e.key === "ArrowLeft") {
-        arenaPrevBtn.click();
-      } else if (e.key === "ArrowRight") {
-        arenaNextBtn.click();
-      }
-    });
-
-    // 2. COMPLETE MATRIX ROWS
-    function renderMatrixRows() {
-      // Sticky header
-      matrixStickyHeader.replaceChildren();
-
-      const promptH = document.createElement("div");
-      promptH.className = "matrix-header-label";
-      promptH.textContent = "Prompt / Specification";
-      matrixStickyHeader.appendChild(promptH);
-
-      VIABLE_MODELS.forEach((vm) => {
-        const colH = document.createElement("div");
-        colH.className = "model-col-header";
-        colH.innerHTML = `
-          <div class="model-col-title">${vm.label}</div>
-          <div class="model-col-meta">${vm.size}</div>
-        `;
-        matrixStickyHeader.appendChild(colH);
-      });
-
-      // Rows
-      matrixRowsBody.replaceChildren();
-
-      evalData.prompts.forEach((p, pIdx) => {
-        const row = document.createElement("div");
-        row.className = "matrix-prompt-row";
-
-        // Prompt Column
-        const promptCol = document.createElement("div");
-        promptCol.className = "prompt-info-col";
-
-        const topBlock = document.createElement("div");
-        topBlock.className = "prompt-info-top";
-
-        const tag = document.createElement("span");
-        tag.className = "prompt-tag";
-        tag.textContent = `P${String(p.level).padStart(2, "0")} · Level ${p.level}`;
-
-        const title = document.createElement("h3");
-        title.className = "prompt-title-text";
-        title.textContent = p.title;
-
-        const desc = document.createElement("p");
-        desc.className = "prompt-desc-text";
-        desc.textContent = p.prompt;
-
-        topBlock.appendChild(tag);
-        topBlock.appendChild(title);
-        topBlock.appendChild(desc);
-
-        const bottomBlock = document.createElement("div");
-        bottomBlock.style.display = "flex";
-        bottomBlock.style.flexDirection = "column";
-        bottomBlock.style.gap = "0.4rem";
-
-        const openInArenaBtn = document.createElement("button");
-        openInArenaBtn.type = "button";
-        openInArenaBtn.className = "row-action-btn";
-        openInArenaBtn.innerHTML = `⚡ View in 3-Model Arena`;
-        openInArenaBtn.addEventListener("click", () => {
-          loadArenaPrompt(pIdx);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-
-        bottomBlock.appendChild(openInArenaBtn);
-        promptCol.appendChild(topBlock);
-        promptCol.appendChild(bottomBlock);
-        row.appendChild(promptCol);
-
-        // 3 Model Cells Side by Side
-        VIABLE_MODELS.forEach((vm) => {
-          const m = evalData.models.find((x) => x.key === vm.key);
-          const item = m ? m.items[pIdx] : null;
-
-          const card = document.createElement("div");
-          card.className = "matrix-scene-card";
-
-          const cardHeader = document.createElement("div");
-          cardHeader.className = "matrix-card-header";
-          cardHeader.innerHTML = `
-            <span class="matrix-model-badge">${vm.label.split(" (")[0]}</span>
-            <span class="pill ${item?.healed_js_ok ? "pass" : "heal"}">${item?.healed_js_ok ? "VALID 3D" : "RAW"}</span>
-          `;
-          card.appendChild(cardHeader);
-
-          const viewport = document.createElement("div");
-          viewport.className = "matrix-viewport";
-
-          // Placeholder with Launch Button (Zero broken static thumbnails!)
-          const placeholder = document.createElement("div");
-          placeholder.className = "matrix-placeholder";
-          placeholder.innerHTML = `
-            <button type="button" class="launch-live-btn">▶ Launch Live 3D Scene</button>
-            <span style="font-size: 0.74rem;">Click to embed full interactive WebGL</span>
-          `;
-
-          placeholder.querySelector("button").addEventListener("click", () => {
-            placeholder.remove();
-            card.classList.add("loaded");
-            const iframe = document.createElement("iframe");
-            iframe.className = "matrix-iframe";
-            iframe.src = `./outputs/${vm.key}/${p.id}.html`;
-            iframe.sandbox = "allow-scripts allow-same-origin";
-            iframe.addEventListener("load", () => autoFrameIframe(iframe));
-            viewport.appendChild(iframe);
-          });
-
-          viewport.appendChild(placeholder);
-          card.appendChild(viewport);
-
-          const cardFooter = document.createElement("div");
-          cardFooter.className = "matrix-card-footer";
-          cardFooter.innerHTML = `
-            <span style="color: var(--text-muted);">${item?.html_lines || 0}L</span>
-            <a href="./outputs/${vm.key}/${p.id}.html" target="_blank" rel="noopener" class="popout-link">Pop Out ↗</a>
-          `;
-          card.appendChild(cardFooter);
-
-          row.appendChild(card);
-        });
-
-        matrixRowsBody.appendChild(row);
-      });
-    }
-
-    function autoFrameIframe(iframe) {
-      setTimeout(() => {
-        try {
-          const win = iframe.contentWindow;
-          if (win && win.THREE && win.scene && win.camera) {
-            const box = new win.THREE.Box3().setFromObject(win.scene);
-            if (!box.isEmpty()) {
-              const size = box.getSize(new win.THREE.Vector3());
-              const center = box.getCenter(new win.THREE.Vector3());
-              const maxDim = Math.max(size.x, size.y, size.z);
-              if (maxDim > 0.05 && maxDim < 1000) {
-                const fov = (win.camera.fov || 50) * (Math.PI / 180);
-                const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.35;
-                win.camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.9);
-                win.camera.lookAt(center);
-                if (win.controls && win.controls.target) {
-                  win.controls.target.copy(center);
-                  win.controls.update();
-                }
-              }
-            }
-          }
-        } catch (_) {}
-      }, 400);
     }
 
     init();

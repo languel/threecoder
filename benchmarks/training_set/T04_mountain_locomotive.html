@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mountain Rack Locomotive — Interactive Cutaway</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #9bbdca;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .title-card {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: min(390px, calc(100vw - 40px));
+      padding: 17px 19px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 13px;
+      background: linear-gradient(135deg, rgba(15, 25, 32, 0.9), rgba(24, 39, 47, 0.74));
+      box-shadow: 0 14px 45px rgba(0, 0, 0, 0.26);
+      color: #edf7f7;
+      backdrop-filter: blur(12px);
+    }
+
+    .eyebrow {
+      margin-bottom: 6px;
+      color: #f3bf61;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.19em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(21px, 3vw, 30px);
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+    }
+
+    .subtitle {
+      margin: 9px 0 0;
+      color: #bdcdd2;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.11);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.055);
+      color: #d9e6e8;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f0ad3d;
+      box-shadow: 0 0 9px #f0ad3d;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 9px;
+      width: min(560px, calc(100vw - 40px));
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      background: rgba(13, 23, 29, 0.83);
+      color: white;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    button {
+      min-height: 36px;
+      padding: 0 13px;
+      border: 1px solid rgba(255, 255, 255, 0.19);
+      border-radius: 8px;
+      background: #f2b34b;
+      color: #172028;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: #ffc765;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.09);
+      color: #e8f2f3;
+    }
+
+    .speed {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 3px;
+      color: #c5d4d8;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    input[type="range"] {
+      width: 105px;
+      accent-color: #f2b34b;
+      cursor: pointer;
+    }
+
+    .readout {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      min-width: 205px;
+      padding: 13px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 11px;
+      background: rgba(13, 23, 29, 0.76);
+      color: #dbe8ea;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(10px);
+      font-size: 11px;
+      line-height: 1.65;
+    }
+
+    .readout strong {
+      color: #f5c66e;
+      font-weight: 800;
+    }
+
+    .help {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 9px;
+      background: rgba(13, 23, 29, 0.64);
+      color: rgba(235, 244, 245, 0.8);
+      backdrop-filter: blur(8px);
+      font-size: 11px;
+    }
+
+    @media (max-width: 720px) {
+      .title-card {
+        top: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .subtitle,
+      .legend {
+        display: none;
+      }
+
+      .controls {
+        bottom: 12px;
+        left: 12px;
+        width: calc(100vw - 24px);
+      }
+
+      .readout,
+      .help {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="hud">
+    <section class="title-card">
+      <div class="eyebrow">Alpine Steam Technology</div>
+      <h1>Mountain Rack Locomotive</h1>
+      <p class="subtitle">
+        Interactive cutaway showing the boiler, firebox, running gear, and
+        toothed center-rack drive.
+      </p>
+      <div class="legend">
+        <span class="badge"><span class="dot"></span>Center-rack contact locked</span>
+        <span class="badge">No-slip gearing</span>
+        <span class="badge">Custom orbit camera</span>
+      </div>
+    </section>
+
+    <div class="help">Drag to orbit · Wheel to zoom · Shift-drag to pan</div>
+
+    <div class="controls">
+      <button id="pauseButton" type="button">Pause</button>
+      <button id="cameraButton" class="secondary" type="button">Reset camera</button>
+      <label class="speed">
+        Speed
+        <input id="speedSlider" type="range" min="0" max="2" step="0.05" value="1">
+        <span id="speedValue">1.00×</span>
+      </label>
+    </div>
+
+    <div class="readout">
+      <div>Rack wheel angle <strong id="rackAngle">0°</strong></div>
+      <div>Driving-wheel angle <strong id="wheelAngle">0°</strong></div>
+      <div>Center contact <strong>engaged</strong></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    // -------------------------------------------------------------------------
+    // Renderer, scene, camera and lighting
+    // -------------------------------------------------------------------------
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9abdc9);
+    scene.fog = new THREE.Fog(0x9abdc9, 17, 48);
+
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      innerWidth / innerHeight,
+      0.08,
+      120
+    );
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    document.body.appendChild(renderer.domElement);
+
+    const hemi = new THREE.HemisphereLight(0xcde8f4, 0x46513b, 2.1);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xffeed1, 3.3);
+    sun.position.set(-7, 12, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -9;
+    sun.shadow.camera.right = 9;
+    sun.shadow.camera.top = 9;
+    sun.shadow.camera.bottom = -9;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 35;
+    sun.shadow.bias = -0.00025;
+    scene.add(sun);
+
+    const rimLight = new THREE.DirectionalLight(0xa5d6ff, 1.15);
+    rimLight.position.set(7, 6, -9);
+    scene.add(rimLight);
+
+    // -------------------------------------------------------------------------
+    // Materials and geometry helpers
+    // -------------------------------------------------------------------------
+
+    const material = {
+      steel: new THREE.MeshStandardMaterial({
+        color: 0x343c42,
+        metalness: 0.82,
+        roughness: 0.34
+      }),
+      darkSteel: new THREE.MeshStandardMaterial({
+        color: 0x161c20,
+        metalness: 0.8,
+        roughness: 0.46
+      }),
+      brightSteel: new THREE.MeshStandardMaterial({
+        color: 0x9ca9ae,
+        metalness: 0.9,
+        roughness: 0.24
+      }),
+      boiler: new THREE.MeshStandardMaterial({
+        color: 0x263238,
+        metalness: 0.7,
+        roughness: 0.32,
+        side: THREE.DoubleSide
+      }),
+      boilerInside: new THREE.MeshStandardMaterial({
+        color: 0x16100e,
+        metalness: 0.35,
+        roughness: 0.78,
+        side: THREE.BackSide
+      }),
+      red: new THREE.MeshStandardMaterial({
+        color: 0x7f1d1b,
+        metalness: 0.5,
+        roughness: 0.4
+      }),
+      redDark: new THREE.MeshStandardMaterial({
+        color: 0x47100f,
+        metalness: 0.55,
+        roughness: 0.42
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0xd8a13a,
+        metalness: 0.86,
+        roughness: 0.24
+      }),
+      rack: new THREE.MeshStandardMaterial({
+        color: 0xe5b24c,
+        metalness: 0.82,
+        roughness: 0.3
+      }),
+      wood: new THREE.MeshStandardMaterial({
+        color: 0x4d2d1c,
+        metalness: 0.08,
+        roughness: 0.82
+      }),
+      rubber: new THREE.MeshStandardMaterial({
+        color: 0x101315,
+        metalness: 0.08,
+        roughness: 0.86
+      }),
+      glass: new THREE.MeshStandardMaterial({
+        color: 0x9bcbd1,
+        metalness: 0.1,
+        roughness: 0.15,
+        transparent: true,
+        opacity: 0.36
+      }),
+      fire: new THREE.MeshStandardMaterial({
+        color: 0xff6a14,
+        emissive: 0xff3000,
+        emissiveIntensity: 3.2,
+        roughness: 0.5
+      }),
+      marker: new THREE.MeshStandardMaterial({
+        color: 0xe5b34f,
+        metalness: 0.35,
+        roughness: 0.5
+      }),
+      ground: new THREE.MeshStandardMaterial({
+        color: 0x536345,
+        roughness: 1
+      }),
+      ballast: new THREE.MeshStandardMaterial({
+        color: 0x777a78,
+        roughness: 1
+      })
+    };
+
+    function addBox(parent, size, position, mat, castShadow = true) {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        mat
+      );
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addCylinder(
+      parent,
+      radius,
+      length,
+      position,
+      mat,
+      axis = "z",
+      radialSegments = 24
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          radius,
+          radius,
+          length,
+          radialSegments
+        ),
+        mat
+      );
+
+      if (axis === "x") mesh.rotation.z = Math.PI / 2;
+      if (axis === "z") mesh.rotation.x = Math.PI / 2;
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    function addTorus(
+      parent,
+      radius,
+      tube,
+      position,
+      mat,
+      axis = "z"
+    ) {
+      const mesh = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 10, 48),
+        mat
+      );
+
+      if (axis === "x") mesh.rotation.y = Math.PI / 2;
+
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    // -------------------------------------------------------------------------
+    // Alpine environment
+    // -------------------------------------------------------------------------
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 70),
+      material.ground
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.32;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    addBox(
+      scene,
+      [38, 0.2, 3.45],
+      [0, -0.2, 0],
+      material.ballast,
+      false
+    );
+
+    const mountainMatA = new THREE.MeshStandardMaterial({
+      color: 0x65756d,
+      roughness: 1,
+      flatShading: true
+    });
+
+    const mountainMatB = new THREE.MeshStandardMaterial({
+      color: 0x4f625e,
+      roughness: 1,
+      flatShading: true
+    });
+
+    const snowMat = new THREE.MeshStandardMaterial({
+      color: 0xe3e9e8,
+      roughness: 0.95,
+      flatShading: true
+    });
+
+    const mountains = [
+      [-15, 3.3, -13, 5.3, 7.2, 0],
+      [-7, 2.6, -16, 4.3, 5.6, 1],
+      [1, 3.8, -18, 6.4, 8.4, 0],
+      [10, 3.0, -15, 5.0, 6.5, 1],
+      [18, 4.1, -19, 6.8, 9.0, 0],
+      [-22, 3.5, -23, 7.0, 8.0, 1]
+    ];
+
+    for (const [x, y, z, radius, height, variant] of mountains) {
+      const mountain = new THREE.Mesh(
+        new THREE.ConeGeometry(radius, height, 7, 1),
+        variant ? mountainMatA : mountainMatB
+      );
+      mountain.position.set(x, y, z);
+      mountain.rotation.y = x * 0.17;
+      mountain.receiveShadow = true;
+      scene.add(mountain);
+
+      const cap = new THREE.Mesh(
+        new THREE.ConeGeometry(radius * 0.31, height * 0.31, 7, 1),
+        snowMat
+      );
+      cap.position.set(x, y + height * 0.345, z);
+      cap.rotation.y = mountain.rotation.y;
+      scene.add(cap);
+    }
+
+    const treeMat = new THREE.MeshStandardMaterial({
+      color: 0x203f35,
+      roughness: 1,
+      flatShading: true
+    });
+
+    for (let i = 0; i < 36; i++) {
+      const tree = new THREE.Mesh(
+        new THREE.ConeGeometry(
+          0.22 + (i % 4) * 0.05,
+          1.0 + (i % 5) * 0.18,
+          6
+        ),
+        treeMat
+      );
+      const side = i % 2 ? -1 : 1;
+      tree.position.set(
+        -20 + ((i * 3.71) % 40),
+        0.35,
+        side * (3.0 + ((i * 1.37) % 4.5))
+      );
+      tree.rotation.y = i * 0.77;
+      scene.add(tree);
+    }
+
+    // -------------------------------------------------------------------------
+    // Track: running rails, sleepers, elevated center rack and moving details
+    // -------------------------------------------------------------------------
+
+    const tieGroup = new THREE.Group();
+    const markerGroup = new THREE.Group();
+    const rackTeethGroup = new THREE.Group();
+    scene.add(tieGroup, markerGroup, rackTeethGroup);
+
+    const tieSpacing = 0.72;
+
+    for (let x = -19; x <= 19; x += tieSpacing) {
+      addBox(
+        tieGroup,
+        [0.23, 0.14, 2.65],
+        [x, 0, 0],
+        material.wood,
+        false
+      );
+    }
+
+    const railZ = 0.82;
+
+    for (const z of [-railZ, railZ]) {
+      addBox(scene, [38, 0.1, 0.055], [0, 0.14, z], material.steel, false);
+      addBox(scene, [38, 0.06, 0.14], [0, 0.26, z], material.brightSteel, false);
+    }
+
+    const markerSpacing = 1.44;
+
+    for (let x = -19; x <= 19; x += markerSpacing) {
+      for (const z of [-railZ, railZ]) {
+        addBox(
+          markerGroup,
+          [0.075, 0.012, 0.145],
+          [x, 0.296, z],
+          material.marker,
+          false
+        );
+      }
+    }
+
+    // The center rack is carried above the center of the track bed.
+    addBox(scene, [38, 0.1, 0.22], [0, 0.7, 0], material.steel, false);
+
+    for (let x = -18; x <= 18; x += 1.44) {
+      addBox(
+        scene,
+        [0.075, 0.56, 0.18],
+        [x + 0.72, 0.38, 0],
+        material.darkSteel,
+        false
+      );
+      addBox(
+        scene,
+        [0.28, 0.06, 0.38],
+        [x + 0.72, 0.1, 0],
+        material.steel,
+        false
+      );
+    }
+
+    const rackPitch = 0.12;
+    const rackTeeth = 12;
+    const rackPitchRadius = rackTeeth * rackPitch / (Math.PI * 2);
+
+    // A tooth is centered in the rack wheel's top gap at the start.
+    for (let x = -18; x <= 18; x += rackPitch) {
+      addBox(
+        rackTeethGroup,
+        [0.055, 0.2, 0.14],
+        [x + 0.05, 0.55, 0],
+        material.rack,
+        false
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Locomotive frame
+    // -------------------------------------------------------------------------
+
+    const locomotive = new THREE.Group();
+    scene.add(locomotive);
+
+    for (const z of [-0.54, 0.54]) {
+      addBox(
+        locomotive,
+        [4.35, 0.23, 0.18],
+        [0.05, 1.17, z],
+        material.redDark
+      );
+    }
+
+    for (const x of [-1.82, -0.55, 0.72, 1.86]) {
+      addBox(
+        locomotive,
+        [0.18, 0.16, 1.25],
+        [x, 1.13, 0],
+        material.steel
+      );
+    }
+
+    addBox(
+      locomotive,
+      [1.02, 0.12, 1.35],
+      [-1.77, 0.95, 0],
+      material.darkSteel
+    );
+
+    // Running board and rear deck.
+    addBox(
+      locomotive,
+      [1.22, 0.1, 1.53],
+      [1.3, 1.37, 0],
+      material.wood
+    );
+
+    // -------------------------------------------------------------------------
+    // Driving wheels and coupling rods
+    // -------------------------------------------------------------------------
+
+    const driveRadius = 0.445;
+    const wheelY = 0.735;
+    const wheelXs = [-1.35, -0.15, 1.05];
+    const drivingWheels = [];
+
+    function createDrivingWheel(x, z, side) {
+      const group = new THREE.Group();
+      group.position.set(x, wheelY, z);
+      locomotive.add(group);
+
+      addTorus(
+        group,
+        0.385,
+        0.06,
+        [0, 0, 0],
+        material.darkSteel
+      );
+
+      addTorus(
+        group,
+        0.415,
+        0.025,
+        [0, 0, -side * 0.075],
+        material.brightSteel
+      );
+
+      addCylinder(
+        group,
+        0.12,
+        0.22,
+        [0, 0, 0],
+        material.brass
+      );
+
+      for (let i = 0; i < 10; i++) {
+        const spoke = addBox(
+          group,
+          [0.69, 0.047, 0.075],
+          [0, 0, 0],
+          material.steel
+        );
+        spoke.rotation.z = i * Math.PI / 5;
+      }
+
+      // A contrasting rim mark makes rotation easy to read.
+      addBox(
+        group,
+        [0.095, 0.06, 0.13],
+        [0.39, 0, 0],
+        material.marker
+      );
+
+      const crankPin = addCylinder(
+        group,
+        0.052,
+        0.16,
+        [0.25, 0, side * 0.12],
+        material.brass
+      );
+
+      drivingWheels.push({ group, crankPin, x, side });
+      return group;
+    }
+
+    for (const side of [-1, 1]) {
+      for (const x of wheelXs) {
+        createDrivingWheel(x, side * railZ, side);
+      }
+    }
+
+    const couplingRod = addBox(
+      locomotive,
+      [wheelXs[2] - wheelXs[0], 0.09, 0.075],
+      [0, wheelY, 1.01],
+      material.brightSteel
+    );
+
+    const connectingRod = addBox(
+      locomotive,
+      [1, 0.075, 0.065],
+      [0, 1, 1.035],
+      material.brightSteel
+    );
+
+    // Piston and cylinder on the visible side.
+    addCylinder(
+      locomotive,
+      0.19,
+      0.72,
+      [-2.02, 1.08, 0.76],
+      material.steel,
+      "x"
+    );
+
+    addCylinder(
+      locomotive,
+      0.12,
+      0.16,
+      [-1.61, 1.08, 0.76],
+      material.brightSteel,
+      "x"
+    );
+
+    // -------------------------------------------------------------------------
+    // Toothed rack wheel. It shares the same virtual travel as the train.
+    // -------------------------------------------------------------------------
+
+    const rackWheel = new THREE.Group();
+    rackWheel.position.set(-0.55, 0.38, 0);
+    locomotive.add(rackWheel);
+
+    addTorus(
+      rackWheel,
+      0.205,
+      0.028,
+      [0, 0, 0],
+      material.brass
+    );
+
+    addCylinder(
+      rackWheel,
+      0.09,
+      0.2,
+      [0, 0, 0],
+      material.brightSteel
+    );
+
+    for (let i = 0; i < 6; i++) {
+      const spoke = addBox(
+        rackWheel,
+        [0.36, 0.035, 0.065],
+        [0, 0, 0],
+        material.brass
+      );
+      spoke.rotation.z = i * Math.PI / 3;
+    }
+
+    for (let i = 0; i < rackTeeth; i++) {
+      const angle = Math.PI / rackTeeth + i * Math.PI * 2 / rackTeeth;
+      const tooth = addBox(
+        rackWheel,
+        [0.062, 0.07, 0.15],
+        [
+          Math.cos(angle) * 0.245,
+          Math.sin(angle) * 0.245,
+          0
+        ],
+        material.rack
+      );
+      tooth.rotation.z = angle - Math.PI / 2;
+    }
+
+    // Small pulsing contact marker at the rack-wheel / center-rack engagement.
+    const contactMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.027, 12, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xffb22f,
+        transparent: true,
+        opacity: 0.85
+      })
+    );
+    contactMarker.position.set(-0.55, 0.645, 0.1);
+    locomotive.add(contactMarker);
+
+    // -------------------------------------------------------------------------
+    // Cutaway boiler and firebox
+    // -------------------------------------------------------------------------
+
+    const boilerLength = 2.35;
+    const boilerX = -0.43;
+    const boilerY = 2.05;
+
+    // The front-facing angular section is omitted to expose the interior.
+    const outerBoiler = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        0.69,
+        0.69,
+        boilerLength,
+        48,
+        1,
+        true,
+        0.73,
+        Math.PI * 2 - 1.46
+      ),
+      material.boiler
+    );
+    outerBoiler.rotation.z = Math.PI / 2;
+    outerBoiler.position.set(boilerX, boilerY, 0);
+    outerBoiler.castShadow = true;
+    outerBoiler.receiveShadow = true;
+    locomotive.add(outerBoiler);
+
+    // Far half of the boiler forms a dark inner wall.
+    const innerBoiler = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        0.635,
+        0.635,
+        boilerLength - 0.04,
+        48,
+        1,
+        true,
+        Math.PI / 2,
+        Math.PI
+      ),
+      material.boilerInside
+    );
+    innerBoiler.rotation.z = Math.PI / 2;
+    innerBoiler.position.set(boilerX, boilerY, 0);
+    locomotive.add(innerBoiler);
+
+    // Boiler bands and longitudinal riveted seams.
+    for (const x of [-1.38, -0.63, 0.18, 0.63]) {
+      addTorus(
+        locomotive,
+        0.695,
+        0.022,
+        [x, boilerY, 0],
+        material.brightSteel,
+        "x"
+      );
+    }
+
+    // Visible boiler tubes.
+    for (let i = 0; i < 10; i++) {
+      const angle = -0.12 + i * 0.16;
+      addCylinder(
+        locomotive,
+        0.025,
+        1.9,
+        [
+          boilerX,
+          boilerY + Math.sin(angle) * 0.39,
+          Math.cos(angle) * 0.41
+        ],
+        i % 3 === 0 ? material.brass : material.brightSteel,
+        "x",
+        10
+      );
+    }
+
+    // Firebox and visible fire.
+    addBox(
+      locomotive,
+      [0.58, 0.69, 0.88],
+      [0.68, 1.78, -0.04],
+      material.darkSteel
+    );
+
+    addBox(
+      locomotive,
+      [0.38, 0.35, 0.055],
+      [0.65, 1.71, 0.42],
+      material.fire
+    );
+
+    const fireLight = new THREE.PointLight(0xff5418, 2.2, 3.2);
+    fireLight.position.set(0.6, 1.85, 0.55);
+    locomotive.add(fireLight);
+
+    // Smokebox and front door.
+    addCylinder(
+      locomotive,
+      0.715,
+      0.32,
+      [-1.72, boilerY, 0],
+      material.steel,
+      "x",
+      48
+    );
+
+    addCylinder(
+      locomotive,
+      0.57,
+      0.06,
+      [-1.9, boilerY, 0],
+      material.darkSteel,
+      "x",
+      48
+    );
+
+    addTorus(
+      locomotive,
+      0.57,
+      0.035,
+      [-1.94, boilerY, 0],
+      material.brass,
+      "x"
+    );
+
+    addCylinder(
+      locomotive,
+      0.045,
+      0.12,
+      [-1.985, boilerY, 0],
+      material.brass,
+      "x"
+    );
+
+    // Chimney.
+    addCylinder(
+      locomotive,
+      0.16,
+      0.44,
+      [-1.6, 2.93, 0],
+      material.darkSteel,
+      "y"
+    );
+
+    addCylinder(
+      locomotive,
+      0.23,
+      0.11,
+      [-1.6, 3.17, 0],
+      material.steel,
+      "y"
+    );
+
+    const chimneyTop = new THREE.Vector3(-1.6, 3.28, 0);
+
+    // Headlamp.
+    addCylinder(
+      locomotive,
+      0.17,
+      0.18,
+      [-2.03, 2.27, 0],
+      material.brass,
+      "x"
+    );
+
+    const lamp = new THREE.Mesh(
+      new THREE.CircleGeometry(0.13, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffe8a8 })
+    );
+    lamp.rotation.y = -Math.PI / 2;
+    lamp.position.set(-2.125, 2.27, 0);
+    locomotive.add(lamp);
+
+    // Cowcatcher.
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8;
+      const slat = addBox(
+        locomotive,
+        [0.07, 0.07, 1.2 - t * 0.72],
+        [-2.04 - t * 0.34, 0.55 - t * 0.18, 0],
+        material.steel
+      );
+      slat.rotation.z = -0.45;
+    }
+
+    addBox(
+      locomotive,
+      [0.14, 0.12, 1.35],
+      [-2.0, 0.75, 0],
+      material.darkSteel
+    );
+
+    // -------------------------------------------------------------------------
+    // Cab: near side intentionally open as part of the cutaway
+    // -------------------------------------------------------------------------
+
+    addBox(
+      locomotive,
+      [1.38, 0.12, 1.45],
+      [1.33, 1.47, 0],
+      material.red
+    );
+
+    addBox(
+      locomotive,
+      [0.1, 1.52, 1.45],
+      [1.98, 2.22, 0],
+      material.redDark
+    );
+
+    addBox(
+      locomotive,
+      [1.35, 1.42, 0.09],
+      [1.33, 2.2, -0.68],
+      material.red
+    );
+
+    for (const x of [0.66, 1.98]) {
+      for (const z of [-0.68, 0.68]) {
+        addBox(
+          locomotive,
+          [0.1, 1.55, 0.1],
+          [x, 2.22, z],
+          material.redDark
+        );
+      }
+    }
+
+    // Rear window.
+    addBox(
+      locomotive,
+      [0.035, 0.57, 0.8],
+      [2.04, 2.54, 0],
+      material.glass
+    );
+
+    addBox(
+      locomotive,
+      [1.6, 0.14, 1.68],
+      [1.3, 3.03, 0],
+      material.darkSteel
+    );
+
+    addBox(
+      locomotive,
+      [1.7, 0.055, 1.76],
+      [1.3, 3.13, 0],
+      material.red
+    );
+
+    // Cab controls and gauges.
+    addCylinder(
+      locomotive,
+      0.04,
+      0.95,
+      [1.12, 2.02, -0.2],
+      material.brass,
+      "y"
+    );
+
+    addBox(
+      locomotive,
+      [0.08, 0.08, 0.55],
+      [1.12, 2.46, -0.02],
+      material.brass
+    );
+
+    for (const z of [-0.17, 0.17]) {
+      const gauge = addCylinder(
+        locomotive,
+        0.105,
+        0.045,
+        [1.03, 2.53, z],
+        material.brass,
+        "x",
+        20
+      );
+      gauge.rotation.z = Math.PI / 2;
+    }
+
+    // -------------------------------------------------------------------------
+    // Procedural steam puffs
+    // -------------------------------------------------------------------------
+
+    const smokeGeometry = new THREE.SphereGeometry(0.13, 10, 8);
+    const smokeParticles = [];
+
+    for (let i = 0; i < 24; i++) {
+      const puffMaterial = new THREE.MeshStandardMaterial({
+        color: 0xd8dde0,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        roughness: 1
+      });
+
+      const puff = new THREE.Mesh(smokeGeometry, puffMaterial);
+      puff.visible = false;
+      scene.add(puff);
+
+      smokeParticles.push({
+        mesh: puff,
+        age: 10,
+        life: 2.5 + Math.random() * 1.5,
+        drift: (Math.random() - 0.5) * 0.3,
+        speed: 0.7 + Math.random() * 0.5
+      });
+    }
+
+    let smokeAccumulator = 0;
+
+    function emitSmoke() {
+      const puff = smokeParticles.find(p => p.age >= p.life);
+      if (!puff) return;
+
+      puff.age = 0;
+      puff.life = 2.5 + Math.random() * 1.5;
+      puff.drift = (Math.random() - 0.5) * 0.35;
+      puff.speed = 0.7 + Math.random() * 0.55;
+      puff.mesh.position.copy(chimneyTop);
+      puff.mesh.position.x += (Math.random() - 0.5) * 0.08;
+      puff.mesh.position.z += (Math.random() - 0.5) * 0.08;
+      puff.mesh.scale.setScalar(0.65);
+      puff.mesh.material.opacity = 0.42;
+      puff.mesh.visible = true;
+    }
+
+    function updateSmoke(dt) {
+      smokeAccumulator += dt;
+
+      if (smokeAccumulator > 0.13) {
+        smokeAccumulator = 0;
+        emitSmoke();
+      }
+
+      for (const puff of smokeParticles) {
+        if (!puff.mesh.visible) continue;
+
+        puff.age += dt;
+        const t = puff.age / puff.life;
+
+        if (t >= 1) {
+          puff.mesh.visible = false;
+          continue;
+        }
+
+        puff.mesh.position.y += puff.speed * dt;
+        puff.mesh.position.x -= (0.08 + t * 0.3) * dt;
+        puff.mesh.position.x += puff.drift * dt * 0.12;
+        puff.mesh.position.z += puff.drift * dt;
+
+        puff.mesh.scale.setScalar(0.65 + t * 3.1);
+        puff.mesh.material.opacity = Math.sin(Math.PI * t) * 0.36;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Custom orbit / pan / zoom camera controls
+    // -------------------------------------------------------------------------
+
+    const cameraState = {
+      target: new THREE.Vector3(0.05, 1.55, 0),
+      theta: 0.94,
+      phi: 1.12,
+      radius: 8.6
+    };
+
+    const defaultCamera = {
+      target: cameraState.target.clone(),
+      theta: cameraState.theta,
+      phi: cameraState.phi,
+      radius: cameraState.radius
+    };
+
+    function updateCamera() {
+      const sinPhi = Math.sin(cameraState.phi);
+      camera.position.set(
+        cameraState.target.x +
+          cameraState.radius * sinPhi * Math.sin(cameraState.theta),
+        cameraState.target.y +
+          cameraState.radius * Math.cos(cameraState.phi),
+        cameraState.target.z +
+          cameraState.radius * sinPhi * Math.cos(cameraState.theta)
+      );
+      camera.lookAt(cameraState.target);
+    }
+
+    updateCamera();
+
+    let dragging = false;
+    let pointerX = 0;
+    let pointerY = 0;
+    let shiftPressed = false;
+
+    renderer.domElement.addEventListener("pointerdown", event => {
+      dragging = true;
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      shiftPressed = event.shiftKey;
+      renderer.domElement.setPointerCapture(event.pointerId);
+    });
+
+    renderer.domElement.addEventListener("pointermove", event => {
+      if (!dragging) return;
+
+      const dx = event.clientX - pointerX;
+      const dy = event.clientY - pointerY;
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+
+      if (shiftPressed || event.buttons === 2) {
+        const right = new THREE.Vector3();
+        const up = new THREE.Vector3();
+        camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
+
+        const panScale = cameraState.radius * 0.0011;
+        cameraState.target.addScaledVector(right, -dx * panScale);
+        cameraState.target.addScaledVector(up, dy * panScale);
+      } else {
+        cameraState.theta -= dx * 0.006;
+        cameraState.phi = THREE.MathUtils.clamp(
+          cameraState.phi - dy * 0.006,
+          0.28,
+          1.48
+        );
+      }
+
+      updateCamera();
+    });
+
+    function endDrag(event) {
+      dragging = false;
+      if (event.pointerId !== undefined) {
+        try {
+          renderer.domElement.releasePointerCapture(event.pointerId);
+        } catch (_) {}
+      }
+    }
+
+    renderer.domElement.addEventListener("pointerup", endDrag);
+    renderer.domElement.addEventListener("pointercancel", endDrag);
+    renderer.domElement.addEventListener("contextmenu", event => event.preventDefault());
+
+    renderer.domElement.addEventListener(
+      "wheel",
+      event => {
+        event.preventDefault();
+        cameraState.radius = THREE.MathUtils.clamp(
+          cameraState.radius * Math.exp(event.deltaY * 0.001),
+          4.7,
+          18
+        );
+        updateCamera();
+      },
+      { passive: false }
+    );
+
+    // -------------------------------------------------------------------------
+    // UI
+    // -------------------------------------------------------------------------
+
+    const pauseButton = document.getElementById("pauseButton");
+    const cameraButton = document.getElementById("cameraButton");
+    const speedSlider = document.getElementById("speedSlider");
+    const speedValue = document.getElementById("speedValue");
+    const rackAngleText = document.getElementById("rackAngle");
+    const wheelAngleText = document.getElementById("wheelAngle");
+
+    let paused = false;
+    let speed = 1;
+    let travel = 0;
+
+    pauseButton.addEventListener("click", () => {
+      paused = !paused;
+      pauseButton.textContent = paused ? "Resume" : "Pause";
+    });
+
+    speedSlider.addEventListener("input", () => {
+      speed = Number(speedSlider.value);
+      speedValue.textContent = `${speed.toFixed(2)}×`;
+    });
+
+    cameraButton.addEventListener("click", () => {
+      cameraState.target.copy(defaultCamera.target);
+      cameraState.theta = defaultCamera.theta;
+      cameraState.phi = defaultCamera.phi;
+      cameraState.radius = defaultCamera.radius;
+      updateCamera();
+    });
+
+    // -------------------------------------------------------------------------
+    // Animation and no-slip synchronization
+    // -------------------------------------------------------------------------
+
+    const clock = new THREE.Clock();
+    const unitX = new THREE.Vector3(1, 0, 0);
+
+    function placeRodBetween(mesh, pointA, pointB) {
+      const direction = new THREE.Vector3().subVectors(pointB, pointA);
+      const length = direction.length();
+      const midpoint = new THREE.Vector3()
+        .addVectors(pointA, pointB)
+        .multiplyScalar(0.5);
+
+      mesh.position.copy(midpoint);
+      mesh.scale.set(length, 1, 1);
+      mesh.quaternion.setFromUnitVectors(unitX, direction.normalize());
+    }
+
+    function animate() {
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      if (!paused) {
+        travel += dt * speed * 0.62;
+      }
+
+      // Track-bed detail scrolls opposite the locomotive's virtual travel.
+      tieGroup.position.x = -((travel % tieSpacing) + tieSpacing) % tieSpacing;
+      markerGroup.position.x =
+        -((travel % markerSpacing) + markerSpacing) % markerSpacing;
+
+      // Center-rack teeth advance by exactly one tooth per rack-wheel tooth.
+      rackTeethGroup.position.x =
+        -((travel % rackPitch) + rackPitch) % rackPitch;
+
+      const drivingAngle = -travel / driveRadius;
+      const rackAngle = -travel / rackPitchRadius;
+
+      for (const wheel of drivingWheels) {
+        wheel.group.rotation.z = drivingAngle;
+      }
+
+      rackWheel.rotation.z = rackAngle;
+
+      // The near coupling rod follows all three crank pins.
+      const crankRadius = 0.25;
+      const rodY = wheelY + Math.sin(drivingAngle) * crankRadius;
+      const rodX = (wheelXs[0] + wheelXs[2]) * 0.5 +
+        Math.cos(drivingAngle) * crankRadius;
+
+      couplingRod.position.set(rodX, rodY, 1.015);
+
+      // Connecting rod runs from the first crank pin toward the piston crosshead.
+      const crankPoint = new THREE.Vector3(
+        wheelXs[0] + Math.cos(drivingAngle) * crankRadius,
+        wheelY + Math.sin(drivingAngle) * crankRadius,
+        1.025
+      );
+
+      const crosshead = new THREE.Vector3(
+        -1.58 + Math.cos(drivingAngle) * 0.08,
+        1.08 + Math.sin(drivingAngle) * 0.08,
+        1.025
+      );
+
+      placeRodBetween(connectingRod, crankPoint, crosshead);
+
+      // Emphasize the live meshing point.
+      const pulse = 0.8 + Math.sin(performance.now() * 0.009) * 0.22;
+      contactMarker.scale.setScalar(pulse);
+      contactMarker.material.opacity = 0.58 + pulse * 0.3;
+
+      // Firebox flicker.
+      const flicker = 0.78 + Math.random() * 0.32;
+      fireLight.intensity = 1.65 + flicker * 1.05;
+      material.fire.emissiveIntensity = 2.5 + flicker * 1.4;
+
+      updateSmoke(dt);
+      updateCamera();
+
+      const displayRackAngle = THREE.MathUtils.euclideanModulo(
+        rackAngle * 180 / Math.PI,
+        360
+      );
+
+      const displayWheelAngle = THREE.MathUtils.euclideanModulo(
+        drivingAngle * 180 / Math.PI,
+        360
+      );
+
+      rackAngleText.textContent = `${displayRackAngle.toFixed(0)}°`;
+      wheelAngleText.textContent = `${displayWheelAngle.toFixed(0)}°`;
+
+      renderer.render(scene, camera);
+    }
+
+    renderer.setAnimationLoop(animate);
+
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

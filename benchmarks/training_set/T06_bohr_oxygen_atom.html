@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oxygen — Bohr Atom Model</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 44%, #17233e 0%, #090f1e 42%, #03060d 100%);
+      color: #edf4ff;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      box-shadow: inset 0 0 170px rgba(0, 0, 0, 0.72);
+    }
+
+    #viewport {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas.dragging {
+      cursor: grabbing;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .brand {
+      position: absolute;
+      top: 30px;
+      left: 34px;
+    }
+
+    .eyebrow {
+      margin-bottom: 9px;
+      color: #7895bd;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .atomic-number {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 1px solid rgba(117, 190, 255, 0.34);
+      border-radius: 50%;
+      color: #8bdcff;
+      background: rgba(60, 145, 210, 0.08);
+      font-size: 15px;
+      font-weight: 650;
+      box-shadow: 0 0 24px rgba(57, 174, 255, 0.12);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(32px, 5vw, 56px);
+      font-weight: 480;
+      letter-spacing: 0.12em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .composition {
+      margin-top: 13px;
+      color: #8fa3c1;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+
+    .composition strong {
+      color: #dbe9fb;
+      font-weight: 550;
+    }
+
+    .legend {
+      position: absolute;
+      top: 30px;
+      right: 34px;
+      display: flex;
+      gap: 9px;
+      padding: 9px;
+      border: 1px solid rgba(139, 171, 211, 0.16);
+      border-radius: 12px;
+      background: rgba(7, 13, 27, 0.58);
+      backdrop-filter: blur(12px);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      color: #9eb0c9;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .legend-item b {
+      margin-left: 2px;
+      color: #edf5ff;
+      font-weight: 650;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 11px currentColor;
+    }
+
+    .proton {
+      color: #f05252;
+    }
+
+    .neutron {
+      color: #9aa5b3;
+    }
+
+    .electron {
+      color: #6ee7ff;
+    }
+
+    .shell-readout {
+      position: absolute;
+      bottom: 30px;
+      left: 34px;
+      display: flex;
+      gap: 9px;
+    }
+
+    .shell-card {
+      min-width: 104px;
+      padding: 11px 13px;
+      border: 1px solid rgba(125, 166, 215, 0.16);
+      border-radius: 10px;
+      background: rgba(7, 13, 27, 0.54);
+      backdrop-filter: blur(10px);
+    }
+
+    .shell-card span {
+      display: block;
+      margin-bottom: 4px;
+      color: #7890ae;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .shell-card strong {
+      color: #dceaff;
+      font-size: 15px;
+      font-weight: 550;
+    }
+
+    .hint {
+      position: absolute;
+      right: 34px;
+      bottom: 31px;
+      color: #7185a1;
+      font-size: 11px;
+      letter-spacing: 0.035em;
+      text-align: right;
+    }
+
+    kbd {
+      padding: 2px 5px;
+      border: 1px solid rgba(142, 169, 204, 0.22);
+      border-radius: 4px;
+      color: #b7c6da;
+      background: rgba(13, 22, 40, 0.65);
+      font: inherit;
+    }
+
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 17px;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(120, 160, 210, 0.18);
+      border-radius: 10px;
+      color: #9fb3ce;
+      background: rgba(7, 13, 27, 0.8);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      transition: opacity 0.35s ease, visibility 0.35s ease;
+    }
+
+    #loading.ready {
+      visibility: hidden;
+      opacity: 0;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(110, 231, 255, 0.18);
+      border-top-color: #6ee7ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 680px) {
+      .brand {
+        top: 19px;
+        left: 18px;
+      }
+
+      .atomic-number {
+        width: 33px;
+        height: 33px;
+        font-size: 13px;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .composition {
+        font-size: 10px;
+      }
+
+      .legend {
+        top: auto;
+        right: auto;
+        bottom: 18px;
+        left: 18px;
+        gap: 2px;
+        padding: 6px;
+      }
+
+      .legend-item {
+        gap: 5px;
+        padding: 6px;
+        font-size: 10px;
+      }
+
+      .shell-readout {
+        display: none;
+      }
+
+      .hint {
+        top: 122px;
+        right: 18px;
+        bottom: auto;
+        max-width: 125px;
+        font-size: 10px;
+      }
+    }
+
+    @media (max-width: 390px) {
+      .legend-item span {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="viewport"></div>
+
+  <div class="hud">
+    <header class="brand">
+      <div class="eyebrow">Bohr atomic model</div>
+
+      <div class="title-row">
+        <div class="atomic-number">8</div>
+        <h1>Oxygen</h1>
+      </div>
+
+      <div class="composition">
+        <strong>8 protons</strong> · 8 neutrons · 8 electrons
+      </div>
+    </header>
+
+    <aside class="legend" aria-label="Particle legend">
+      <div class="legend-item">
+        <i class="dot proton"></i>
+        <span>Proton</span>
+        <b>8</b>
+      </div>
+
+      <div class="legend-item">
+        <i class="dot neutron"></i>
+        <span>Neutron</span>
+        <b>8</b>
+      </div>
+
+      <div class="legend-item">
+        <i class="dot electron"></i>
+        <span>Electron</span>
+        <b>8</b>
+      </div>
+    </aside>
+
+    <div class="shell-readout">
+      <div class="shell-card">
+        <span>K shell</span>
+        <strong>2 e⁻</strong>
+      </div>
+      <div class="shell-card">
+        <span>L shell</span>
+        <strong>6 e⁻</strong>
+      </div>
+    </div>
+
+    <div class="hint">
+      Drag to orbit · Scroll or pinch to zoom<br />
+      <kbd>Space</kbd> pause · <kbd>R</kbd> reset
+    </div>
+  </div>
+
+  <div id="loading" role="status" aria-live="polite">
+    <span class="spinner"></span>
+    Building oxygen model…
+  </div>
+
+  <script type="module">
+    import * as THREE from
+      "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js";
+
+    const viewport = document.getElementById("viewport");
+    const loading = document.getElementById("loading");
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    let renderer;
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance"
+      });
+    } catch (error) {
+      loading.innerHTML =
+        "<strong>WebGL is unavailable.</strong> Please use a WebGL-enabled browser.";
+      throw error;
+    }
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    viewport.appendChild(renderer.domElement);
+
+    const canvas = renderer.domElement;
+    canvas.tabIndex = 0;
+    canvas.setAttribute(
+      "aria-label",
+      "Interactive three-dimensional Bohr model of an oxygen atom"
+    );
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      42,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+
+    // Direct camera controls implemented without external addons.
+    const orbit = {
+      theta: 0.76,
+      phi: 0.92,
+      distance: 8.4
+    };
+
+    let fitMultiplier = 1;
+    let autoRotate = !reducedMotion;
+    let animationPaused = false;
+
+    function updateCamera() {
+      const sinPhi = Math.sin(orbit.phi);
+      const distance = orbit.distance * fitMultiplier;
+
+      camera.position.set(
+        distance * sinPhi * Math.sin(orbit.theta),
+        distance * Math.cos(orbit.phi),
+        distance * sinPhi * Math.cos(orbit.theta)
+      );
+
+      camera.lookAt(0, 0, 0);
+    }
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      renderer.setSize(width, height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      // Pull the camera back on narrow portrait screens.
+      fitMultiplier = Math.max(1, 0.86 / camera.aspect);
+      updateCamera();
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Lighting.
+    scene.add(
+      new THREE.HemisphereLight(0xc5dcff, 0x180b1c, 1.5)
+    );
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.0);
+    keyLight.position.set(4.5, 6.5, 5.5);
+    scene.add(keyLight);
+
+    const blueRim = new THREE.PointLight(0x4f86ff, 28, 15, 2);
+    blueRim.position.set(-4, 1.5, 3);
+    scene.add(blueRim);
+
+    const warmRim = new THREE.PointLight(0xff6868, 18, 10, 2);
+    warmRim.position.set(3, -1, -4);
+    scene.add(warmRim);
+
+    // Faint background stars.
+    let randomSeed = 81273;
+    function random() {
+      randomSeed =
+        (randomSeed * 1664525 + 1013904223) >>> 0;
+      return randomSeed / 4294967296;
+    }
+
+    const starCount = 260;
+    const starPositions = new Float32Array(starCount * 3);
+
+    for (let i = 0; i < starCount; i++) {
+      const radius = 13 + random() * 20;
+      const theta = random() * Math.PI * 2;
+      const y = random() * 2 - 1;
+      const planar = Math.sqrt(1 - y * y);
+
+      starPositions[i * 3] = radius * planar * Math.cos(theta);
+      starPositions[i * 3 + 1] = radius * y;
+      starPositions[i * 3 + 2] = radius * planar * Math.sin(theta);
+    }
+
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(starPositions, 3)
+    );
+
+    const stars = new THREE.Points(
+      starGeometry,
+      new THREE.PointsMaterial({
+        color: 0x8aaed7,
+        size: 0.035,
+        transparent: true,
+        opacity: 0.38,
+        depthWrite: false,
+        sizeAttenuation: true
+      })
+    );
+
+    scene.add(stars);
+
+    // Shared nucleus geometry and materials.
+    const nucleonGeometry = new THREE.SphereGeometry(0.205, 28, 20);
+
+    const protonMaterial = new THREE.MeshStandardMaterial({
+      color: 0xef4444,
+      roughness: 0.28,
+      metalness: 0.08,
+      emissive: 0x3b0709,
+      emissiveIntensity: 0.22
+    });
+
+    const neutronMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9aa5b3,
+      roughness: 0.5,
+      metalness: 0.04
+    });
+
+    // Compact 16-nucleon cluster: 6 around the equator, 5 above and 5 below.
+    const nucleusPositions = [];
+
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      nucleusPositions.push(
+        new THREE.Vector3(
+          Math.cos(angle) * 0.52,
+          0,
+          Math.sin(angle) * 0.52
+        )
+      );
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 + Math.PI / 5;
+      nucleusPositions.push(
+        new THREE.Vector3(
+          Math.cos(angle) * 0.38,
+          0.42,
+          Math.sin(angle) * 0.38
+        )
+      );
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 - Math.PI / 5;
+      nucleusPositions.push(
+        new THREE.Vector3(
+          Math.cos(angle) * 0.38,
+          -0.42,
+          Math.sin(angle) * 0.38
+        )
+      );
+    }
+
+    const nucleus = new THREE.Group();
+
+    nucleusPositions.forEach((position, index) => {
+      // Alternating assignment produces exactly 8 protons and 8 neutrons.
+      const nucleon = new THREE.Mesh(
+        nucleonGeometry,
+        index % 2 === 0 ? protonMaterial : neutronMaterial
+      );
+
+      nucleon.position.copy(position);
+      nucleus.add(nucleon);
+    });
+
+    scene.add(nucleus);
+
+    // Electron material and reusable glow texture.
+    const electronGeometry = new THREE.SphereGeometry(0.115, 24, 16);
+    const electronMaterial = new THREE.MeshStandardMaterial({
+      color: 0xa5f3fc,
+      roughness: 0.18,
+      metalness: 0.04,
+      emissive: 0x0ea5e9,
+      emissiveIntensity: 1.8
+    });
+
+    const glowCanvas = document.createElement("canvas");
+    glowCanvas.width = 64;
+    glowCanvas.height = 64;
+
+    const glowContext = glowCanvas.getContext("2d");
+    const glowGradient = glowContext.createRadialGradient(
+      32,
+      32,
+      0,
+      32,
+      32,
+      32
+    );
+
+    glowGradient.addColorStop(0, "rgba(255,255,255,1)");
+    glowGradient.addColorStop(0.16, "rgba(135,231,255,0.8)");
+    glowGradient.addColorStop(0.48, "rgba(35,183,255,0.2)");
+    glowGradient.addColorStop(1, "rgba(35,183,255,0)");
+
+    glowContext.fillStyle = glowGradient;
+    glowContext.fillRect(0, 0, 64, 64);
+
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+    const glowMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: 0x5bd9ff,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false
+    });
+
+    function createElectron(parent) {
+      const electron = new THREE.Mesh(
+        electronGeometry,
+        electronMaterial
+      );
+
+      const glow = new THREE.Sprite(glowMaterial);
+      glow.scale.set(0.62, 0.62, 0.62);
+      electron.add(glow);
+
+      parent.add(electron);
+      return electron;
+    }
+
+    // Both rings share the same center. TorusGeometry lies in the XY plane.
+    const innerRadius = 1.58;
+    const outerRadius = 2.85;
+
+    const innerRingGroup = new THREE.Group();
+    const outerRingGroup = new THREE.Group();
+
+    // The outer ring is rotated 90 degrees, making the two ring planes
+    // exactly perpendicular while retaining a common center.
+    outerRingGroup.rotation.y = Math.PI / 2;
+
+    const innerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(innerRadius, 0.021, 10, 192),
+      new THREE.MeshBasicMaterial({
+        color: 0x6ee7f9,
+        transparent: true,
+        opacity: 0.68,
+        depthWrite: false
+      })
+    );
+
+    const outerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(outerRadius, 0.018, 10, 224),
+      new THREE.MeshBasicMaterial({
+        color: 0x7899ff,
+        transparent: true,
+        opacity: 0.58,
+        depthWrite: false
+      })
+    );
+
+    innerRingGroup.add(innerRing);
+    outerRingGroup.add(outerRing);
+    scene.add(innerRingGroup, outerRingGroup);
+
+    // Two inner-shell electrons.
+    const innerElectrons = [];
+
+    for (let i = 0; i < 2; i++) {
+      const electron = createElectron(innerRingGroup);
+      innerElectrons.push({
+        mesh: electron,
+        phase: i * Math.PI
+      });
+    }
+
+    // Six outer-shell electrons.
+    const outerElectrons = [];
+
+    for (let i = 0; i < 6; i++) {
+      const electron = createElectron(outerRingGroup);
+      outerElectrons.push({
+        mesh: electron,
+        phase: (i / 6) * Math.PI * 2
+      });
+    }
+
+    // Pointer, wheel, pinch, and keyboard camera controls.
+    const pointers = new Map();
+    let pinchDistance = 0;
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+
+      canvas.focus({ preventScroll: true });
+      canvas.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      autoRotate = false;
+      canvas.classList.add("dragging");
+
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
+      }
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      const previous = pointers.get(event.pointerId);
+      if (!previous) return;
+
+      pointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      if (pointers.size === 1) {
+        const deltaX = event.clientX - previous.x;
+        const deltaY = event.clientY - previous.y;
+
+        orbit.theta -= deltaX * 0.006;
+        orbit.phi = THREE.MathUtils.clamp(
+          orbit.phi - deltaY * 0.005,
+          0.16,
+          Math.PI - 0.16
+        );
+      } else if (pointers.size >= 2) {
+        const [a, b] = [...pointers.values()];
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+
+        if (pinchDistance > 0 && distance > 0) {
+          orbit.distance = THREE.MathUtils.clamp(
+            orbit.distance * (pinchDistance / distance),
+            5.8,
+            12.5
+          );
+        }
+
+        pinchDistance = distance;
+      }
+    });
+
+    function releasePointer(event) {
+      pointers.delete(event.pointerId);
+
+      if (pointers.size < 2) {
+        pinchDistance = 0;
+      }
+
+      if (pointers.size === 0) {
+        canvas.classList.remove("dragging");
+      }
+    }
+
+    canvas.addEventListener("pointerup", releasePointer);
+    canvas.addEventListener("pointercancel", releasePointer);
+    canvas.addEventListener("lostpointercapture", releasePointer);
+
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        autoRotate = false;
+
+        orbit.distance = THREE.MathUtils.clamp(
+          orbit.distance * Math.exp(event.deltaY * 0.001),
+          5.8,
+          12.5
+        );
+      },
+      { passive: false }
+    );
+
+    function resetView() {
+      orbit.theta = 0.76;
+      orbit.phi = 0.92;
+      orbit.distance = 8.4;
+      autoRotate = !reducedMotion;
+    }
+
+    canvas.addEventListener("dblclick", resetView);
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    canvas.addEventListener("keydown", (event) => {
+      let handled = true;
+
+      switch (event.key) {
+        case "ArrowLeft":
+          orbit.theta += 0.12;
+          break;
+
+        case "ArrowRight":
+          orbit.theta -= 0.12;
+          break;
+
+        case "ArrowUp":
+          orbit.phi = Math.max(0.16, orbit.phi - 0.08);
+          break;
+
+        case "ArrowDown":
+          orbit.phi = Math.min(Math.PI - 0.16, orbit.phi + 0.08);
+          break;
+
+        case "+":
+        case "=":
+          orbit.distance = Math.max(5.8, orbit.distance * 0.9);
+          break;
+
+        case "-":
+        case "_":
+          orbit.distance = Math.min(12.5, orbit.distance * 1.1);
+          break;
+
+        case " ":
+          animationPaused = !animationPaused;
+          break;
+
+        case "r":
+        case "R":
+          resetView();
+          break;
+
+        default:
+          handled = false;
+      }
+
+      if (handled) {
+        event.preventDefault();
+        autoRotate = false;
+      }
+    });
+
+    // Animation.
+    const clock = new THREE.Clock();
+    let electronTime = 0;
+    let firstFrame = true;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      if (!animationPaused && !reducedMotion) {
+        electronTime += delta;
+
+        if (autoRotate && pointers.size === 0) {
+          orbit.theta += delta * 0.04;
+        }
+      }
+
+      const innerAngle = electronTime * 0.55;
+      const outerAngle = -electronTime * 0.28;
+
+      for (const electron of innerElectrons) {
+        const angle = innerAngle + electron.phase;
+        const pulse =
+          1 + Math.sin(electronTime * 4 + electron.phase) * 0.055;
+
+        electron.mesh.position.set(
+          Math.cos(angle) * innerRadius,
+          Math.sin(angle) * innerRadius,
+          0
+        );
+        electron.mesh.scale.setScalar(pulse);
+      }
+
+      for (const electron of outerElectrons) {
+        const angle = outerAngle + electron.phase;
+        const pulse =
+          1 + Math.sin(electronTime * 4 + electron.phase) * 0.055;
+
+        electron.mesh.position.set(
+          Math.cos(angle) * outerRadius,
+          Math.sin(angle) * outerRadius,
+          0
+        );
+        electron.mesh.scale.setScalar(pulse);
+      }
+
+      nucleus.rotation.y = Math.sin(electronTime * 0.2) * 0.15;
+      nucleus.rotation.x = Math.sin(electronTime * 0.14 + 0.7) * 0.07;
+      stars.rotation.y = electronTime * 0.006;
+
+      updateCamera();
+      renderer.render(scene, camera);
+
+      if (firstFrame) {
+        firstFrame = false;
+        loading.classList.add("ready");
+      }
+    }
+
+    animate();
+  </script>
+</body>
+</html>

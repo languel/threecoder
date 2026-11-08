@@ -168,6 +168,51 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if parsed.path == "/api/training_exemplars":
+            meta_path = os.path.join(BENCHMARKS_DIR, "training_set", "exemplars.json")
+            if os.path.exists(meta_path):
+                with open(meta_path, "r", encoding="utf-8") as f:
+                    self.send_json(200, {"exemplars": json.load(f)})
+            else:
+                self.send_json(200, {"exemplars": []})
+            return
+
+        if parsed.path == "/api/ollama/models":
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://localhost:11434/api/tags")
+                with urllib.request.urlopen(req, timeout=2.5) as resp:
+                    data = json.loads(resp.read().decode())
+                    models = []
+                    curated_ids = {
+                        "LisyNeko/qwen3.8-9b-coder:latest": "Qwen 3.8 9B Coder (Ollama · 6.7 GB · High Capability)",
+                        "ccore-3d-coder-mlx:latest": "CCORE 3D Coder 4B (Ollama MLX · 9.1 GB)",
+                        "lfm3-3d-coder-bf16:latest": "LFM3 1.7B 3D Coder BF16 (Ollama · 3.5 GB)",
+                        "lfm3-3d-coder:latest": "LFM3 1.7B 3D Coder Q8_0 (Ollama · 1.8 GB)",
+                        "base-lfm3-omni-2b:latest": "LFM3-Omni 2B (Ollama · 2.4 GB)",
+                        "qwen3.5:4b": "Qwen 3.5 4B Base (Ollama · 4.0 GB)",
+                    }
+                    for m in data.get("models", []):
+                        m_name = m.get("name", "")
+                        if m_name in curated_ids:
+                            models.append({
+                                "id": m_name,
+                                "label": curated_ids[m_name],
+                                "size": round(m.get("size", 0) / (1024**3), 2),
+                                "is_curated": True
+                            })
+                        elif "coder" in m_name.lower() or "3d" in m_name.lower() or "lfm" in m_name.lower() or "qwen" in m_name.lower():
+                            models.append({
+                                "id": m_name,
+                                "label": f"{m_name} ({round(m.get('size', 0) / (1024**3), 1)} GB)",
+                                "size": round(m.get("size", 0) / (1024**3), 2),
+                                "is_curated": False
+                            })
+                    self.send_json(200, {"ok": True, "models": models})
+            except Exception as e:
+                self.send_json(200, {"ok": False, "models": [], "error": str(e)})
+            return
+
         if parsed.path == "/api/benchmarks":
             items = []
             if os.path.isdir(BENCHMARKS_DIR):
@@ -235,6 +280,58 @@ class PlaygroundHandler(BaseHTTPRequestHandler):
             return
 
         parsed = urlparse(self.path)
+        if parsed.path == "/api/ollama/generate":
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 5 * 1024 * 1024:
+                self.send_json(400, {"error": "Invalid payload size"})
+                return
+            raw = self.rfile.read(length)
+            try:
+                import urllib.request
+                payload = json.loads(raw.decode("utf-8"))
+                stream = payload.get("stream", False)
+                
+                ollama_req_data = {
+                    "model": payload.get("model", "LisyNeko/qwen3.8-9b-coder:latest"),
+                    "prompt": payload.get("prompt", ""),
+                    "system": payload.get("system", "Use only the Three.js core ES module from https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js. Implement any camera controls directly inside the HTML."),
+                    "stream": stream,
+                    "options": {
+                        "temperature": float(payload.get("temperature", 0.6)),
+                        "top_p": float(payload.get("top_p", 0.95)),
+                        "num_predict": int(payload.get("num_predict", -1))
+                    }
+                }
+                
+                req = urllib.request.Request(
+                    "http://localhost:11434/api/generate",
+                    data=json.dumps(ollama_req_data).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if not stream:
+                    with urllib.request.urlopen(req, timeout=300) as resp:
+                        res_data = json.loads(resp.read().decode("utf-8"))
+                        self.send_json(200, res_data)
+                        return
+                else:
+                    self.send_response(200)
+                    self.add_security_headers()
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "keep-alive")
+                    self.end_headers()
+                    
+                    with urllib.request.urlopen(req, timeout=300) as resp:
+                        for chunk in resp:
+                            if chunk:
+                                self.wfile.write(b"data: " + chunk + b"\n\n")
+                                self.wfile.flush()
+                    return
+            except Exception as e:
+                self.send_json(500, {"error": str(e)})
+                return
+
         if parsed.path == "/api/save_glb":
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 50 * 1024 * 1024:
